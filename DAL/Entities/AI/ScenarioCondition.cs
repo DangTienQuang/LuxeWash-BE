@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AutoWashPro.DAL.Entities
+namespace DAL.Entities.AI
 {
     public class ScenarioCondition
     {

@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AutoWashPro.DAL.Entities
+namespace DAL.Entities.AI
 {
     public class KnowledgeCategory
     {
