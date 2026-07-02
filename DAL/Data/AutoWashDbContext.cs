@@ -45,6 +45,19 @@ namespace AutoWashPro.DAL.Data
         public DbSet<FleetImportBatch> FleetImportBatches { get; set; }
         public DbSet<FleetImportError> FleetImportErrors { get; set; }
         public DbSet<FleetWashLog> FleetWashLogs { get; set; }
+        public DbSet<CustomerFeatureProfile> CustomerFeatureProfiles { get; set; }
+        public DbSet<CustomerBehaviorHistory> CustomerBehaviorHistories { get; set; }
+        public DbSet<FeatureDefinition> FeatureDefinitions { get; set; }
+        public DbSet<KnowledgeCategory> KnowledgeCategories { get; set; }
+        public DbSet<KnowledgeScenario> KnowledgeScenarios { get; set; }
+        public DbSet<ScenarioCondition> ScenarioConditions { get; set; }
+        public DbSet<ScenarioExclusion> ScenarioExclusions { get; set; }
+        public DbSet<ScenarioAction> ScenarioActions { get; set; }
+        public DbSet<ScenarioMessageTemplate> ScenarioMessageTemplates { get; set; }
+        public DbSet<ScenarioExplanation> ScenarioExplanations { get; set; }
+        public DbSet<AIDecisionHistory> AIDecisionHistories { get; set; }
+        public DbSet<AILearning> AILearnings { get; set; }
+        public DbSet<AIAuditLog> AIAuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -284,6 +297,62 @@ namespace AutoWashPro.DAL.Data
                 .WithMany()
                 .HasForeignKey(b => b.FleetVehicleId)
                 .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<CustomerFeatureProfile>()
+                .HasOne(x => x.Customer)
+                .WithMany()
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<CustomerFeatureProfile>()
+                .HasOne(x => x.FavoriteService)
+                .WithMany()
+                .HasForeignKey(x => x.FavoriteServiceId)
+                .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<CustomerFeatureProfile>()
+                .HasOne(x => x.FavoriteBranch)
+                .WithMany()
+                .HasForeignKey(x => x.FavoriteBranchId)
+                .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<CustomerFeatureProfile>()
+                .HasOne(x => x.MembershipTier)
+                .WithMany()
+                .HasForeignKey(x => x.MembershipTierId)
+                .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<CustomerBehaviorHistory>()
+                .HasOne(x => x.Customer)
+                .WithMany()
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<CustomerFeatureProfile>()
+                .HasIndex(x => x.CustomerId)
+                .IsUnique();
+            modelBuilder.Entity<CustomerBehaviorHistory>()
+                .HasIndex(x => new
+                {
+                    x.CustomerId,
+                    x.BehaviorType,
+                    x.DetectedOn
+                });
+            modelBuilder.Entity<AIDecisionHistory>()
+                .HasIndex(x => new
+                {
+                    x.CustomerId,
+                    x.CreatedAt
+                });
+            modelBuilder.Entity<AIDecisionHistory>()
+                .HasIndex(x => x.ScenarioId);
+
+            modelBuilder.Entity<AILearning>()
+                .HasIndex(x => new
+                {
+                    x.ScenarioId,
+                    x.VoucherId
+                });
+            modelBuilder.Entity<AIAuditLog>()
+                .HasIndex(x => new
+                {
+                    x.CustomerId,
+                    x.CreatedAt
+                });
         }
     }
 }
