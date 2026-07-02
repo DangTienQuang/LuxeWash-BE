@@ -1,6 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using AutoWashPro.DAL.Entities;
+using System.ComponentModel.DataAnnotations;
 
-namespace AutoWashPro.DAL.Entities
+namespace DAL.Entities.AI
 {
     public class AIAuditLog
     {
