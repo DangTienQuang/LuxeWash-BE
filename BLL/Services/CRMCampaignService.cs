@@ -269,6 +269,108 @@ namespace AutoWashPro.BLL.Services
             return $"Smart Weather Campaign executed. Issued {totalVouchersIssued} branch-specific vouchers.";
         }
 
+        public async Task<string> SimulateSmartWeatherCampaignAsync(WeatherCampaignSimulationRequestDTO request)
+        {
+            if (request.OccupancyRate > 0.50)
+            {
+                return "Simulation: Branch is too busy. No vouchers issued.";
+            }
+
+            if (!request.IsProlongedRain)
+            {
+                return "Simulation: No prolonged rain. No vouchers issued.";
+            }
+
+            var branch = await _context.Branches.FirstOrDefaultAsync(b => b.BranchId == request.BranchId && b.IsActive);
+            if (branch == null)
+            {
+                return $"Simulation: Branch {request.BranchId} not found or inactive. No vouchers issued.";
+            }
+
+            var today = DateTime.UtcNow.Date;
+            int totalVouchersIssued = 0;
+
+            var scenario = await GetOrCreateWeatherCampaignScenarioAsync();
+
+            string voucherCode = $"RAIN_BR{request.BranchId}";
+            var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == voucherCode);
+
+            if (voucher == null)
+            {
+                voucher = new Voucher
+                {
+                    Code = voucherCode,
+                    DiscountAmount = 30,
+                    VoucherType = VoucherType.Discount,
+                    CampaignType = VoucherCampaignType.Weather,
+                    ExpiryDays = 1,
+                    IsActive = true,
+                    MaxUsagePerUser = 1,
+                    MaxUsages = 999999,
+                    StartDate = DateTime.UtcNow,
+                    ExpiryDate = DateTime.UtcNow.AddYears(1)
+                };
+                _context.Vouchers.Add(voucher);
+                await _context.SaveChangesAsync();
+            }
+
+            var targetCustomerIds = await _context.CustomerFeatureProfiles
+                .Where(cfp => cfp.FavoriteBranchId == request.BranchId &&
+                              cfp.Customer.Status == "Active")
+                .Select(cfp => cfp.CustomerId)
+                .Distinct()
+                .ToListAsync();
+
+            var issuedTodayUserIds = await _context.UserVouchers
+                .Where(uv => uv.VoucherId == voucher.VoucherId &&
+                             uv.ReceivedDate.Date == today &&
+                             uv.TriggerKey == "SmartWeatherCampaign")
+                .Select(uv => uv.UserId)
+                .ToListAsync();
+
+            var issuedTodaySet = new HashSet<int>(issuedTodayUserIds);
+            bool hasNewAssignments = false;
+
+            foreach (var customerId in targetCustomerIds)
+            {
+                if (issuedTodaySet.Add(customerId))
+                {
+                    var userVoucher = new UserVoucher
+                    {
+                        UserId = customerId,
+                        VoucherId = voucher.VoucherId,
+                        ReceivedDate = DateTime.UtcNow,
+                        ExpiryDate = DateTime.UtcNow.AddDays(1),
+                        IsUsed = false,
+                        TriggerKey = "SmartWeatherCampaign"
+                    };
+                    _context.UserVouchers.Add(userVoucher);
+
+                    var decisionHistory = new AIDecisionHistory
+                    {
+                        CustomerId = customerId,
+                        ScenarioId = scenario.ScenarioId,
+                        VoucherId = voucher.VoucherId,
+                        ActionType = "Issue Weather Voucher",
+                        DecisionReason = "Prolonged rain + Occupancy below 50%",
+                        Confidence = 0.95,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.AIDecisionHistories.Add(decisionHistory);
+
+                    totalVouchersIssued++;
+                    hasNewAssignments = true;
+                }
+            }
+
+            if (hasNewAssignments)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return $"Simulation: Smart Weather Campaign executed for Branch {request.BranchId}. Issued {totalVouchersIssued} vouchers.";
+        }
+
         private async Task<KnowledgeScenario> GetOrCreateWeatherCampaignScenarioAsync()
         {
             var scenario = await _context.KnowledgeScenarios.FirstOrDefaultAsync(s => s.ScenarioCode == "WEATHER_CAMPAIGN");

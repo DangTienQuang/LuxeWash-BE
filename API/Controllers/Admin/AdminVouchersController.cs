@@ -106,5 +106,12 @@ namespace API.Controllers.Admin
             var result = await _crmCampaignService.TriggerWeatherCampaignAsync();
             return Ok(new { statusCode = 200, message = result });
         }
+
+        [HttpPost("simulate-weather")]
+        public async Task<IActionResult> SimulateWeatherCampaign([FromBody] WeatherCampaignSimulationRequestDTO request)
+        {
+            var result = await _crmCampaignService.SimulateSmartWeatherCampaignAsync(request);
+            return Ok(new { statusCode = 200, message = result });
+        }
     }
 }
