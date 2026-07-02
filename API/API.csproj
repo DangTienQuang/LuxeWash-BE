@@ -37,7 +37,7 @@
     <None Update="Models\dict.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Models\license_plate.onnx">
+    <None Update="Models\license_plate_Anh.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Models\license_plate_old.onnx">
