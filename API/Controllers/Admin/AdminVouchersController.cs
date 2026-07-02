@@ -12,11 +12,16 @@ namespace API.Controllers.Admin
     {
         private readonly IVoucherService _voucherService;
         private readonly IVoucherCampaignService _voucherCampaignService;
+        private readonly ICRMCampaignService _crmCampaignService;
 
-        public AdminVouchersController(IVoucherService voucherService, IVoucherCampaignService voucherCampaignService)
+        public AdminVouchersController(
+            IVoucherService voucherService,
+            IVoucherCampaignService voucherCampaignService,
+            ICRMCampaignService crmCampaignService)
         {
             _voucherService = voucherService;
             _voucherCampaignService = voucherCampaignService;
+            _crmCampaignService = crmCampaignService;
         }
 
         [HttpGet]
@@ -93,6 +98,13 @@ namespace API.Controllers.Admin
         {
             var result = await _voucherCampaignService.ProcessDailyCampaignsAsync();
             return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
+        [HttpPost("trigger-weather")]
+        public async Task<IActionResult> TriggerWeatherCampaign()
+        {
+            var result = await _crmCampaignService.TriggerWeatherCampaignAsync();
+            return Ok(new { statusCode = 200, message = result });
         }
     }
 }

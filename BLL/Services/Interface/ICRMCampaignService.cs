@@ -7,5 +7,7 @@ namespace AutoWashPro.BLL.Services
     public interface ICRMCampaignService
     {
         Task<List<VoucherCampaignProcessResultDTO>> ProcessDailyCampaignsAsync();
+        Task<string> TriggerWeatherCampaignAsync();
+        Task<string> TriggerSmartWeatherCampaignAsync();
     }
 }
