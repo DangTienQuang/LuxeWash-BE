@@ -1,5 +1,6 @@
 ﻿using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Exceptions;
+using AutoWashPro.BLL.Services;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using BLL.DTOs;
@@ -20,11 +21,16 @@ namespace BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly ILaneSchedulerService _laneSchedulerService;
+        private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
 
-        public BusinessBookingService(AutoWashDbContext context, ILaneSchedulerService laneSchedulerService)
+        public BusinessBookingService(
+            AutoWashDbContext context,
+            ILaneSchedulerService laneSchedulerService,
+            IBookingMaterialUsageService bookingMaterialUsageService)
         {
             _context = context;
             _laneSchedulerService = laneSchedulerService;
+            _bookingMaterialUsageService = bookingMaterialUsageService;
         }
 
         public async Task<List<DTOs.Business.TimeSlotResponseDTO>> GetAvailableSlotsForBusinessAsync(int businessUserId, CheckBusinessSlotsRequestDTO request)
@@ -290,6 +296,7 @@ namespace BLL.Services
 
                     var booking = new Booking
                     {
+                        UserId = business.UserId,
                         BusinessProfileId = business.BusinessProfileId,
                         FleetVehicleId = vehicle.FleetVehicleId,
                         BookingType = "Business",
@@ -300,6 +307,7 @@ namespace BLL.Services
                         OriginalPrice = vehicleTotal,
                         FinalAmount = vehicleTotal,
                         CapacityWeight = vehicle.VehicleType.BaseWeight,
+                        ActualVehicleTypeId = vehicle.VehicleTypeId,
                         FallbackQrCode = Guid.NewGuid().ToString("N")[..8].ToUpper(),
                         ProcessingLaneId = assignment.LaneId
                     };
@@ -876,12 +884,18 @@ namespace BLL.Services
             washLog.Status = "Completed";
             washLog.CompletedTime = DateTime.UtcNow;
 
-            if (washLog.Booking.Status != null)
+            if (washLog.Booking != null)
             {
                 washLog.Booking.Status = "Completed";
+                washLog.Booking.UpdatedAt = DateTime.UtcNow;
             }
 
             await _context.SaveChangesAsync();
+
+            if (washLog.BookingId.HasValue)
+            {
+                await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(washLog.BookingId.Value);
+            }
 
             return new FleetCheckoutResponseDTO
             {

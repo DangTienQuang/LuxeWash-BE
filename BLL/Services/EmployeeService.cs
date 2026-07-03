@@ -64,10 +64,32 @@ namespace AutoWashPro.BLL.Services
                 .Include(e => e.User)
                 .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
 
-            if (employee == null) throw new NotFoundException("Employee not found.");
-
             var branch = await _context.Branches.FindAsync(transferDto.BranchId);
             if (branch == null) throw new NotFoundException("Branch not found.");
+
+            if (employee == null)
+            {
+                var user = await _context.Users
+                    .Include(u => u.ManagerProfile)
+                    .Include(u => u.StaffProfile)
+                    .FirstOrDefaultAsync(u => u.UserId == employeeId
+                        && (u.Role == "Manager" || u.Role == "Staff"));
+
+                if (user == null) throw new NotFoundException("Employee not found.");
+
+                employee = new EmployeeProfile
+                {
+                    EmployeeId = user.UserId,
+                    FullName = user.Role == "Manager"
+                        ? user.ManagerProfile?.FullName ?? user.PhoneNumber
+                        : user.StaffProfile?.FullName ?? user.PhoneNumber,
+                    BranchId = transferDto.BranchId
+                };
+
+                _context.EmployeeProfiles.Add(employee);
+                await _context.SaveChangesAsync();
+                return true;
+            }
 
             employee.BranchId = transferDto.BranchId;
             await _context.SaveChangesAsync();

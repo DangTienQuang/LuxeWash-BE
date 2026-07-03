@@ -16,11 +16,13 @@ namespace AutoWashPro.BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly IWalletService _walletService;
+        private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
 
-        public OperationStaffService(AutoWashDbContext context, IWalletService walletService)
+        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService)
         {
             _context = context;
             _walletService = walletService;
+            _bookingMaterialUsageService = bookingMaterialUsageService;
         }
 
         public async Task<StaffLaneTaskDTO?> GetTodayLaneAssignmentAsync(int staffUserId, DateTime? date = null)
@@ -136,9 +138,15 @@ namespace AutoWashPro.BLL.Services
                     throw new BadRequestException("You are not assigned to this vehicle.");
             }
 
+            var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
             booking.Status = newStatus;
 
-            if (newStatus == "Completed" && booking.UserId > 0)
+            if (newStatus == "Completed")
+            {
+                await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(booking.BookingId, staffUserId);
+            }
+
+            if (isCompletingNow && booking.UserId > 0)
             {
                  var userProfile = await _context.CustomerProfiles
                         .Include(cp => cp.Tier)
@@ -162,6 +170,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             await _context.SaveChangesAsync();
+
             return true;
         }
 

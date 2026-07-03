@@ -20,6 +20,7 @@ namespace AutoWashPro.BLL.Services
         private readonly IVoucherService _voucherService;
         private readonly IVoucherCampaignService _voucherCampaignService;
         private readonly IPayOsService _payOsService;
+        private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
 
         public BookingService(
             AutoWashDbContext context,
@@ -28,7 +29,8 @@ namespace AutoWashPro.BLL.Services
             IEmailService emailService,
             IVoucherService voucherService,
             IVoucherCampaignService voucherCampaignService,
-            IPayOsService payOsService)
+            IPayOsService payOsService,
+            IBookingMaterialUsageService bookingMaterialUsageService)
         {
             _context = context;
             _walletService = walletService;
@@ -37,6 +39,7 @@ namespace AutoWashPro.BLL.Services
             _voucherService = voucherService;
             _voucherCampaignService = voucherCampaignService;
             _payOsService = payOsService;
+            _bookingMaterialUsageService = bookingMaterialUsageService;
         }
 
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
@@ -429,7 +432,17 @@ namespace AutoWashPro.BLL.Services
                 && !await HasCompletedBookingPaymentAsync(booking.BookingId))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Lịch hẹn chưa thanh toán, không thể check-in hoặc hoàn thành.");
 
-            if (newStatus == "Completed" && booking.Status != "Completed")
+            var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
+
+            booking.Status = newStatus;
+            booking.UpdatedAt = DateTime.UtcNow;
+
+            if (newStatus == "Completed")
+            {
+                await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(booking.BookingId);
+            }
+
+            if (isCompletingNow)
             {
                 if (booking.UserId > 0)
                 {
@@ -453,11 +466,9 @@ namespace AutoWashPro.BLL.Services
                 }
             }
 
-            booking.Status = newStatus;
-            booking.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            if (newStatus == "Completed" && booking.UserId.HasValue)
+            if (isCompletingNow && booking.UserId.HasValue)
             {
                 await _voucherCampaignService.ProcessMilestoneCampaignsAsync(booking.UserId.Value);
             }

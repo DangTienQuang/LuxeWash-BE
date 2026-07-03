@@ -171,6 +171,11 @@ builder.Services.AddScoped<IBusinessBookingService, BusinessBookingService>();
 builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 builder.Services.AddScoped<ILaneSchedulerService, LaneSchedulerService>();
 builder.Services.AddScoped<IFleetService, FleetService>();
+builder.Services.AddScoped<IMaterialService, MaterialService>();
+builder.Services.AddScoped<IServiceMaterialUsageService, ServiceMaterialUsageService>();
+builder.Services.AddScoped<IInventoryTransferService, InventoryTransferService>();
+builder.Services.AddScoped<IBookingMaterialUsageService, BookingMaterialUsageService>();
+builder.Services.AddScoped<IInventoryReportService, InventoryReportService>();
 // ==============================================================================
 // 7. BACKGROUND WORKERS
 // ==============================================================================

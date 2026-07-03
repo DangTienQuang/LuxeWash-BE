@@ -3,6 +3,7 @@ using System;
 using AutoWashPro.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DAL.Migrations
 {
     [DbContext(typeof(AutoWashDbContext))]
-    partial class AutoWashDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702015552_AddMaterialInventoryManagement")]
+    partial class AddMaterialInventoryManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -201,13 +204,7 @@ namespace DAL.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<decimal?>("EstimatedUnitCost")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<bool>("IsCostPending")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int?>("MaterialBatchId")
+                    b.Property<int>("MaterialBatchId")
                         .HasColumnType("int");
 
                     b.Property<int>("MaterialId")
@@ -249,9 +246,6 @@ namespace DAL.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
 
-                    b.Property<bool>("AllowNegativeStock")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
 
@@ -259,9 +253,6 @@ namespace DAL.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
-
-                    b.Property<decimal?>("NegativeStockLimit")
-                        .HasColumnType("decimal(65,30)");
 
                     b.HasKey("BranchId");
 
@@ -421,64 +412,6 @@ namespace DAL.Migrations
                     b.HasIndex("BranchId");
 
                     b.ToTable("EmployeeProfiles");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.ExtraMaterialUsageRequest", b =>
-                {
-                    b.Property<int>("RequestId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<int>("BookingId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BranchId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("ManagerNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<int>("MaterialId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ReviewedByManagerId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StaffUserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.HasKey("RequestId");
-
-                    b.HasIndex("BookingId");
-
-                    b.HasIndex("MaterialId");
-
-                    b.HasIndex("ReviewedByManagerId");
-
-                    b.HasIndex("StaffUserId");
-
-                    b.HasIndex("BranchId", "Status", "CreatedAt");
-
-                    b.ToTable("ExtraMaterialUsageRequests");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.InventoryTransaction", b =>
@@ -682,9 +615,6 @@ namespace DAL.Migrations
                     b.Property<decimal>("RemainingQuantity")
                         .HasColumnType("decimal(65,30)");
 
-                    b.Property<int?>("SourceMaterialBatchId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -709,8 +639,6 @@ namespace DAL.Migrations
                         .IsUnique();
 
                     b.HasIndex("MaterialId");
-
-                    b.HasIndex("SourceMaterialBatchId");
 
                     b.HasIndex("WarehouseId");
 
@@ -2106,7 +2034,8 @@ namespace DAL.Migrations
                     b.HasOne("AutoWashPro.DAL.Entities.MaterialBatch", "MaterialBatch")
                         .WithMany()
                         .HasForeignKey("MaterialBatchId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
                         .WithMany()
@@ -2196,48 +2125,6 @@ namespace DAL.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.ExtraMaterialUsageRequest", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
-                        .WithMany()
-                        .HasForeignKey("MaterialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "ReviewedByManager")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByManagerId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "StaffUser")
-                        .WithMany()
-                        .HasForeignKey("StaffUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Booking");
-
-                    b.Navigation("Branch");
-
-                    b.Navigation("Material");
-
-                    b.Navigation("ReviewedByManager");
-
-                    b.Navigation("StaffUser");
-                });
-
             modelBuilder.Entity("AutoWashPro.DAL.Entities.InventoryTransaction", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
@@ -2312,11 +2199,6 @@ namespace DAL.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("AutoWashPro.DAL.Entities.MaterialBatch", "SourceMaterialBatch")
-                        .WithMany()
-                        .HasForeignKey("SourceMaterialBatchId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("AutoWashPro.DAL.Entities.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
@@ -2324,8 +2206,6 @@ namespace DAL.Migrations
                         .IsRequired();
 
                     b.Navigation("Material");
-
-                    b.Navigation("SourceMaterialBatch");
 
                     b.Navigation("Warehouse");
                 });
