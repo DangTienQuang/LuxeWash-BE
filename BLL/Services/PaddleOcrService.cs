@@ -43,21 +43,27 @@ namespace BLL.Services
                         "ExtractTextAsync — plateType: {Type} position: {Pos}",
                         plateType, position);
 
-                    if (plateType != "LONG")
+                    using var rawBmp = SKBitmap.Decode(imageBytes);
+                    if (rawBmp == null) return string.Empty;
+
+                    var oneLine = RecognizeBestTextLine(rawBmp, position + "_oneline");
+                    int cleanLen = oneLine.text.Count(char.IsLetterOrDigit);
+
+                    // If 1-line recognition yields a confident string of length >= 6, use it directly
+                    if (cleanLen >= 6 && oneLine.conf >= 0.65f)
                     {
-                        using var testBmp = SKBitmap.Decode(imageBytes);
-                        if (testBmp != null && !IsTwoLinePlate(testBmp))
-                        {
-                            _logger.LogInformation(
-                                "[{Pos}] Auto-detected 1-line layout (override SHORT → LONG)", position);
-                            return ReadLongPlate(imageBytes, position);
-                        }
+                        _logger.LogInformation("[{Pos}] High-confidence 1-line layout: '{Text}' (Conf: {Conf:F3})", position, oneLine.text, oneLine.conf);
+                        return PostProcessPlateText(oneLine.text);
                     }
 
-                    if (plateType == "LONG")
-                        return ReadLongPlate(imageBytes, position);
-                    else
-                        return ReadTwoLinePlate(imageBytes, position);
+                    if (plateType == "LONG" || !IsTwoLinePlate(rawBmp))
+                    {
+                        _logger.LogInformation("[{Pos}] Standard 1-line layout: '{Text}' (Conf: {Conf:F3})", position, oneLine.text, oneLine.conf);
+                        return PostProcessPlateText(oneLine.text);
+                    }
+
+                    _logger.LogInformation("[{Pos}] Evaluating 2-line layout...", position);
+                    return PostProcessPlateText(ReadTwoLinePlate(rawBmp, position, oneLine));
                 }
                 catch (Exception ex)
                 {
@@ -119,25 +125,9 @@ namespace BLL.Services
             return peakCount >= 2;
         }
 
-        // ── One-line plate (biển dài) ────────────────────────────────────────
-        private string ReadLongPlate(byte[] imageBytes, string position)
-        {
-            using var rawBmp = SKBitmap.Decode(imageBytes);
-            if (rawBmp == null) return string.Empty;
-
-            var lineText = RecognizeTextLine(rawBmp, position + "_long");
-            _logger.LogInformation("[{Pos}] LONG plate result: '{T}'", position, lineText);
-
-            return lineText.ToUpper();
-        }
-
         // ── Two-line plate (biển ngắn) ───────────────────────────────────────
-        private string ReadTwoLinePlate(byte[] imageBytes, string position)
+        private string ReadTwoLinePlate(SKBitmap rawBmp, string position, (string text, float conf) oneLineResult)
         {
-            using var rawBmp = SKBitmap.Decode(imageBytes);
-            if (rawBmp == null) return string.Empty;
-
-            // Scale up for high-precision edge profile splitting without arbitrary padding
             int scale = Math.Max(3, 300 / Math.Max(rawBmp.Width, 1));
             int W = rawBmp.Width * scale;
             int H = rawBmp.Height * scale;
@@ -145,7 +135,6 @@ namespace BLL.Services
             var samplingOptions = new SKSamplingOptions(SKCubicResampler.Mitchell);
             using var upscaled = rawBmp.Resize(new SKImageInfo(W, H), samplingOptions);
 
-            // Search for valley (minimum horizontal transition density) between 32% and 68% height
             int searchStart = (int)(H * 0.32f);
             int searchEnd = (int)(H * 0.68f);
 
@@ -196,48 +185,78 @@ namespace BLL.Services
             upscaled.ExtractSubset(topBmp, new SKRectI(0, 0, W, splitY));
             upscaled.ExtractSubset(botBmp, new SKRectI(0, splitY, W, H));
 
-            var line1 = RecognizeTextLine(topBmp, position + "_line1");
-            var line2 = RecognizeTextLine(botBmp, position + "_line2");
+            var line1 = RecognizeBestTextLine(topBmp, position + "_line1");
+            var line2 = RecognizeBestTextLine(botBmp, position + "_line2");
 
-            _logger.LogInformation("[{Pos}] Line 1: '{A}'", position, line1);
-            _logger.LogInformation("[{Pos}] Line 2: '{B}'", position, line2);
+            _logger.LogInformation("[{Pos}] Line 1: '{A}' (Conf: {C1:F3})", position, line1.text, line1.conf);
+            _logger.LogInformation("[{Pos}] Line 2: '{B}' (Conf: {C2:F3})", position, line2.text, line2.conf);
 
-            return (line1 + line2).ToUpper();
+            float oneScore = oneLineResult.conf + oneLineResult.text.Count(char.IsLetterOrDigit) * 0.15f;
+            float twoScore = ((line1.conf + line2.conf) / 2f) + (line1.text.Count(char.IsLetterOrDigit) + line2.text.Count(char.IsLetterOrDigit)) * 0.15f;
+
+            if (oneScore >= twoScore || line1.text.Count(char.IsLetterOrDigit) < 2 || line2.text.Count(char.IsLetterOrDigit) < 2)
+            {
+                _logger.LogInformation("[{Pos}] 1-line score ({S1:F2}) >= 2-line score ({S2:F2}), preferring 1-line", position, oneScore, twoScore);
+                return oneLineResult.text;
+            }
+
+            return (line1.text + line2.text).ToUpper();
         }
 
-        // ── Text line preprocessing & recognition ────────────────────────────
-        private string RecognizeTextLine(SKBitmap sourceBmp, string debugName)
+        // ── Multi-Candidate Ensemble Recognition ─────────────────────────────
+        private (string text, float conf) RecognizeBestTextLine(SKBitmap sourceBmp, string debugName)
         {
-            using var cropped = AutoCropTextRegion(sourceBmp);
-            if (cropped.Width < 5 || cropped.Height < 5) return string.Empty;
+            var candidates = new List<(string text, float conf, float score, SKBitmap bmp)>();
 
-            byte[] ToBytes(SKBitmap bmp)
+            float[] ths  = { 0.00f, 0.25f, 0.35f, 0.25f, 0.25f, 0.35f };
+            float[] tops = { 0.00f, 0.00f, 0.00f, 0.12f, 0.20f, 0.20f };
+            float[] bots = { 1.00f, 1.00f, 1.00f, 0.95f, 0.90f, 0.90f };
+
+            for (int i = 0; i < ths.Length; i++)
             {
-                using var ms = new MemoryStream();
-                bmp.Encode(ms, SKEncodedImageFormat.Png, 100);
-                return ms.ToArray();
+                var c = ths[i] == 0.0f ? sourceBmp.Copy() : AutoCropY(sourceBmp, ths[i], tops[i], bots[i]);
+                if (c.Width >= 5 && c.Height >= 5)
+                {
+                    var (text, conf) = RunOnnxRecognitionWithConf(c);
+                    int cleanLen = text.Count(char.IsLetterOrDigit);
+                    float cropPenalty = (tops[i] >= 0.10f) ? 0.12f : 0.0f;
+                    float score = conf - cropPenalty + cleanLen * 0.15f;
+                    candidates.Add((text, conf, score, c));
+                }
+                else
+                {
+                    c.Dispose();
+                }
             }
+
+            if (!candidates.Any()) return (string.Empty, 0f);
+
+            var best = candidates.OrderByDescending(c => c.score).First();
 
             try
             {
+                using var ms = new MemoryStream();
+                best.bmp.Encode(ms, SKEncodedImageFormat.Png, 100);
                 File.WriteAllBytes(
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"debug_{debugName}.png"),
-                    ToBytes(cropped));
+                    ms.ToArray());
             }
             catch { /* Ignore debug save errors */ }
 
-            return RunOnnxRecognition(cropped);
+            foreach (var cand in candidates) cand.bmp.Dispose();
+
+            return (best.text, best.conf);
         }
 
-        private SKBitmap AutoCropTextRegion(SKBitmap bmp)
+        private SKBitmap AutoCropY(SKBitmap bmp, float thMult, float topSkipRatio, float botLimitRatio)
         {
             int W = bmp.Width;
             int H = bmp.Height;
-
-            // Compute horizontal transition profile
+            int startY = (int)(H * topSkipRatio);
+            int endY = (int)(H * botLimitRatio);
             float[] rowEdges = new float[H];
             float maxRowEdge = 0f;
-            for (int y = 0; y < H; y++)
+            for (int y = startY; y < endY; y++)
             {
                 float edges = 0f;
                 for (int x = 1; x < W; x++)
@@ -252,16 +271,16 @@ namespace BLL.Services
 
             if (maxRowEdge < 0.01f) return bmp.Copy();
 
-            float thresholdY = maxRowEdge * 0.27f;
-            int minY = 0;
-            while (minY < H - 1 && rowEdges[minY] < thresholdY) minY++;
+            float thresholdY = maxRowEdge * thMult;
+            int minY = startY;
+            while (minY < endY - 1 && rowEdges[minY] < thresholdY) minY++;
 
-            int maxY = H - 1;
+            int maxY = endY - 1;
             while (maxY > minY && rowEdges[maxY] < thresholdY) maxY--;
 
-            int padY = Math.Max(2, (maxY - minY) / 20);
-            minY = Math.Max(0, minY - padY);
-            maxY = Math.Min(H - 1, maxY + padY);
+            int padY = Math.Max(1, (maxY - minY) / 30);
+            minY = Math.Max(startY, minY - padY);
+            maxY = Math.Min(endY - 1, maxY + padY);
 
             if (maxY <= minY + 2) return bmp.Copy();
 
@@ -270,8 +289,23 @@ namespace BLL.Services
             return cropped;
         }
 
+        private string PostProcessPlateText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+            string upper = text.ToUpper().Trim();
+            upper = upper.Replace(".", "-");
+            if (upper.Length >= 4 && upper.EndsWith("I"))
+            {
+                if (char.IsDigit(upper[upper.Length - 2]) && char.IsDigit(upper[upper.Length - 3]))
+                {
+                    upper = upper.Substring(0, upper.Length - 1) + "1";
+                }
+            }
+            return upper;
+        }
+
         // ── Recognition ──────────────────────────────────────────────────────
-        private string RunOnnxRecognition(SKBitmap bitmap)
+        private (string text, float conf) RunOnnxRecognitionWithConf(SKBitmap bitmap)
         {
             int recH = 48; // PP-OCRv3/v4 recognition models standard input height
             float ratio = (float)bitmap.Width / Math.Max(bitmap.Height, 1);
@@ -303,16 +337,18 @@ namespace BLL.Services
                 .First(r => r.Name == "softmax_2.tmp_0")
                 .AsTensor<float>();
 
-            return DecodeCtc(output);
+            return DecodeCtcWithConf(output);
         }
 
         // ── CTC Decoder ──────────────────────────────────────────────────────
-        private string DecodeCtc(Tensor<float> output)
+        private (string text, float conf) DecodeCtcWithConf(Tensor<float> output)
         {
             int T = output.Dimensions[1];
             int numClasses = output.Dimensions[2];
 
             var sb = new System.Text.StringBuilder();
+            float totalConf = 0f;
+            int count = 0;
             int lastIdx = -1;
 
             for (int t = 0; t < T; t++)
@@ -335,12 +371,15 @@ namespace BLL.Services
                     if (charIdx < _charSet.Length)
                     {
                         sb.Append(_charSet[charIdx]);
+                        totalConf += maxVal;
+                        count++;
                     }
                 }
                 lastIdx = maxIdx;
             }
 
-            return sb.ToString();
+            float avgConf = count > 0 ? totalConf / count : 0f;
+            return (sb.ToString(), avgConf);
         }
 
         public void Dispose() => _recSession?.Dispose();
