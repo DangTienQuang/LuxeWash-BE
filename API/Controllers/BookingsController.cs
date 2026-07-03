@@ -156,5 +156,12 @@ namespace AutoWashPro.API.Controllers
             await _bookingService.UpdateVehicleConditionAsync(staffId, id, request);
             return Ok(new { statusCode = 200, message = "Đã cập nhật tình trạng xe và áp dụng phụ phí thành công." });
         }
+
+        [HttpGet("{id}/payment-status")]
+        public async Task<IActionResult> GetBookingPaymentStatus(int id)
+        {
+            var result = await _bookingService.GetBookingPaymentStatusAsync(id);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
     }
 }

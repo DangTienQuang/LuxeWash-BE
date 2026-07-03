@@ -3,6 +3,7 @@ using System;
 using AutoWashPro.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,14 +11,218 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DAL.Migrations
 {
     [DbContext(typeof(AutoWashDbContext))]
-    partial class AutoWashDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702041519_UpdateAIv1")]
+    partial class UpdateAIv1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.AIAuditLog", b =>
+                {
+                    b.Property<int>("AuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("AIResponse")
+                        .HasColumnType("longtext");
+
+                    b.Property<double>("Confidence")
+                        .HasColumnType("double");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DecisionReason")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("DecisionScore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EngineVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<long>("ExecutionTimeMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MatchedScenarios")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ModelVersion")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Prompt")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("SelectedScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("AuditId");
+
+                    b.HasIndex("CustomerId", "CreatedAt");
+
+                    b.ToTable("AIAuditLogs");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.AIDecisionHistory", b =>
+                {
+                    b.Property<int>("DecisionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Accepted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<double>("Confidence")
+                        .HasColumnType("double");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("CustomerClicked")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("CustomerOpened")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("DecisionReason")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("EstimatedRevenue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("FinalScore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("GeneratedPrompt")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("LLMResponse")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("NotificationSent")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("Redeemed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("RedeemedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("RevenueGenerated")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("ScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("VoucherId")
+                        .HasColumnType("int");
+
+                    b.HasKey("DecisionId");
+
+                    b.HasIndex("ScenarioId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("VoucherId");
+
+                    b.HasIndex("CustomerId", "CreatedAt");
+
+                    b.ToTable("AIDecisionHistories");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.AILearning", b =>
+                {
+                    b.Property<int>("LearningId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<double>("AcceptanceRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("AcceptedCount")
+                        .HasColumnType("int");
+
+                    b.Property<double>("AverageConfidence")
+                        .HasColumnType("double");
+
+                    b.Property<decimal>("AverageRevenue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<double>("ClickThroughRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("ClickedCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("NotificationsOpened")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NotificationsSent")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RedeemedCount")
+                        .HasColumnType("int");
+
+                    b.Property<double>("RedemptionRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("ScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("SuccessRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("TimesTriggered")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalRevenue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("VoucherId")
+                        .HasColumnType("int");
+
+                    b.HasKey("LearningId");
+
+                    b.HasIndex("VoucherId");
+
+                    b.HasIndex("ScenarioId", "VoucherId");
+
+                    b.ToTable("AILearnings");
+                });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Booking", b =>
                 {
@@ -180,65 +385,6 @@ namespace DAL.Migrations
                     b.ToTable("BookingDocuments");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.BookingMaterialUsage", b =>
-                {
-                    b.Property<int>("BookingMaterialUsageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<int?>("BookingDetailId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BookingId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BranchId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("CostAmount")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<decimal?>("EstimatedUnitCost")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<bool>("IsCostPending")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int?>("MaterialBatchId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MaterialId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("QuantityUsed")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<string>("UsageType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.HasKey("BookingMaterialUsageId");
-
-                    b.HasIndex("BookingDetailId");
-
-                    b.HasIndex("BookingId");
-
-                    b.HasIndex("BranchId");
-
-                    b.HasIndex("MaterialBatchId");
-
-                    b.HasIndex("MaterialId");
-
-                    b.ToTable("BookingMaterialUsages");
-                });
-
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Branch", b =>
                 {
                     b.Property<int>("BranchId")
@@ -249,9 +395,6 @@ namespace DAL.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
 
-                    b.Property<bool>("AllowNegativeStock")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
 
@@ -259,9 +402,6 @@ namespace DAL.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
-
-                    b.Property<decimal?>("NegativeStockLimit")
-                        .HasColumnType("decimal(65,30)");
 
                     b.HasKey("BranchId");
 
@@ -305,6 +445,208 @@ namespace DAL.Migrations
                     b.HasIndex("VehicleTypeId");
 
                     b.ToTable("CarModels");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerBehaviorHistory", b =>
+                {
+                    b.Property<int>("BehaviorHistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("BehaviorType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<double>("Confidence")
+                        .HasColumnType("double");
+
+                    b.Property<string>("CurrentValue")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DetectedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("DetectedOn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Explanation")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("PreviousValue")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.HasKey("BehaviorHistoryId");
+
+                    b.HasIndex("CustomerId", "BehaviorType", "DetectedOn");
+
+                    b.ToTable("CustomerBehaviorHistories");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerFeatureProfile", b =>
+                {
+                    b.Property<int>("FeatureProfileId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<double>("AfternoonVisitRate")
+                        .HasColumnType("double");
+
+                    b.Property<double>("AverageRating")
+                        .HasColumnType("double");
+
+                    b.Property<decimal>("AverageSpend")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<double>("AverageVehicleAge")
+                        .HasColumnType("double");
+
+                    b.Property<double>("AverageVisitGap")
+                        .HasColumnType("double");
+
+                    b.Property<int>("CancelledVisitCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CompletedVisitCount")
+                        .HasColumnType("int");
+
+                    b.Property<double>("CouponUsageRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("CurrentPoints")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DaysSinceLastVisit")
+                        .HasColumnType("int");
+
+                    b.Property<double>("EngagementScore")
+                        .HasColumnType("double");
+
+                    b.Property<double>("EveningVisitRate")
+                        .HasColumnType("double");
+
+                    b.Property<DateTime?>("ExpectedNextVisit")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("FavoriteBranchId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("FavoriteServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FavoriteVisitDay")
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int?>("FavoriteVisitHour")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("HighestSpend")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("LastFeatureCalculation")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("LifetimeBookings")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("LifetimeSpend")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("LongestVisitGap")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("LowestSpend")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<double>("LoyaltyScore")
+                        .HasColumnType("double");
+
+                    b.Property<int>("LuxuryVehicleCount")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MembershipTierId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("MorningVisitRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("NoShowCount")
+                        .HasColumnType("int");
+
+                    b.Property<double>("PredictedChurnScore")
+                        .HasColumnType("double");
+
+                    b.Property<decimal>("PredictedLifetimeValue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<double>("PredictedUpgradeScore")
+                        .HasColumnType("double");
+
+                    b.Property<double>("PremiumPreferenceScore")
+                        .HasColumnType("double");
+
+                    b.Property<double>("PriceSensitivityScore")
+                        .HasColumnType("double");
+
+                    b.Property<double>("PromotionResponseRate")
+                        .HasColumnType("double");
+
+                    b.Property<double>("RainVisitRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("ReferralCount")
+                        .HasColumnType("int");
+
+                    b.Property<double>("ReferralSuccessRate")
+                        .HasColumnType("double");
+
+                    b.Property<int>("ShortestVisitGap")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VehicleCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VisitCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("VisitTrend")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<decimal>("WalletBalance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<double>("WeekendVisitRate")
+                        .HasColumnType("double");
+
+                    b.HasKey("FeatureProfileId");
+
+                    b.HasIndex("CustomerId")
+                        .IsUnique();
+
+                    b.HasIndex("FavoriteBranchId");
+
+                    b.HasIndex("FavoriteServiceId");
+
+                    b.HasIndex("MembershipTierId");
+
+                    b.ToTable("CustomerFeatureProfiles");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerProfile", b =>
@@ -423,130 +765,141 @@ namespace DAL.Migrations
                     b.ToTable("EmployeeProfiles");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.ExtraMaterialUsageRequest", b =>
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.FeatureDefinition", b =>
                 {
-                    b.Property<int>("RequestId")
+                    b.Property<int>("FeatureId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    b.Property<int>("BookingId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BranchId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("ManagerNote")
+                    b.Property<string>("CalculationMethod")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
-                    b.Property<int>("MaterialId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ReviewedByManagerId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StaffUserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
+                    b.Property<string>("DataType")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
 
-                    b.HasKey("RequestId");
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
 
-                    b.HasIndex("BookingId");
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
 
-                    b.HasIndex("MaterialId");
+                    b.Property<string>("FeatureCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
 
-                    b.HasIndex("ReviewedByManagerId");
+                    b.Property<bool>("IsAIFeature")
+                        .HasColumnType("tinyint(1)");
 
-                    b.HasIndex("StaffUserId");
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
 
-                    b.HasIndex("BranchId", "Status", "CreatedAt");
+                    b.Property<string>("SourceTable")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
 
-                    b.ToTable("ExtraMaterialUsageRequests");
+                    b.HasKey("FeatureId");
+
+                    b.ToTable("FeatureDefinitions");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.InventoryTransaction", b =>
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.KnowledgeCategory", b =>
                 {
-                    b.Property<int>("InventoryTransactionId")
+                    b.Property<int>("CategoryId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    b.Property<decimal>("AfterQuantity")
-                        .HasColumnType("decimal(65,30)");
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
 
-                    b.Property<decimal>("BeforeQuantity")
-                        .HasColumnType("decimal(65,30)");
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
 
-                    b.Property<int?>("BookingId")
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int>("Priority")
                         .HasColumnType("int");
 
-                    b.Property<int?>("BranchId")
+                    b.HasKey("CategoryId");
+
+                    b.ToTable("KnowledgeCategories");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.KnowledgeScenario", b =>
+                {
+                    b.Property<int>("ScenarioId")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    b.Property<decimal>("CostAmount")
-                        .HasColumnType("decimal(65,30)");
+                    b.Property<string>("BusinessGoal")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("ConfidenceThreshold")
+                        .HasColumnType("double");
+
+                    b.Property<int>("CooldownDays")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<int?>("CreatedByUserId")
+                    b.Property<string>("Description")
+                        .HasMaxLength(3000)
+                        .HasColumnType("varchar(3000)");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsSystemScenario")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastTriggeredAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ModelVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<int>("Priority")
                         .HasColumnType("int");
 
-                    b.Property<int?>("MaterialBatchId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MaterialId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<string>("TransactionType")
+                    b.Property<string>("ScenarioCode")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
 
-                    b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(65,30)");
+                    b.Property<string>("ScenarioName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
 
-                    b.Property<int>("WarehouseId")
+                    b.Property<int>("TriggerCount")
                         .HasColumnType("int");
 
-                    b.HasKey("InventoryTransactionId");
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
 
-                    b.HasIndex("BookingId");
+                    b.HasKey("ScenarioId");
 
-                    b.HasIndex("BranchId");
+                    b.HasIndex("CategoryId");
 
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("MaterialBatchId");
-
-                    b.HasIndex("MaterialId");
-
-                    b.HasIndex("WarehouseId");
-
-                    b.ToTable("InventoryTransactions");
+                    b.ToTable("KnowledgeScenarios");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Lane", b =>
@@ -603,113 +956,6 @@ namespace DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("ManagerProfiles");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.Material", b =>
-                {
-                    b.Property<int>("MaterialId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<decimal>("DefaultMinStockLevel")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<int>("ExpiryWarningDays")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<bool>("RequiresExpiryTracking")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("MaterialId");
-
-                    b.ToTable("Materials");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialBatch", b =>
-                {
-                    b.Property<int>("MaterialBatchId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("BatchCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<DateTime?>("ExpiryDate")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<DateTime>("ImportedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<decimal>("ImportedQuantity")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<DateTime?>("ManufactureDate")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int>("MaterialId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("RemainingQuantity")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<string>("SupplierName")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<decimal>("TotalCost")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<decimal>("UnitCost")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<int>("WarehouseId")
-                        .HasColumnType("int");
-
-                    b.HasKey("MaterialBatchId");
-
-                    b.HasIndex("BatchCode")
-                        .IsUnique();
-
-                    b.HasIndex("MaterialId");
-
-                    b.HasIndex("WarehouseId");
-
-                    b.ToTable("MaterialBatches");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.OvertimeRequest", b =>
@@ -794,6 +1040,184 @@ namespace DAL.Migrations
                     b.ToTable("PointLedgers");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioAction", b =>
+                {
+                    b.Property<int>("ActionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<bool>("AllowStacking")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("CooldownDays")
+                        .HasColumnType("int");
+
+                    b.Property<double>("ExpectedConversion")
+                        .HasColumnType("double");
+
+                    b.Property<decimal>("ExpectedRevenue")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("MaxPerCustomer")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("StopProcessing")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("VoucherId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Weight")
+                        .HasColumnType("int");
+
+                    b.HasKey("ActionId");
+
+                    b.HasIndex("ScenarioId");
+
+                    b.HasIndex("VoucherId");
+
+                    b.ToTable("ScenarioActions");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioCondition", b =>
+                {
+                    b.Property<int>("ConditionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("ComparisonValue")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("FeatureId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LogicalGroup")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Operator")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("ScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.HasKey("ConditionId");
+
+                    b.HasIndex("FeatureId");
+
+                    b.HasIndex("ScenarioId");
+
+                    b.ToTable("ScenarioConditions");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioExclusion", b =>
+                {
+                    b.Property<int>("ExclusionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("ComparisonValue")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("FeatureId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Operator")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int>("ScenarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ExclusionId");
+
+                    b.HasIndex("FeatureId");
+
+                    b.HasIndex("ScenarioId");
+
+                    b.ToTable("ScenarioExclusions");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioExplanation", b =>
+                {
+                    b.Property<int>("ScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("BusinessContext")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ExpectedOutcome")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("LLMNotes")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Reasoning")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("ScenarioId");
+
+                    b.ToTable("ScenarioExplanations");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioMessageTemplate", b =>
+                {
+                    b.Property<int>("TemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("EmailMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("PushMessage")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("ScenarioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SmsMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.HasKey("TemplateId");
+
+                    b.HasIndex("ScenarioId");
+
+                    b.ToTable("ScenarioMessageTemplates");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Service", b =>
                 {
                     b.Property<int>("ServiceId")
@@ -814,44 +1238,6 @@ namespace DAL.Migrations
                     b.HasKey("ServiceId");
 
                     b.ToTable("Services");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.ServiceMaterialUsage", b =>
-                {
-                    b.Property<int>("ServiceMaterialUsageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("BaseQuantity")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("MaterialId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ServiceId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<int?>("VehicleTypeId")
-                        .HasColumnType("int");
-
-                    b.HasKey("ServiceMaterialUsageId");
-
-                    b.HasIndex("MaterialId");
-
-                    b.HasIndex("VehicleTypeId");
-
-                    b.HasIndex("ServiceId", "VehicleTypeId", "MaterialId")
-                        .IsUnique();
-
-                    b.ToTable("ServiceMaterialUsages");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ServicePrice", b =>
@@ -1273,33 +1659,6 @@ namespace DAL.Migrations
                     b.ToTable("Vehicles");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.VehicleConditionMaterialMultiplier", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<decimal>("Multiplier")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<int>("VehicleCondition")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VehicleCondition")
-                        .IsUnique();
-
-                    b.ToTable("VehicleConditionMaterialMultipliers");
-                });
-
             modelBuilder.Entity("AutoWashPro.DAL.Entities.VehicleType", b =>
                 {
                     b.Property<int>("Id")
@@ -1435,69 +1794,6 @@ namespace DAL.Migrations
                     b.ToTable("Wallets");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.Warehouse", b =>
-                {
-                    b.Property<int>("WarehouseId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<int?>("BranchId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.HasKey("WarehouseId");
-
-                    b.HasIndex("BranchId");
-
-                    b.HasIndex("Type", "BranchId")
-                        .IsUnique();
-
-                    b.ToTable("Warehouses");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.WarehouseStock", b =>
-                {
-                    b.Property<int>("WarehouseStockId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("CurrentQuantity")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<int>("MaterialId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal?>("MinStockLevel")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int>("WarehouseId")
-                        .HasColumnType("int");
-
-                    b.HasKey("WarehouseStockId");
-
-                    b.HasIndex("MaterialId");
-
-                    b.HasIndex("WarehouseId", "MaterialId")
-                        .IsUnique();
-
-                    b.ToTable("WarehouseStocks");
-                });
-
             modelBuilder.Entity("AutoWashPro.DAL.Entities.WorkShift", b =>
                 {
                     b.Property<int>("WorkShiftId")
@@ -1523,67 +1819,7 @@ namespace DAL.Migrations
                     b.ToTable("WorkShifts");
                 });
 
-            modelBuilder.Entity("DAL.Entities.AI.AIAuditLog", b =>
-                {
-                    b.Property<int>("AuditId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("AIResponse")
-                        .HasColumnType("longtext");
-
-                    b.Property<double>("Confidence")
-                        .HasColumnType("double");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("DecisionReason")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("DecisionScore")
-                        .HasColumnType("int");
-
-                    b.Property<string>("EngineVersion")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("longtext");
-
-                    b.Property<long>("ExecutionTimeMs")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("MatchedScenarios")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("ModelVersion")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("Prompt")
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("SelectedScenarioId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("Success")
-                        .HasColumnType("tinyint(1)");
-
-                    b.HasKey("AuditId");
-
-                    b.HasIndex("CustomerId", "CreatedAt");
-
-                    b.ToTable("AIAuditLogs");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.AIConversationLog", b =>
+            modelBuilder.Entity("DAL.Entities.AIConversationLog", b =>
                 {
                     b.Property<int>("ConversationLogId")
                         .ValueGeneratedOnAdd()
@@ -1615,86 +1851,7 @@ namespace DAL.Migrations
                     b.ToTable("AIConversationLogs");
                 });
 
-            modelBuilder.Entity("DAL.Entities.AI.AIDecisionHistory", b =>
-                {
-                    b.Property<int>("DecisionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<bool>("Accepted")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("ActionType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<double>("Confidence")
-                        .HasColumnType("double");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<bool>("CustomerClicked")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("CustomerOpened")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("DecisionReason")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<decimal>("EstimatedRevenue")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("FinalScore")
-                        .HasColumnType("int");
-
-                    b.Property<string>("GeneratedPrompt")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("LLMResponse")
-                        .HasColumnType("longtext");
-
-                    b.Property<bool>("NotificationSent")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("Redeemed")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<DateTime?>("RedeemedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<decimal>("RevenueGenerated")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("ScenarioId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ServiceId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("VoucherId")
-                        .HasColumnType("int");
-
-                    b.HasKey("DecisionId");
-
-                    b.HasIndex("ScenarioId");
-
-                    b.HasIndex("ServiceId");
-
-                    b.HasIndex("VoucherId");
-
-                    b.HasIndex("CustomerId", "CreatedAt");
-
-                    b.ToTable("AIDecisionHistories");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.AIKnowledgeBase", b =>
+            modelBuilder.Entity("DAL.Entities.AIKnowledgeBase", b =>
                 {
                     b.Property<int>("KnowledgeId")
                         .ValueGeneratedOnAdd()
@@ -1723,586 +1880,6 @@ namespace DAL.Migrations
                     b.HasKey("KnowledgeId");
 
                     b.ToTable("AIKnowledgeBases");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.AILearning", b =>
-                {
-                    b.Property<int>("LearningId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<double>("AcceptanceRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("AcceptedCount")
-                        .HasColumnType("int");
-
-                    b.Property<double>("AverageConfidence")
-                        .HasColumnType("double");
-
-                    b.Property<decimal>("AverageRevenue")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<double>("ClickThroughRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("ClickedCount")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int>("NotificationsOpened")
-                        .HasColumnType("int");
-
-                    b.Property<int>("NotificationsSent")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RedeemedCount")
-                        .HasColumnType("int");
-
-                    b.Property<double>("RedemptionRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("ScenarioId")
-                        .HasColumnType("int");
-
-                    b.Property<double>("SuccessRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("TimesTriggered")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("TotalRevenue")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int?>("VoucherId")
-                        .HasColumnType("int");
-
-                    b.HasKey("LearningId");
-
-                    b.HasIndex("VoucherId");
-
-                    b.HasIndex("ScenarioId", "VoucherId");
-
-                    b.ToTable("AILearnings");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.CustomerBehaviorHistory", b =>
-                {
-                    b.Property<int>("BehaviorHistoryId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("BehaviorType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<double>("Confidence")
-                        .HasColumnType("double");
-
-                    b.Property<string>("CurrentValue")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("DetectedBy")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<DateTime>("DetectedOn")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Explanation")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
-                    b.Property<string>("PreviousValue")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.HasKey("BehaviorHistoryId");
-
-                    b.HasIndex("CustomerId", "BehaviorType", "DetectedOn");
-
-                    b.ToTable("CustomerBehaviorHistories");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.CustomerFeatureProfile", b =>
-                {
-                    b.Property<int>("FeatureProfileId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<double>("AfternoonVisitRate")
-                        .HasColumnType("double");
-
-                    b.Property<double>("AverageRating")
-                        .HasColumnType("double");
-
-                    b.Property<decimal>("AverageSpend")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<double>("AverageVehicleAge")
-                        .HasColumnType("double");
-
-                    b.Property<double>("AverageVisitGap")
-                        .HasColumnType("double");
-
-                    b.Property<int>("CancelledVisitCount")
-                        .HasColumnType("int");
-
-                    b.Property<int>("CompletedVisitCount")
-                        .HasColumnType("int");
-
-                    b.Property<double>("CouponUsageRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("CurrentPoints")
-                        .HasColumnType("int");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("DaysSinceLastVisit")
-                        .HasColumnType("int");
-
-                    b.Property<double>("EngagementScore")
-                        .HasColumnType("double");
-
-                    b.Property<double>("EveningVisitRate")
-                        .HasColumnType("double");
-
-                    b.Property<DateTime?>("ExpectedNextVisit")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("FavoriteBranchId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("FavoriteServiceId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("FavoriteVisitDay")
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<int?>("FavoriteVisitHour")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("GeneratedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<decimal>("HighestSpend")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("LastFeatureCalculation")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int>("LifetimeBookings")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("LifetimeSpend")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("LongestVisitGap")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("LowestSpend")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<double>("LoyaltyScore")
-                        .HasColumnType("double");
-
-                    b.Property<int>("LuxuryVehicleCount")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("MembershipTierId")
-                        .HasColumnType("int");
-
-                    b.Property<double>("MorningVisitRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("NoShowCount")
-                        .HasColumnType("int");
-
-                    b.Property<double>("PredictedChurnScore")
-                        .HasColumnType("double");
-
-                    b.Property<decimal>("PredictedLifetimeValue")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<double>("PredictedUpgradeScore")
-                        .HasColumnType("double");
-
-                    b.Property<double>("PremiumPreferenceScore")
-                        .HasColumnType("double");
-
-                    b.Property<double>("PriceSensitivityScore")
-                        .HasColumnType("double");
-
-                    b.Property<double>("PromotionResponseRate")
-                        .HasColumnType("double");
-
-                    b.Property<double>("RainVisitRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("ReferralCount")
-                        .HasColumnType("int");
-
-                    b.Property<double>("ReferralSuccessRate")
-                        .HasColumnType("double");
-
-                    b.Property<int>("ShortestVisitGap")
-                        .HasColumnType("int");
-
-                    b.Property<int>("VehicleCount")
-                        .HasColumnType("int");
-
-                    b.Property<int>("VisitCount")
-                        .HasColumnType("int");
-
-                    b.Property<string>("VisitTrend")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<decimal>("WalletBalance")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<double>("WeekendVisitRate")
-                        .HasColumnType("double");
-
-                    b.HasKey("FeatureProfileId");
-
-                    b.HasIndex("CustomerId")
-                        .IsUnique();
-
-                    b.HasIndex("FavoriteBranchId");
-
-                    b.HasIndex("FavoriteServiceId");
-
-                    b.HasIndex("MembershipTierId");
-
-                    b.ToTable("CustomerFeatureProfiles");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.FeatureDefinition", b =>
-                {
-                    b.Property<int>("FeatureId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("CalculationMethod")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("varchar(150)");
-
-                    b.Property<string>("FeatureCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<bool>("IsAIFeature")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("SourceTable")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("FeatureId");
-
-                    b.ToTable("FeatureDefinitions");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.KnowledgeCategory", b =>
-                {
-                    b.Property<int>("CategoryId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("varchar(150)");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("int");
-
-                    b.HasKey("CategoryId");
-
-                    b.ToTable("KnowledgeCategories");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.KnowledgeScenario", b =>
-                {
-                    b.Property<int>("ScenarioId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("BusinessGoal")
-                        .HasMaxLength(300)
-                        .HasColumnType("varchar(300)");
-
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("int");
-
-                    b.Property<double>("ConfidenceThreshold")
-                        .HasColumnType("double");
-
-                    b.Property<int>("CooldownDays")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(3000)
-                        .HasColumnType("varchar(3000)");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("IsSystemScenario")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<DateTime?>("LastTriggeredAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("ModelVersion")
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ScenarioCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<string>("ScenarioName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<int>("TriggerCount")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("ScenarioId");
-
-                    b.HasIndex("CategoryId");
-
-                    b.ToTable("KnowledgeScenarios");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioAction", b =>
-                {
-                    b.Property<int>("ActionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<bool>("AllowStacking")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("CooldownDays")
-                        .HasColumnType("int");
-
-                    b.Property<double>("ExpectedConversion")
-                        .HasColumnType("double");
-
-                    b.Property<decimal>("ExpectedRevenue")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<bool>("IsPrimary")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("MaxPerCustomer")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ScenarioId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("StopProcessing")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("VoucherId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Weight")
-                        .HasColumnType("int");
-
-                    b.HasKey("ActionId");
-
-                    b.HasIndex("ScenarioId");
-
-                    b.HasIndex("VoucherId");
-
-                    b.ToTable("ScenarioActions");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioCondition", b =>
-                {
-                    b.Property<int>("ConditionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("ComparisonValue")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<int>("FeatureId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("LogicalGroup")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Operator")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<bool>("Required")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("ScenarioId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("int");
-
-                    b.HasKey("ConditionId");
-
-                    b.HasIndex("FeatureId");
-
-                    b.HasIndex("ScenarioId");
-
-                    b.ToTable("ScenarioConditions");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioExclusion", b =>
-                {
-                    b.Property<int>("ExclusionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("ComparisonValue")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<int>("FeatureId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Operator")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<int>("ScenarioId")
-                        .HasColumnType("int");
-
-                    b.HasKey("ExclusionId");
-
-                    b.HasIndex("FeatureId");
-
-                    b.HasIndex("ScenarioId");
-
-                    b.ToTable("ScenarioExclusions");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioExplanation", b =>
-                {
-                    b.Property<int>("ScenarioId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("BusinessContext")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("ExpectedOutcome")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("LLMNotes")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Reasoning")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.HasKey("ScenarioId");
-
-                    b.ToTable("ScenarioExplanations");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioMessageTemplate", b =>
-                {
-                    b.Property<int>("TemplateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("EmailMessage")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("PushMessage")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("ScenarioId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SmsMessage")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("varchar(300)");
-
-                    b.HasKey("TemplateId");
-
-                    b.HasIndex("ScenarioId");
-
-                    b.ToTable("ScenarioMessageTemplates");
                 });
 
             modelBuilder.Entity("DAL.Entities.BusinessProfile", b =>
@@ -2638,6 +2215,65 @@ namespace DAL.Migrations
                     b.ToTable("InvoiceItems");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.AIAuditLog", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.AIDecisionHistory", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeScenario", "Scenario")
+                        .WithMany()
+                        .HasForeignKey("ScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Service", "Service")
+                        .WithMany()
+                        .HasForeignKey("ServiceId");
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Voucher", "Voucher")
+                        .WithMany()
+                        .HasForeignKey("VoucherId");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Scenario");
+
+                    b.Navigation("Service");
+
+                    b.Navigation("Voucher");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.AILearning", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeScenario", "Scenario")
+                        .WithMany()
+                        .HasForeignKey("ScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Voucher", "Voucher")
+                        .WithMany()
+                        .HasForeignKey("VoucherId");
+
+                    b.Navigation("Scenario");
+
+                    b.Navigation("Voucher");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Booking", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.VehicleType", "ActualVehicleType")
@@ -2731,47 +2367,6 @@ namespace DAL.Migrations
                     b.Navigation("Booking");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.BookingMaterialUsage", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.BookingDetail", "BookingDetail")
-                        .WithMany()
-                        .HasForeignKey("BookingDetailId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.MaterialBatch", "MaterialBatch")
-                        .WithMany()
-                        .HasForeignKey("MaterialBatchId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
-                        .WithMany()
-                        .HasForeignKey("MaterialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Booking");
-
-                    b.Navigation("BookingDetail");
-
-                    b.Navigation("Branch");
-
-                    b.Navigation("Material");
-
-                    b.Navigation("MaterialBatch");
-                });
-
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CarModel", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.User", "RequestedByUser")
@@ -2785,6 +2380,49 @@ namespace DAL.Migrations
                     b.Navigation("RequestedByUser");
 
                     b.Navigation("VehicleType");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerBehaviorHistory", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerFeatureProfile", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "FavoriteBranch")
+                        .WithMany()
+                        .HasForeignKey("FavoriteBranchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Service", "FavoriteService")
+                        .WithMany()
+                        .HasForeignKey("FavoriteServiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Tier", "MembershipTier")
+                        .WithMany()
+                        .HasForeignKey("MembershipTierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("FavoriteBranch");
+
+                    b.Navigation("FavoriteService");
+
+                    b.Navigation("MembershipTier");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerProfile", b =>
@@ -2843,90 +2481,15 @@ namespace DAL.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.ExtraMaterialUsageRequest", b =>
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.KnowledgeScenario", b =>
                 {
-                    b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
-                        .WithMany()
-                        .HasForeignKey("BookingId")
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeCategory", "Category")
+                        .WithMany("Scenarios")
+                        .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
-                        .WithMany()
-                        .HasForeignKey("MaterialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "ReviewedByManager")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByManagerId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "StaffUser")
-                        .WithMany()
-                        .HasForeignKey("StaffUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Booking");
-
-                    b.Navigation("Branch");
-
-                    b.Navigation("Material");
-
-                    b.Navigation("ReviewedByManager");
-
-                    b.Navigation("StaffUser");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.InventoryTransaction", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId");
-
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.HasOne("AutoWashPro.DAL.Entities.MaterialBatch", "MaterialBatch")
-                        .WithMany()
-                        .HasForeignKey("MaterialBatchId");
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
-                        .WithMany()
-                        .HasForeignKey("MaterialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Warehouse", "Warehouse")
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Booking");
-
-                    b.Navigation("Branch");
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Material");
-
-                    b.Navigation("MaterialBatch");
-
-                    b.Navigation("Warehouse");
+                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Lane", b =>
@@ -2951,25 +2514,6 @@ namespace DAL.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialBatch", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
-                        .WithMany("Batches")
-                        .HasForeignKey("MaterialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Warehouse", "Warehouse")
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Material");
-
-                    b.Navigation("Warehouse");
-                });
-
             modelBuilder.Entity("AutoWashPro.DAL.Entities.OvertimeRequest", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.User", "StaffUser")
@@ -2992,29 +2536,83 @@ namespace DAL.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.ServiceMaterialUsage", b =>
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioAction", b =>
                 {
-                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
-                        .WithMany()
-                        .HasForeignKey("MaterialId")
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeScenario", "Scenario")
+                        .WithMany("Actions")
+                        .HasForeignKey("ScenarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("AutoWashPro.DAL.Entities.Service", "Service")
+                    b.HasOne("AutoWashPro.DAL.Entities.Voucher", "Voucher")
                         .WithMany()
-                        .HasForeignKey("ServiceId")
+                        .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("AutoWashPro.DAL.Entities.VehicleType", "VehicleType")
-                        .WithMany()
-                        .HasForeignKey("VehicleTypeId");
+                    b.Navigation("Scenario");
 
-                    b.Navigation("Material");
+                    b.Navigation("Voucher");
+                });
 
-                    b.Navigation("Service");
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioCondition", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.FeatureDefinition", "Feature")
+                        .WithMany("ScenarioConditions")
+                        .HasForeignKey("FeatureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Navigation("VehicleType");
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeScenario", "Scenario")
+                        .WithMany("Conditions")
+                        .HasForeignKey("ScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feature");
+
+                    b.Navigation("Scenario");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioExclusion", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.FeatureDefinition", "Feature")
+                        .WithMany("ScenarioExclusions")
+                        .HasForeignKey("FeatureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeScenario", "Scenario")
+                        .WithMany("Exclusions")
+                        .HasForeignKey("ScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feature");
+
+                    b.Navigation("Scenario");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioExplanation", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeScenario", "Scenario")
+                        .WithOne("Explanation")
+                        .HasForeignKey("AutoWashPro.DAL.Entities.ScenarioExplanation", "ScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Scenario");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioMessageTemplate", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.KnowledgeScenario", "Scenario")
+                        .WithMany("MessageTemplates")
+                        .HasForeignKey("ScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Scenario");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ServicePrice", b =>
@@ -3208,47 +2806,7 @@ namespace DAL.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.Warehouse", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Branch");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.WarehouseStock", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
-                        .WithMany()
-                        .HasForeignKey("MaterialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Warehouse", "Warehouse")
-                        .WithMany("Stocks")
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Material");
-
-                    b.Navigation("Warehouse");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.AIAuditLog", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.AIConversationLog", b =>
+            modelBuilder.Entity("DAL.Entities.AIConversationLog", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.User", "User")
                         .WithMany("AIConversationLogs")
@@ -3257,187 +2815,6 @@ namespace DAL.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.AIDecisionHistory", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DAL.Entities.AI.KnowledgeScenario", "Scenario")
-                        .WithMany()
-                        .HasForeignKey("ScenarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Service", "Service")
-                        .WithMany()
-                        .HasForeignKey("ServiceId");
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Voucher", "Voucher")
-                        .WithMany()
-                        .HasForeignKey("VoucherId");
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("Scenario");
-
-                    b.Navigation("Service");
-
-                    b.Navigation("Voucher");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.AILearning", b =>
-                {
-                    b.HasOne("DAL.Entities.AI.KnowledgeScenario", "Scenario")
-                        .WithMany()
-                        .HasForeignKey("ScenarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Voucher", "Voucher")
-                        .WithMany()
-                        .HasForeignKey("VoucherId");
-
-                    b.Navigation("Scenario");
-
-                    b.Navigation("Voucher");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.CustomerBehaviorHistory", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.CustomerFeatureProfile", b =>
-                {
-                    b.HasOne("AutoWashPro.DAL.Entities.User", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "FavoriteBranch")
-                        .WithMany()
-                        .HasForeignKey("FavoriteBranchId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Service", "FavoriteService")
-                        .WithMany()
-                        .HasForeignKey("FavoriteServiceId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Tier", "MembershipTier")
-                        .WithMany()
-                        .HasForeignKey("MembershipTierId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("FavoriteBranch");
-
-                    b.Navigation("FavoriteService");
-
-                    b.Navigation("MembershipTier");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.KnowledgeScenario", b =>
-                {
-                    b.HasOne("DAL.Entities.AI.KnowledgeCategory", "Category")
-                        .WithMany("Scenarios")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Category");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioAction", b =>
-                {
-                    b.HasOne("DAL.Entities.AI.KnowledgeScenario", "Scenario")
-                        .WithMany("Actions")
-                        .HasForeignKey("ScenarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("AutoWashPro.DAL.Entities.Voucher", "Voucher")
-                        .WithMany()
-                        .HasForeignKey("VoucherId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Scenario");
-
-                    b.Navigation("Voucher");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioCondition", b =>
-                {
-                    b.HasOne("DAL.Entities.AI.FeatureDefinition", "Feature")
-                        .WithMany("ScenarioConditions")
-                        .HasForeignKey("FeatureId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DAL.Entities.AI.KnowledgeScenario", "Scenario")
-                        .WithMany("Conditions")
-                        .HasForeignKey("ScenarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Feature");
-
-                    b.Navigation("Scenario");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioExclusion", b =>
-                {
-                    b.HasOne("DAL.Entities.AI.FeatureDefinition", "Feature")
-                        .WithMany("ScenarioExclusions")
-                        .HasForeignKey("FeatureId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DAL.Entities.AI.KnowledgeScenario", "Scenario")
-                        .WithMany("Exclusions")
-                        .HasForeignKey("ScenarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Feature");
-
-                    b.Navigation("Scenario");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioExplanation", b =>
-                {
-                    b.HasOne("DAL.Entities.AI.KnowledgeScenario", "Scenario")
-                        .WithOne("Explanation")
-                        .HasForeignKey("DAL.Entities.AI.ScenarioExplanation", "ScenarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Scenario");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.ScenarioMessageTemplate", b =>
-                {
-                    b.HasOne("DAL.Entities.AI.KnowledgeScenario", "Scenario")
-                        .WithMany("MessageTemplates")
-                        .HasForeignKey("ScenarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Scenario");
                 });
 
             modelBuilder.Entity("DAL.Entities.BusinessProfile", b =>
@@ -3594,16 +2971,36 @@ namespace DAL.Migrations
                     b.Navigation("Lanes");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.FeatureDefinition", b =>
+                {
+                    b.Navigation("ScenarioConditions");
+
+                    b.Navigation("ScenarioExclusions");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.KnowledgeCategory", b =>
+                {
+                    b.Navigation("Scenarios");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.KnowledgeScenario", b =>
+                {
+                    b.Navigation("Actions");
+
+                    b.Navigation("Conditions");
+
+                    b.Navigation("Exclusions");
+
+                    b.Navigation("Explanation");
+
+                    b.Navigation("MessageTemplates");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Lane", b =>
                 {
                     b.Navigation("ProcessingBookings");
 
                     b.Navigation("StaffAssignments");
-                });
-
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.Material", b =>
-                {
-                    b.Navigation("Batches");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Service", b =>
@@ -3650,39 +3047,9 @@ namespace DAL.Migrations
                     b.Navigation("Transactions");
                 });
 
-            modelBuilder.Entity("AutoWashPro.DAL.Entities.Warehouse", b =>
-                {
-                    b.Navigation("Stocks");
-                });
-
             modelBuilder.Entity("AutoWashPro.DAL.Entities.WorkShift", b =>
                 {
                     b.Navigation("Assignments");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.FeatureDefinition", b =>
-                {
-                    b.Navigation("ScenarioConditions");
-
-                    b.Navigation("ScenarioExclusions");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.KnowledgeCategory", b =>
-                {
-                    b.Navigation("Scenarios");
-                });
-
-            modelBuilder.Entity("DAL.Entities.AI.KnowledgeScenario", b =>
-                {
-                    b.Navigation("Actions");
-
-                    b.Navigation("Conditions");
-
-                    b.Navigation("Exclusions");
-
-                    b.Navigation("Explanation");
-
-                    b.Navigation("MessageTemplates");
                 });
 
             modelBuilder.Entity("DAL.Entities.Invoice", b =>

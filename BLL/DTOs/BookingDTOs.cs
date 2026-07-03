@@ -176,6 +176,16 @@ namespace AutoWashPro.BLL.DTOs
         public string PaymentStatus { get; set; } = "Unpaid";
     }
 
+    public class BookingPaymentStatusDTO
+    {
+        public int BookingId { get; set; }
+        public string PaymentStatus { get; set; } = "Unpaid";
+        public string? PaymentMethod { get; set; }
+        public string? OrderCode { get; set; }
+        public decimal? Amount { get; set; }
+        public DateTime? PaidAt { get; set; }
+    }
+
     public class UpdateVehicleConditionDTO
     {
         [Required]

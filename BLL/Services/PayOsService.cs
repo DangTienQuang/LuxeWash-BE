@@ -69,5 +69,38 @@ namespace AutoWashPro.BLL.Services
             }
         }
 
+        public async Task<PayOsOrderStatusResult?> GetPaymentStatusAsync(string orderCode)
+        {
+            if (string.IsNullOrWhiteSpace(orderCode))
+                return null;
+
+            if (!long.TryParse(orderCode, out var numericOrderCode))
+                return null;
+
+            try
+            {
+                dynamic paymentLink = await _payOSClient.PaymentRequests.GetAsync(numericOrderCode);
+
+                string status = string.Empty;
+                decimal amount = 0;
+                DateTime? paidAt = null;
+
+                try { status = paymentLink.Status?.ToString() ?? string.Empty; } catch { }
+                try { amount = Convert.ToDecimal(paymentLink.Amount); } catch { }
+                try { paidAt = paymentLink.PaidAt; } catch { }
+
+                return new PayOsOrderStatusResult
+                {
+                    OrderCode = orderCode,
+                    Status = status,
+                    Amount = amount,
+                    PaidAt = paidAt
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 }

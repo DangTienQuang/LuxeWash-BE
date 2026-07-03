@@ -26,5 +26,6 @@ namespace AutoWashPro.BLL.Services
         Task ForceCancelBookingsAsync(ForceCancelRequestDTO request);
         Task<bool> SendBookingConfirmationEmailAsync(int userId, int bookingId);
         Task<BookingResponseDTO> RescheduleBookingAsync(int userId, int bookingId, RescheduleBookingDTO request);
+        Task<BookingPaymentStatusDTO> GetBookingPaymentStatusAsync(int bookingId);
     }
 }

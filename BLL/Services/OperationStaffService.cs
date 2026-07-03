@@ -101,13 +101,51 @@ namespace AutoWashPro.BLL.Services
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
                 .ToListAsync();
 
-            return bookings.Select(b => new StaffBookingDTO
+            if (bookings.Count == 0)
             {
-                BookingId = b.BookingId,
-                LicensePlate = b.LicensePlate,
-                ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName).ToList(),
-                VehicleTypeName = b.ActualVehicleType?.Name ?? "Unknown",
-                Status = b.Status
+                return new List<StaffBookingDTO>();
+            }
+
+            var bookingIds = bookings.Select(b => b.BookingId).Distinct().ToList();
+
+            var paymentTransactions = await _context.Transactions
+                .Where(t => t.ReferenceBookingId.HasValue
+                    && bookingIds.Contains(t.ReferenceBookingId.Value)
+                    && (t.TransactionType == "Payment"
+                        || t.TransactionType == "BookingPayment"
+                        || t.TransactionType == "WalkInPayment"))
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new
+                {
+                    BookingId = t.ReferenceBookingId!.Value,
+                    t.Status,
+                    t.PaymentMethod,
+                    t.OrderCode
+                })
+                .ToListAsync();
+
+            var latestPaymentByBooking = paymentTransactions
+                .GroupBy(t => t.BookingId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            return bookings.Select(b =>
+            {
+                latestPaymentByBooking.TryGetValue(b.BookingId, out var tx);
+                var paymentStatus = tx != null && string.Equals(tx.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+                    ? "Completed"
+                    : "Unpaid";
+                return new StaffBookingDTO
+                {
+                    BookingId = b.BookingId,
+                    LicensePlate = b.LicensePlate,
+                    ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName).ToList(),
+                    VehicleTypeName = b.ActualVehicleType?.Name ?? "Unknown",
+                    Status = b.Status,
+                    PaymentStatus = paymentStatus,
+                    PaymentMethod = tx?.PaymentMethod,
+                    OrderCode = tx?.OrderCode,
+                    FinalAmount = b.FinalAmount
+                };
             }).ToList();
         }
 

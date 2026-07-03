@@ -153,6 +153,7 @@ namespace AutoWashPro.BLL.Services
                 Amount = payOsAmount,
                 TransactionType = transactionType,
                 Description = transactionDescription,
+                PaymentMethod = "PayOS",
                 ReferenceBookingId = referenceBookingId,
                 OrderCode = orderCode.ToString(),
                 Status = "Pending",
@@ -242,9 +243,13 @@ namespace AutoWashPro.BLL.Services
                 }
 
                 transaction.Status = "Completed";
-                transaction.Description = transaction.TransactionType == "Topup"
-                    ? $"Nạp tiền thành công (Mã: {data.OrderCode})"
-                    : $"Thanh toán booking thành công (Mã: {data.OrderCode})";
+                transaction.Description = transaction.TransactionType switch
+                {
+                    "Topup" => $"Nạp tiền thành công (Mã: {data.OrderCode})",
+                    "BookingPayment" => $"Thanh toán booking thành công (Mã: {data.OrderCode})",
+                    "WalkInPayment" => $"Thanh toán walk-in thành công (Mã: {data.OrderCode})",
+                    _ => transaction.Description
+                };
 
                 if (transaction.TransactionType == "Topup")
                 {
@@ -255,7 +260,7 @@ namespace AutoWashPro.BLL.Services
                     transaction.Description = $"Nap tien thanh cong (Ma: {data.OrderCode})";
                     transaction.Wallet.Balance += data.Amount;
                 }
-                else if (transaction.TransactionType == "BookingPayment")
+                else if (transaction.TransactionType == "BookingPayment" || transaction.TransactionType == "WalkInPayment")
                 {
                     if (!transaction.ReferenceBookingId.HasValue)
                         throw new BadRequestException("Giao dịch thanh toán booking thiếu mã booking.");
@@ -273,7 +278,7 @@ namespace AutoWashPro.BLL.Services
                     var otherPendingBookingPayments = await _context.Transactions
                         .Where(t => t.ReferenceBookingId == booking.BookingId
                                  && t.TransactionId != transaction.TransactionId
-                                 && t.TransactionType == "BookingPayment"
+                                 && (t.TransactionType == "BookingPayment" || t.TransactionType == "WalkInPayment")
                                  && t.Status == "Pending")
                         .ToListAsync();
 
@@ -557,7 +562,9 @@ namespace AutoWashPro.BLL.Services
             return _context.Transactions.AnyAsync(t =>
                 t.ReferenceBookingId == bookingId
                 && t.Status == "Completed"
-                && (t.TransactionType == "Payment" || t.TransactionType == "BookingPayment"));
+                && (t.TransactionType == "Payment"
+                    || t.TransactionType == "BookingPayment"
+                    || t.TransactionType == "WalkInPayment"));
         }
 
         private async Task<WebhookData> VerifyPayOsWebhookAsync(WebhookTopUpDTO webhookData)
