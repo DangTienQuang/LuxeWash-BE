@@ -1,5 +1,6 @@
 ﻿using AutoWashPro.BLL.Exceptions;
 using BLL.Services;
+using BLL.Services.AI.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers
@@ -9,10 +10,12 @@ namespace API.Controllers
     public class VehicleDetectionController : ControllerBase
     {
         private readonly ILicensePlateService _plateService;
+        private readonly ICarRecognitionService _carRecognitionService;
 
-        public VehicleDetectionController(ILicensePlateService plateService)
+        public VehicleDetectionController(ILicensePlateService plateService, ICarRecognitionService carRecognitionService)
         {
             _plateService = plateService;
+            _carRecognitionService = carRecognitionService;
         }
 
         [HttpPost("detect-plate")]
@@ -20,7 +23,7 @@ namespace API.Controllers
         public async Task<IActionResult> DetectPlate(IFormFile image)
         {
             if (image == null || image.Length == 0)
-                throw new BadRequestException("No image provided.");
+                throw new BadRequestException("Vui lòng cung cấp ảnh.");
 
             using var ms = new MemoryStream();
             await image.CopyToAsync(ms);
@@ -28,7 +31,7 @@ namespace API.Controllers
             var result = await _plateService.DetectPlateAsync(ms.ToArray());
 
             if (!result.Detected)
-                throw new NotFoundException("No license plate detected.");
+                throw new NotFoundException("Không phát hiện được biển số.");
 
             return Ok(new
             {
@@ -44,12 +47,10 @@ namespace API.Controllers
 
         [HttpPost("detect-dual-plate")]
         [RequestSizeLimit(20 * 1024 * 1024)]
-        public async Task<IActionResult> DetectDualPlate(
-            IFormFile? frontImage,
-            IFormFile? backImage)
+        public async Task<IActionResult> DetectDualPlate(IFormFile? frontImage, IFormFile? backImage)
         {
             if (frontImage == null && backImage == null)
-                throw new BadRequestException("At least one image required.");
+                throw new BadRequestException("Cần cung cấp ít nhất một ảnh.");
 
             byte[]? frontBytes = null;
             byte[]? backBytes = null;
@@ -71,7 +72,7 @@ namespace API.Controllers
             var result = await _plateService.DetectDualPlateAsync(frontBytes, backBytes);
 
             if (!result.Detected)
-                throw new NotFoundException("No license plate detected.");
+                throw new NotFoundException("Không phát hiện được biển số.");
 
             return Ok(new
             {
@@ -96,6 +97,34 @@ namespace API.Controllers
                         plateType = result.Back.PlateType
                     }
                 }
+            });
+        }
+
+        [HttpPost("car-recognize")]
+        public async Task<IActionResult> Recognize(IFormFile image)
+        {
+            if (image == null || image.Length == 0)
+                throw new InvalidOperationException("Vui lòng tải lên ảnh xe");
+
+            using var ms = new MemoryStream();
+            await image.CopyToAsync(ms);
+
+            var results = await _carRecognitionService.RecognizeAsync(ms.ToArray());
+
+            return Ok(new
+            {
+                statusCode = 200,
+                message = "Nhận diện xe thành công",
+                data = results.Select(r => new
+                {
+                    box = new { r.Box.X1, r.Box.Y1, r.Box.X2, r.Box.Y2, r.Box.Confidence },
+                    predictedBrand = r.PredictedBrand,
+                    predictedModel = r.PredictedModelName,
+                    confidence = r.ClassificationConfidence,
+                    carModelId = r.CarModelId,
+                    carModelStatus = r.CarModelStatus,
+                    isNewlyRequestedModel = r.IsNewlyRequestedModel
+                })
             });
         }
     }
