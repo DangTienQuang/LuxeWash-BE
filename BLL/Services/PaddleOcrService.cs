@@ -49,14 +49,10 @@ namespace BLL.Services
                     var oneLine = RecognizeBestTextLine(rawBmp, position + "_oneline");
                     int cleanLen = oneLine.text.Count(char.IsLetterOrDigit);
 
-                    // If 1-line recognition yields a confident string of length >= 6, use it directly
-                    if (cleanLen >= 6 && oneLine.conf >= 0.65f)
-                    {
-                        _logger.LogInformation("[{Pos}] High-confidence 1-line layout: '{Text}' (Conf: {Conf:F3})", position, oneLine.text, oneLine.conf);
-                        return PostProcessPlateText(oneLine.text);
-                    }
+                    float imgRatio = (float)rawBmp.Width / Math.Max(1, rawBmp.Height);
+                    bool isTwoLineCandidate = plateType == "SHORT" || imgRatio <= 2.3f || IsTwoLinePlate(rawBmp);
 
-                    if (plateType == "LONG" || !IsTwoLinePlate(rawBmp))
+                    if (!isTwoLineCandidate)
                     {
                         _logger.LogInformation("[{Pos}] Standard 1-line layout: '{Text}' (Conf: {Conf:F3})", position, oneLine.text, oneLine.conf);
                         return PostProcessPlateText(oneLine.text);
@@ -191,16 +187,31 @@ namespace BLL.Services
             _logger.LogInformation("[{Pos}] Line 1: '{A}' (Conf: {C1:F3})", position, line1.text, line1.conf);
             _logger.LogInformation("[{Pos}] Line 2: '{B}' (Conf: {C2:F3})", position, line2.text, line2.conf);
 
-            float oneScore = oneLineResult.conf + oneLineResult.text.Count(char.IsLetterOrDigit) * 0.15f;
-            float twoScore = ((line1.conf + line2.conf) / 2f) + (line1.text.Count(char.IsLetterOrDigit) + line2.text.Count(char.IsLetterOrDigit)) * 0.15f;
+            if (line1.conf < 0.55f || line2.conf < 0.55f)
+            {
+                _logger.LogInformation("[{Pos}] Low confidence on 2-line split (L1:{C1:F2}, L2:{C2:F2}), preferring 1-line", position, line1.conf, line2.conf);
+                return oneLineResult.text;
+            }
 
-            if (oneScore >= twoScore || line1.text.Count(char.IsLetterOrDigit) < 2 || line2.text.Count(char.IsLetterOrDigit) < 2)
+            string l2Text = line2.text;
+            if (l2Text.Count(char.IsDigit) > 5)
+            {
+                if (l2Text.StartsWith("1") || l2Text.StartsWith("I") || l2Text.StartsWith("l"))
+                    l2Text = l2Text.Substring(1);
+                else if (l2Text.EndsWith("1") || l2Text.EndsWith("I") || l2Text.EndsWith("l"))
+                    l2Text = l2Text.Substring(0, l2Text.Length - 1);
+            }
+
+            float oneScore = oneLineResult.conf + oneLineResult.text.Count(char.IsLetterOrDigit) * 0.15f;
+            float twoScore = ((line1.conf + line2.conf) / 2f) + (line1.text.Count(char.IsLetterOrDigit) + l2Text.Count(char.IsLetterOrDigit)) * 0.15f;
+
+            if (oneScore >= twoScore || line1.text.Count(char.IsLetterOrDigit) < 2 || l2Text.Count(char.IsLetterOrDigit) < 2)
             {
                 _logger.LogInformation("[{Pos}] 1-line score ({S1:F2}) >= 2-line score ({S2:F2}), preferring 1-line", position, oneScore, twoScore);
                 return oneLineResult.text;
             }
 
-            return (line1.text + line2.text).ToUpper();
+            return (line1.text + l2Text).ToUpper();
         }
 
         // ── Multi-Candidate Ensemble Recognition ─────────────────────────────
@@ -293,7 +304,6 @@ namespace BLL.Services
         {
             if (string.IsNullOrEmpty(text)) return string.Empty;
             string upper = text.ToUpper().Trim();
-            upper = upper.Replace(".", "-");
             if (upper.Length >= 4 && upper.EndsWith("I"))
             {
                 if (char.IsDigit(upper[upper.Length - 2]) && char.IsDigit(upper[upper.Length - 3]))
