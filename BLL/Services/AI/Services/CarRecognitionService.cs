@@ -1,4 +1,4 @@
-﻿using BLL.Services.AI.Interfaces;
+using BLL.Services.AI.Interfaces;
 using BLL.Services.AI.Models;
 using SkiaSharp;
 using System;
@@ -27,13 +27,25 @@ namespace BLL.Services.AI.Services
 
         public async Task<List<CarRecognitionResult>> RecognizeAsync(byte[] imageBytes)
         {
-            var boxes = _detectionService.DetectCars(imageBytes);
-            if (boxes.Count == 0)
-                return new List<CarRecognitionResult>();
-
             using var original = SKBitmap.Decode(imageBytes);
             if (original == null)
                 throw new InvalidOperationException("Không thể đọc ảnh đầu vào");
+
+            var boxes = _detectionService.DetectCars(imageBytes, 0.25f);
+
+            if (boxes.Count == 0)
+            {
+                boxes.Add(new CarBoundingBox
+                {
+                    X1 = 0,
+                    Y1 = 0,
+                    X2 = original.Width,
+                    Y2 = original.Height,
+                    Confidence = 1.0f,
+                    ClassId = 0,
+                    ClassName = "car"
+                });
+            }
 
             var results = new List<CarRecognitionResult>();
 
@@ -47,27 +59,88 @@ namespace BLL.Services.AI.Services
 
                 var match = await _matchingService.MatchOrCreatePendingAsync(brand, modelName);
 
+                string det = box.ClassName?.ToLower() ?? "";
+                string b = brand?.ToLower() ?? "";
+                string model = modelName?.ToLower() ?? "";
+
+                string predictedType;
+                if (det == "pickup-truck" || det == "truck" ||
+                    b.Contains("hino") || b.Contains("isuzu") || b.Contains("howo") || b.Contains("thaco") || b.Contains("dongfeng") || b.Contains("fuso") || b.Contains("kamaz") || b.Contains("jac") || b.Contains("chenglong") ||
+                    model.Contains("truck") || model.Contains("tải") || model.Contains("500") || model.Contains("300") || model.Contains("ram") || model.Contains("f-150") || model.Contains("ranger") || model.Contains("hilux") || model.Contains("triton") || model.Contains("navara") || model.Contains("bt-50") || model.Contains("colorado"))
+                {
+                    predictedType = "Xe bán tải / Xe tải";
+                }
+                else if (det == "bus")
+                {
+                    predictedType = "Xe khách / Xe buýt";
+                }
+                else if (det == "motorcycle" || det == "bike" || det == "bicycle")
+                {
+                    predictedType = "Xe máy";
+                }
+                else
+                {
+                    predictedType = match.VehicleTypeName ?? InferVehicleType(box.ClassName, brand, modelName);
+                }
+
                 results.Add(new CarRecognitionResult
                 {
                     Box = box,
                     PredictedBrand = brand,
                     PredictedModelName = modelName,
+                    PredictedVehicleType = predictedType,
                     ClassificationConfidence = classification.Confidence,
                     CarModelId = match.CarModelId,
                     CarModelStatus = match.Status,
-                    IsNewlyRequestedModel = match.IsNewlyCreated
+                    IsNewlyRequestedModel = match.IsNewlyCreated,
+                    VehicleTypeId = match.VehicleTypeId,
+                    VehicleTypeName = predictedType
                 });
             }
 
             return results;
         }
 
+        private string InferVehicleType(string detectorClass, string brand, string modelName)
+        {
+            string det = detectorClass?.ToLower() ?? "";
+            string b = brand?.ToLower() ?? "";
+            string model = modelName?.ToLower() ?? "";
+
+            if (det == "motorcycle" || det == "bike" || det == "bicycle")
+                return "Xe máy";
+
+            if (det == "pickup-truck" || det == "truck" ||
+                b.Contains("hino") || b.Contains("isuzu") || b.Contains("howo") || b.Contains("thaco") || b.Contains("dongfeng") || b.Contains("fuso") || b.Contains("kamaz") || b.Contains("jac") || b.Contains("chenglong") ||
+                model.Contains("truck") || model.Contains("tải") || model.Contains("500") || model.Contains("300") || model.Contains("ram") || model.Contains("f-150") || model.Contains("ranger") || model.Contains("hilux") || model.Contains("triton") || model.Contains("navara") || model.Contains("bt-50") || model.Contains("colorado"))
+                return "Xe bán tải / Xe tải";
+
+            if (det == "bus")
+                return "Xe khách / Xe buýt";
+
+            if (det == "suv" || det == "van" || model.Contains("explorer") || model.Contains("wrangler") || model.Contains("fortuner") || model.Contains("everest") || model.Contains("santa fe") || model.Contains("sorento") || model.Contains("cr-v") || model.Contains("cx-8") || model.Contains("innova") || model.Contains("carnival") || model.Contains("xpander") || model.Contains("rush") || model.Contains("veloz"))
+                return "Xe 7 chỗ (SUV/MPV)";
+
+            return "Xe 4 chỗ (Sedan/Hatchback)";
+        }
+
         private byte[] CropToBytes(SKBitmap original, CarBoundingBox box)
         {
-            int x1 = Math.Max(0, (int)box.X1);
-            int y1 = Math.Max(0, (int)box.Y1);
-            int x2 = Math.Min(original.Width, (int)box.X2);
-            int y2 = Math.Min(original.Height, (int)box.Y2);
+            float bw = box.X2 - box.X1;
+            float bh = box.Y2 - box.Y1;
+
+            float expandX = bw * 0.08f;
+            float expandY = bh * 0.08f;
+
+            int x1 = Math.Max(0, (int)(box.X1 - expandX));
+            int y1 = Math.Max(0, (int)(box.Y1 - expandY));
+            int x2 = Math.Min(original.Width, (int)(box.X2 + expandX));
+            int y2 = Math.Min(original.Height, (int)(box.Y2 + expandY));
+
+            if (x2 <= x1 || y2 <= y1)
+            {
+                x1 = 0; y1 = 0; x2 = original.Width; y2 = original.Height;
+            }
 
             var cropRect = new SKRectI(x1, y1, x2, y2);
             using var cropped = new SKBitmap(cropRect.Width, cropRect.Height);
@@ -75,7 +148,7 @@ namespace BLL.Services.AI.Services
             canvas.DrawBitmap(original, cropRect, new SKRect(0, 0, cropRect.Width, cropRect.Height));
 
             using var image = SKImage.FromBitmap(cropped);
-            using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
+            using var data = image.Encode(SKEncodedImageFormat.Jpeg, 95);
             return data.ToArray();
         }
 

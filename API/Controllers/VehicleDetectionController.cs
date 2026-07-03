@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.Exceptions;
+using AutoWashPro.BLL.Exceptions;
 using BLL.Services;
 using BLL.Services.AI.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -117,13 +117,17 @@ namespace API.Controllers
                 message = "Nhận diện xe thành công",
                 data = results.Select(r => new
                 {
-                    box = new { r.Box.X1, r.Box.Y1, r.Box.X2, r.Box.Y2, r.Box.Confidence },
+                    vehicleType = r.VehicleTypeName ?? r.PredictedVehicleType,
                     predictedBrand = r.PredictedBrand,
                     predictedModel = r.PredictedModelName,
                     confidence = r.ClassificationConfidence,
-                    carModelId = r.CarModelId,
-                    carModelStatus = r.CarModelStatus,
-                    isNewlyRequestedModel = r.IsNewlyRequestedModel
+                    box = r.Box != null ? new
+                    {
+                        x1 = r.Box.X1,
+                        y1 = r.Box.Y1,
+                        x2 = r.Box.X2,
+                        y2 = r.Box.Y2
+                    } : null
                 })
             });
         }

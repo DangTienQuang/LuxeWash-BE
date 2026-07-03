@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,5 +12,6 @@ namespace BLL.Services.AI.Models
         public string Status { get; set; } = "Pending"; // mirrors CarModel.Status
         public bool IsNewlyCreated { get; set; }
         public int? VehicleTypeId { get; set; }
+        public string? VehicleTypeName { get; set; }
     }
 }
