@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace DAL.Entities.AI
+namespace AutoWashPro.DAL.Entities
 {
     public class FeatureDefinition
     {

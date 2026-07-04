@@ -1,8 +1,7 @@
-﻿using AutoWashPro.DAL.Entities;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace DAL.Entities.AI
+namespace AutoWashPro.DAL.Entities
 {
     public class AILearning
     {

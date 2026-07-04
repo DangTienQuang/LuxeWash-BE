@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DAL.Entities.AI
+namespace DAL.Entities
 {
     public class AIConversationLog
     {

@@ -1,6 +1,5 @@
 ﻿using AutoWashPro.DAL.Entities;
 using DAL.Entities;
-using DAL.Entities.AI;
 using Microsoft.EntityFrameworkCore;
 
 namespace AutoWashPro.DAL.Data
