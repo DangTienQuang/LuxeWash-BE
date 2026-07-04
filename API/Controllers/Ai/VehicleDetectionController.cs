@@ -3,7 +3,7 @@ using BLL.Services;
 using BLL.Services.AI.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
-namespace API.Controllers
+namespace API.Controllers.Ai
 {
     [ApiController]
     [Route("api/lpr")]
@@ -12,10 +12,17 @@ namespace API.Controllers
         private readonly ILicensePlateService _plateService;
         private readonly ICarRecognitionService _carRecognitionService;
 
-        public VehicleDetectionController(ILicensePlateService plateService, ICarRecognitionService carRecognitionService)
+        // 1. Khai báo thêm Service nhận diện xe
+        private readonly ICarDetectionService _detectionService;
+
+        public VehicleDetectionController(
+            ILicensePlateService plateService,
+            ICarRecognitionService carRecognitionService,
+            ICarDetectionService detectionService)
         {
             _plateService = plateService;
             _carRecognitionService = carRecognitionService;
+            _detectionService = detectionService; 
         }
 
         [HttpPost("detect-plate")]
@@ -130,6 +137,47 @@ namespace API.Controllers
                     } : null
                 })
             });
+        }
+
+
+        [HttpPost("check-has-car")]
+        public async Task<IActionResult> CheckHasCar(IFormFile imageFile)
+        {
+            if (imageFile == null || imageFile.Length == 0)
+            {
+                return BadRequest(new { statusCode = 400, message = "Vui lòng tải lên một bức ảnh." });
+            }
+
+            using var memoryStream = new MemoryStream();
+            await imageFile.CopyToAsync(memoryStream);
+            byte[] imageBytes = memoryStream.ToArray();
+
+
+            var boundingBoxes = _detectionService.DetectCars(imageBytes, 0.25f);
+
+            if (boundingBoxes.Count > 0)
+            {
+                return Ok(new
+                {
+                    statusCode = 200,
+                    success = true,
+                    hasCar = true,
+                    carCount = boundingBoxes.Count,
+                    message = "Đã phát hiện thấy xe ô tô trong khung hình!",
+                    boxes = boundingBoxes
+                });
+            }
+            else
+            {
+                return Ok(new
+                {
+                    statusCode = 200,
+                    success = true,
+                    hasCar = false,
+                    carCount = 0,
+                    message = "Không có xe nào trong khu vực camera."
+                });
+            }
         }
     }
 }
