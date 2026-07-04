@@ -15,6 +15,8 @@ namespace AutoWashPro.DAL.Entities
         [Required]
         [MaxLength(150)]
         public string DisplayName { get; set; } = string.Empty;
+        [MaxLength(100)]
+        public string PropertyName { get; set; } = string.Empty;
 
         [MaxLength(1000)]
         public string? Description { get; set; }
@@ -36,6 +38,7 @@ namespace AutoWashPro.DAL.Entities
         public bool IsAIFeature { get; set; } = true;
 
         public bool IsActive { get; set; } = true;
+        public string? Unit { get; set; }
 
         public virtual ICollection<ScenarioCondition> ScenarioConditions { get; set; }
             = new List<ScenarioCondition>();

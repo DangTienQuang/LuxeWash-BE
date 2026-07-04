@@ -1,4 +1,4 @@
-﻿using DAL.Data;
+using DAL.Data;
 using DAL.DTOs;
 using DAL.Entities;
 using Microsoft.Extensions.Logging;
@@ -12,19 +12,19 @@ namespace BLL.Services
         private readonly PaddleOcrService _ocr;
         private readonly ILogger<LicensePlateService> _logger;
 
-        private const float ConfidenceThreshold = 0.5f;
+        private const float ConfidenceThreshold = 0.25f;
         private const float IouThreshold = 0.45f;
         private const int ModelInputSize = 640;
         //LONG Plate
-        private const float FrontExpandLeft = 0.5f;
-        private const float FrontExpandRight = 0.3f;
-        private const float FrontExpandTop = 0.05f;
-        private const float FrontExpandBot = 0.05f;
+        private const float FrontExpandLeft = 0.0f;
+        private const float FrontExpandRight = 0.0f;
+        private const float FrontExpandTop = 0.0f;
+        private const float FrontExpandBot = 0.0f;
         //Short Plate
-        private const float BackExpandLeft = 0.6f;
-        private const float BackExpandRight = 0.1f;
-        private const float BackExpandTop = 0.15f;
-        private const float BackExpandBot = 0.25f;
+        private const float BackExpandLeft = 0.0f;
+        private const float BackExpandRight = 0.0f;
+        private const float BackExpandTop = 0.0f;
+        private const float BackExpandBot = 0.0f;
 
         public LicensePlateService(OnnxInferenceEngine engine, PaddleOcrService ocr, ILogger<LicensePlateService> logger)
         {
@@ -58,11 +58,26 @@ namespace BLL.Services
         {
             var boxes = GetFilteredBoxes(imageBytes);
             if (!boxes.Any())
+            {
+                // Fallback: If no YOLO box detected (e.g. pre-cropped image uploaded), attempt direct OCR
+                var fallbackText = await _ocr.ExtractTextAsync(imageBytes, "SHORT", position.ToString() + "_Fallback");
+                if (!string.IsNullOrEmpty(fallbackText) && fallbackText.Count(char.IsLetterOrDigit) >= 4)
+                {
+                    return new SinglePlateResult
+                    {
+                        Detected = true,
+                        PlateText = fallbackText,
+                        Confidence = 0.75f,
+                        Position = position,
+                        PlateType = "SHORT"
+                    };
+                }
                 return new SinglePlateResult
                 {
                     Detected = false,
                     Position = position
                 };
+            }
 
             var bestBox = boxes.OrderByDescending(b => b.Confidence).First();
             var cropped = CropRegion(imageBytes, bestBox, position);
@@ -187,7 +202,21 @@ namespace BLL.Services
         {
             var boxes = GetFilteredBoxes(imageBytes);
             if (!boxes.Any())
+            {
+                // Fallback: If no YOLO box detected (e.g. pre-cropped image uploaded), attempt direct OCR
+                var fallbackText = await _ocr.ExtractTextAsync(imageBytes, "SHORT", "Single_Fallback");
+                if (!string.IsNullOrEmpty(fallbackText) && fallbackText.Count(char.IsLetterOrDigit) >= 4)
+                {
+                    return new LicensePlateResult
+                    {
+                        Detected = true,
+                        PlateText = fallbackText,
+                        Confidence = 0.75f,
+                        Boxes = new List<DetectionBox>()
+                    };
+                }
                 return new LicensePlateResult { Detected = false };
+            }
 
             var bestBox = boxes.OrderByDescending(b => b.Confidence).First();
             var cropped = CropRegion(imageBytes, bestBox, PlatePosition.Back);

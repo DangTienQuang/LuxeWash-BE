@@ -37,15 +37,28 @@ namespace AutoWashPro.DAL.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal LifetimeSpend { get; set; }
         public int LifetimeBookings { get; set; }
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal AverageDiscountReceived { get; set; }
+        public decimal AverageOriginalSpend { get; set; }
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal TotalVoucherSavings { get; set; }
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal TotalPointSavings { get; set; }
+
         // ===== Preferences =====
 
         public int? FavoriteServiceId { get; set; }
         public virtual Service? FavoriteService { get; set; }
+        public int? FavoriteServiceUsage { get; set; }
+        public double? AverageServicesPerBooking { get; set; }
+        public int TotalServicesPurchased { get; set; }
         public int? FavoriteBranchId { get; set; }
         public virtual Branch? FavoriteBranch { get; set; }
         [MaxLength(20)]
         public string? FavoriteVisitDay { get; set; }
         public int? FavoriteVisitHour { get; set; }
+        public int? BasicServiceBookings { get; set; }
+        public double? PremiumServiceRate { get; set; }
 
         // ===== Behaviour =====
         public double WeekendVisitRate { get; set; }
@@ -54,12 +67,22 @@ namespace AutoWashPro.DAL.Entities
         public double EveningVisitRate { get; set; }
         public double RainVisitRate { get; set; }
 
+        // ===== Branch Preference
+        public int FavoriteBranchVisits { get; set; }
+        public double BranchLoyaltyRate { get; set; }
+
         // ===== Promotion =====
 
         public double CouponUsageRate { get; set; }
+        public double PointUsageRate { get; set; }
         public double PromotionResponseRate { get; set; }
-
         public int? MembershipTierId { get; set; }
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal AverageVoucherDiscount { get; set; }
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal AveragePointDiscount { get; set; }
+        public int VoucherBookings { get; set; }
+        public int PointBookings { get; set; }
         public virtual Tier? MembershipTier { get; set; }
         public int CurrentPoints { get; set; }
 
@@ -69,8 +92,11 @@ namespace AutoWashPro.DAL.Entities
         // ===== Vehicle =====
 
         public int VehicleCount { get; set; }
-        public int LuxuryVehicleCount { get; set; }
-        public double AverageVehicleAge { get; set; }
+        public int PreferredVehicleTypeId { get; set; }
+        public int DifferentVehicleTypes { get; set; }
+        public double FleetUsageRate { get; set; }
+        public double VehicleTypeConsistency { get; set; }
+
         // ===== Customer =====
 
         public double AverageRating { get; set; }

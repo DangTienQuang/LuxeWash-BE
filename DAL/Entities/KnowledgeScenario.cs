@@ -39,6 +39,7 @@ namespace AutoWashPro.DAL.Entities
         public bool IsSystemScenario { get; set; } = false;
         public DateTime? LastTriggeredAt { get; set; }
         public int TriggerCount { get; set; }
+        public string? RuleVersion { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
