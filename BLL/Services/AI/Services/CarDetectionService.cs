@@ -73,7 +73,7 @@ namespace BLL.Services.AI.Services
             int padX = (_inputWidth - newWidth) / 2;
             int padY = (_inputHeight - newHeight) / 2;
 
-            using var resized = original.Resize(new SKImageInfo(newWidth, newHeight), SKFilterQuality.High);
+            using var resized = original.Resize(new SKImageInfo(newWidth, newHeight), new SKSamplingOptions(SKFilterMode.Linear));
 
             var tensor = new DenseTensor<float>(new[] { 1, 3, _inputHeight, _inputWidth });
 

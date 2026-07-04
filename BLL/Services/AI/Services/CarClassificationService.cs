@@ -57,7 +57,7 @@ namespace BLL.Services.AI.Services
 
         private DenseTensor<float> Preprocess(SKBitmap bitmap)
         {
-            using var resized = bitmap.Resize(new SKImageInfo(InputSize, InputSize), SKFilterQuality.High);
+            using var resized = bitmap.Resize(new SKImageInfo(InputSize, InputSize), new SKSamplingOptions(SKFilterMode.Linear));
             var tensor = new DenseTensor<float>(new[] { 1, 3, InputSize, InputSize });
 
             for (int y = 0; y < InputSize; y++)

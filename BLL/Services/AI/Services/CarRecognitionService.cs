@@ -145,7 +145,7 @@ namespace BLL.Services.AI.Services
             var cropRect = new SKRectI(x1, y1, x2, y2);
             using var cropped = new SKBitmap(cropRect.Width, cropRect.Height);
             using var canvas = new SKCanvas(cropped);
-            canvas.DrawBitmap(original, cropRect, new SKRect(0, 0, cropRect.Width, cropRect.Height));
+            canvas.DrawBitmap(original, cropRect, new SKRect(0, 0, cropRect.Width, cropRect.Height), new SKSamplingOptions(SKFilterMode.Linear));
 
             using var image = SKImage.FromBitmap(cropped);
             using var data = image.Encode(SKEncodedImageFormat.Jpeg, 95);
