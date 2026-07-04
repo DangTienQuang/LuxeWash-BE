@@ -4,6 +4,7 @@ using AutoWashPro.DAL.Entities;
 using BLL.Constants;
 using BLL.DTOs;
 using DAL.Entities;
+using DAL.Entities.AI;
 using Microsoft.EntityFrameworkCore;
 
 namespace BLL.Services

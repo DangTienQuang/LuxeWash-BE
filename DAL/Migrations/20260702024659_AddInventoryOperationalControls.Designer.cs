@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DAL.Migrations
 {
     [DbContext(typeof(AutoWashDbContext))]
-    [Migration("20260610185947_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260702024659_AddInventoryOperationalControls")]
+    partial class AddInventoryOperationalControls
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -183,6 +183,65 @@ namespace DAL.Migrations
                     b.ToTable("BookingDocuments");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.BookingMaterialUsage", b =>
+                {
+                    b.Property<int>("BookingMaterialUsageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BookingDetailId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("CostAmount")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal?>("EstimatedUnitCost")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<bool>("IsCostPending")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int?>("MaterialBatchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("QuantityUsed")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("UsageType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("BookingMaterialUsageId");
+
+                    b.HasIndex("BookingDetailId");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("MaterialBatchId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.ToTable("BookingMaterialUsages");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Branch", b =>
                 {
                     b.Property<int>("BranchId")
@@ -193,6 +252,9 @@ namespace DAL.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
 
+                    b.Property<bool>("AllowNegativeStock")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
 
@@ -200,6 +262,9 @@ namespace DAL.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<decimal?>("NegativeStockLimit")
+                        .HasColumnType("decimal(65,30)");
 
                     b.HasKey("BranchId");
 
@@ -225,7 +290,22 @@ namespace DAL.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<int?>("RequestedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int?>("VehicleTypeId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("VehicleTypeId");
 
                     b.ToTable("CarModels");
                 });
@@ -346,6 +426,132 @@ namespace DAL.Migrations
                     b.ToTable("EmployeeProfiles");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ExtraMaterialUsageRequest", b =>
+                {
+                    b.Property<int>("RequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ManagerNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ReviewedByManagerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StaffUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("RequestId");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("ReviewedByManagerId");
+
+                    b.HasIndex("StaffUserId");
+
+                    b.HasIndex("BranchId", "Status", "CreatedAt");
+
+                    b.ToTable("ExtraMaterialUsageRequests");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.InventoryTransaction", b =>
+                {
+                    b.Property<int>("InventoryTransactionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("AfterQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal>("BeforeQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int?>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("CostAmount")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaterialBatchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("InventoryTransactionId");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("MaterialBatchId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("InventoryTransactions");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Lane", b =>
                 {
                     b.Property<int>("LaneId")
@@ -400,6 +606,190 @@ namespace DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("ManagerProfiles");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.Material", b =>
+                {
+                    b.Property<int>("MaterialId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("ConsumptionType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("DefaultMinStockLevel")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<int>("ExpiryWarningDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<bool>("RequiresExpiryTracking")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("MaterialId");
+
+                    b.ToTable("Materials");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialBatch", b =>
+                {
+                    b.Property<int>("MaterialBatchId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("BatchCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("ImportedQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime?>("ManufactureDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("RemainingQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int?>("SourceMaterialBatchId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("MaterialBatchId");
+
+                    b.HasIndex("BatchCode")
+                        .IsUnique();
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("SourceMaterialBatchId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("MaterialBatches");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialTransferRequest", b =>
+                {
+                    b.Property<int>("RequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("RequestedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("RequestId");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.ToTable("MaterialTransferRequests");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialTransferRequestItem", b =>
+                {
+                    b.Property<int>("RequestItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("ApprovedQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RequestId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("RequestedQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.HasKey("RequestItemId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("RequestId");
+
+                    b.ToTable("MaterialTransferRequestItems");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.OvertimeRequest", b =>
@@ -506,6 +896,44 @@ namespace DAL.Migrations
                     b.ToTable("Services");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ServiceMaterialUsage", b =>
+                {
+                    b.Property<int>("ServiceMaterialUsageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("BaseQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int?>("VehicleTypeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ServiceMaterialUsageId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("VehicleTypeId");
+
+                    b.HasIndex("ServiceId", "VehicleTypeId", "MaterialId")
+                        .IsUnique();
+
+                    b.ToTable("ServiceMaterialUsages");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ServicePrice", b =>
                 {
                     b.Property<int>("ServicePriceId")
@@ -602,11 +1030,16 @@ namespace DAL.Migrations
                     b.Property<int>("StaffId")
                         .HasColumnType("int");
 
+                    b.Property<int>("WorkShiftId")
+                        .HasColumnType("int");
+
                     b.HasKey("AssignmentId");
 
                     b.HasIndex("LaneId");
 
                     b.HasIndex("StaffId");
+
+                    b.HasIndex("WorkShiftId");
 
                     b.ToTable("StaffLaneAssignments");
                 });
@@ -754,6 +1187,10 @@ namespace DAL.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
                     b.Property<int?>("ReferenceBookingId")
                         .HasColumnType("int");
 
@@ -767,7 +1204,7 @@ namespace DAL.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
-                    b.Property<int>("WalletId")
+                    b.Property<int?>("WalletId")
                         .HasColumnType("int");
 
                     b.HasKey("TransactionId");
@@ -916,6 +1353,33 @@ namespace DAL.Migrations
                     b.ToTable("Vehicles");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.VehicleConditionMaterialMultiplier", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("Multiplier")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("VehicleCondition")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VehicleCondition")
+                        .IsUnique();
+
+                    b.ToTable("VehicleConditionMaterialMultipliers");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.VehicleType", b =>
                 {
                     b.Property<int>("Id")
@@ -1049,6 +1513,69 @@ namespace DAL.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Wallets");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.Warehouse", b =>
+                {
+                    b.Property<int>("WarehouseId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("WarehouseId");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("Type", "BranchId")
+                        .IsUnique();
+
+                    b.ToTable("Warehouses");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.WarehouseStock", b =>
+                {
+                    b.Property<int>("WarehouseStockId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("CurrentQuantity")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MinStockLevel")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("WarehouseStockId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("WarehouseId", "MaterialId")
+                        .IsUnique();
+
+                    b.ToTable("WarehouseStocks");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.WorkShift", b =>
@@ -1565,6 +2092,62 @@ namespace DAL.Migrations
                     b.Navigation("Booking");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.BookingMaterialUsage", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.BookingDetail", "BookingDetail")
+                        .WithMany()
+                        .HasForeignKey("BookingDetailId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.MaterialBatch", "MaterialBatch")
+                        .WithMany()
+                        .HasForeignKey("MaterialBatchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("BookingDetail");
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Material");
+
+                    b.Navigation("MaterialBatch");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.CarModel", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "RequestedByUser")
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId");
+
+                    b.HasOne("AutoWashPro.DAL.Entities.VehicleType", "VehicleType")
+                        .WithMany()
+                        .HasForeignKey("VehicleTypeId");
+
+                    b.Navigation("RequestedByUser");
+
+                    b.Navigation("VehicleType");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerProfile", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.Tier", "Tier")
@@ -1621,6 +2204,92 @@ namespace DAL.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ExtraMaterialUsageRequest", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "ReviewedByManager")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByManagerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "StaffUser")
+                        .WithMany()
+                        .HasForeignKey("StaffUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Material");
+
+                    b.Navigation("ReviewedByManager");
+
+                    b.Navigation("StaffUser");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.InventoryTransaction", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId");
+
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("AutoWashPro.DAL.Entities.MaterialBatch", "MaterialBatch")
+                        .WithMany()
+                        .HasForeignKey("MaterialBatchId");
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Material");
+
+                    b.Navigation("MaterialBatch");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Lane", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
@@ -1643,6 +2312,70 @@ namespace DAL.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialBatch", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
+                        .WithMany("Batches")
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.MaterialBatch", "SourceMaterialBatch")
+                        .WithMany()
+                        .HasForeignKey("SourceMaterialBatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Material");
+
+                    b.Navigation("SourceMaterialBatch");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialTransferRequest", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.User", "RequestedByUser")
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("RequestedByUser");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialTransferRequestItem", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.MaterialTransferRequest", "Request")
+                        .WithMany("Items")
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Material");
+
+                    b.Navigation("Request");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.OvertimeRequest", b =>
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.User", "StaffUser")
@@ -1663,6 +2396,31 @@ namespace DAL.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.ServiceMaterialUsage", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Service", "Service")
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.VehicleType", "VehicleType")
+                        .WithMany()
+                        .HasForeignKey("VehicleTypeId");
+
+                    b.Navigation("Material");
+
+                    b.Navigation("Service");
+
+                    b.Navigation("VehicleType");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ServicePrice", b =>
@@ -1725,9 +2483,17 @@ namespace DAL.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("AutoWashPro.DAL.Entities.WorkShift", "WorkShift")
+                        .WithMany()
+                        .HasForeignKey("WorkShiftId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Lane");
 
                     b.Navigation("Staff");
+
+                    b.Navigation("WorkShift");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.StaffProfile", b =>
@@ -1775,9 +2541,7 @@ namespace DAL.Migrations
                 {
                     b.HasOne("AutoWashPro.DAL.Entities.Wallet", "Wallet")
                         .WithMany("Transactions")
-                        .HasForeignKey("WalletId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("WalletId");
 
                     b.Navigation("Wallet");
                 });
@@ -1848,6 +2612,35 @@ namespace DAL.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.Warehouse", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Branch");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.WarehouseStock", b =>
+                {
+                    b.HasOne("AutoWashPro.DAL.Entities.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AutoWashPro.DAL.Entities.Warehouse", "Warehouse")
+                        .WithMany("Stocks")
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Material");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("DAL.Entities.AIConversationLog", b =>
@@ -2022,6 +2815,16 @@ namespace DAL.Migrations
                     b.Navigation("StaffAssignments");
                 });
 
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.Material", b =>
+                {
+                    b.Navigation("Batches");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialTransferRequest", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Service", b =>
                 {
                     b.Navigation("Bookings");
@@ -2064,6 +2867,11 @@ namespace DAL.Migrations
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Wallet", b =>
                 {
                     b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("AutoWashPro.DAL.Entities.Warehouse", b =>
+                {
+                    b.Navigation("Stocks");
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.WorkShift", b =>

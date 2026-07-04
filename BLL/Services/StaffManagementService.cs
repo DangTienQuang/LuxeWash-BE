@@ -21,6 +21,7 @@ namespace AutoWashPro.BLL.Services
             var query = _context.Users
                 .Include(u => u.StaffProfile)
                 .Include(u => u.ManagerProfile)
+                .Include(u => u.EmployeeProfile).ThenInclude(e => e.Branch)
                 .Where(u => u.Role == UserRoles.Staff || u.Role == UserRoles.Manager)
                 .AsQueryable();
 
@@ -488,6 +489,7 @@ namespace AutoWashPro.BLL.Services
             var user = await _context.Users
                 .Include(u => u.StaffProfile)
                 .Include(u => u.ManagerProfile)
+                .Include(u => u.EmployeeProfile).ThenInclude(e => e.Branch)
                 .FirstOrDefaultAsync(u => u.UserId == userId && (u.Role == UserRoles.Staff || u.Role == UserRoles.Manager));
 
             if (user == null) throw new NotFoundException("Không tìm thấy nhân sự.");
@@ -581,7 +583,9 @@ namespace AutoWashPro.BLL.Services
             Role = user.Role,
             Status = user.Status,
             Position = user.Role == UserRoles.Manager ? user.ManagerProfile?.Position : user.StaffProfile?.Position,
-            HiredDate = user.Role == UserRoles.Manager ? user.ManagerProfile?.HiredDate : user.StaffProfile?.HiredDate
+            HiredDate = user.Role == UserRoles.Manager ? user.ManagerProfile?.HiredDate : user.StaffProfile?.HiredDate,
+            BranchId = user.EmployeeProfile?.BranchId,
+            BranchName = user.EmployeeProfile?.Branch?.Name
         };
 
         private static WorkShiftResponseDTO MapWorkShift(WorkShift shift) => new()

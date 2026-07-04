@@ -14,6 +14,8 @@ namespace AutoWashPro.BLL.DTOs
         public string Status { get; set; } = string.Empty;
         public string? Position { get; set; }
         public DateTime? HiredDate { get; set; }
+        public int? BranchId { get; set; }
+        public string? BranchName { get; set; }
     }
 
     public class CreateStaffDTO

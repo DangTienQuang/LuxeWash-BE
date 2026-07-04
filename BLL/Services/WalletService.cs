@@ -144,12 +144,13 @@ namespace AutoWashPro.BLL.Services
                 paymentDescription = $"Booking #{booking.BookingId}";
             }
 
+            var payOsAmount = ToPayOsAmount(amount);
             var orderCode = GenerateOrderCode();
 
             var transaction = new Transaction
             {
                 WalletId = wallet.WalletId,
-                Amount = amount,
+                Amount = payOsAmount,
                 TransactionType = transactionType,
                 Description = transactionDescription,
                 PaymentMethod = "PayOS",
@@ -171,7 +172,7 @@ namespace AutoWashPro.BLL.Services
             var paymentRequest = new CreatePaymentLinkRequest
             {
                 OrderCode = orderCode,
-                Amount = (int)amount,
+                Amount = payOsAmount,
                 Description = paymentDescription,
                 CancelUrl = request.CancelUrl,
                 ReturnUrl = request.ReturnUrl
@@ -184,7 +185,7 @@ namespace AutoWashPro.BLL.Services
                 PaymentUrl = createPaymentResult.CheckoutUrl,
                 OrderCode = orderCode.ToString(),
                 PaymentType = transactionType,
-                Amount = amount,
+                Amount = payOsAmount,
                 BookingId = referenceBookingId
             };
         }
@@ -252,12 +253,20 @@ namespace AutoWashPro.BLL.Services
 
                 if (transaction.TransactionType == "Topup")
                 {
+                    if (transaction.Wallet == null)
+                        throw new BadRequestException("Giao dich nap vi thieu thong tin vi.");
+
+                    transaction.Status = "Completed";
+                    transaction.Description = $"Nap tien thanh cong (Ma: {data.OrderCode})";
                     transaction.Wallet.Balance += data.Amount;
                 }
                 else if (transaction.TransactionType == "BookingPayment" || transaction.TransactionType == "WalkInPayment")
                 {
                     if (!transaction.ReferenceBookingId.HasValue)
                         throw new BadRequestException("Giao dịch thanh toán booking thiếu mã booking.");
+
+                    transaction.Status = "Completed";
+                    transaction.Description = $"Thanh toan booking thanh cong (Ma: {data.OrderCode})";
 
                     var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == transaction.ReferenceBookingId.Value);
                     if (booking == null)
@@ -274,6 +283,32 @@ namespace AutoWashPro.BLL.Services
                         .ToListAsync();
 
                     foreach (var pendingPayment in otherPendingBookingPayments)
+                    {
+                        pendingPayment.Status = "Expired";
+                    }
+                }
+                else if (transaction.TransactionType == "WalkInPayment")
+                {
+                    transaction.Status = "Completed";
+                    transaction.Description = $"Thanh toan walk-in thanh cong (Ma: {data.OrderCode})";
+
+                    if (!transaction.ReferenceBookingId.HasValue)
+                        throw new BadRequestException("Giao dich thanh toan walk-in thieu ma booking.");
+
+                    var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == transaction.ReferenceBookingId.Value);
+                    if (booking == null)
+                        throw new NotFoundException("Khong tim thay booking walk-in can xac nhan thanh toan.");
+
+                    booking.UpdatedAt = DateTime.UtcNow;
+
+                    var otherPendingWalkInPayments = await _context.Transactions
+                        .Where(t => t.ReferenceBookingId == booking.BookingId
+                                 && t.TransactionId != transaction.TransactionId
+                                 && t.TransactionType == "WalkInPayment"
+                                 && t.Status == "Pending")
+                        .ToListAsync();
+
+                    foreach (var pendingPayment in otherPendingWalkInPayments)
                     {
                         pendingPayment.Status = "Expired";
                     }
@@ -493,6 +528,20 @@ namespace AutoWashPro.BLL.Services
             var timestampPart = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1_000_000_000_000;
             var randomPart = Random.Shared.Next(10, 99);
             return timestampPart * 100 + randomPart;
+        }
+
+        private static int ToPayOsAmount(decimal amount)
+        {
+            if (amount <= 0)
+                throw new BadRequestException("So tien thanh toan PayOS phai lon hon 0.");
+
+            if (amount != decimal.Truncate(amount))
+                throw new BadRequestException("PayOS chi ho tro so tien VND nguyen, khong co phan thap phan.");
+
+            if (amount > int.MaxValue)
+                throw new BadRequestException("So tien thanh toan PayOS vuot qua gioi han ho tro.");
+
+            return decimal.ToInt32(amount);
         }
 
         private static string NormalizePaymentType(string paymentType)
