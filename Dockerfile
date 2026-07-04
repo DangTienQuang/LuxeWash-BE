@@ -4,7 +4,6 @@ USER app
 WORKDIR /app
 EXPOSE 8080
 
-# Chuyển qua user root tạm thời để cài các thư viện lõi cho AI & Xử lý ảnh
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
