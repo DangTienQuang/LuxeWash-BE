@@ -1,4 +1,4 @@
-﻿using AutoWashPro.DAL.Data;
+using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.AI.Models;
@@ -27,6 +27,7 @@ namespace BLL.Services.AI.Services
 
             // 1. Exact match against active, approved catalog entries
             var existing = await _context.CarModels
+                .Include(c => c.VehicleType)
                 .Where(c => c.IsActive)
                 .FirstOrDefaultAsync(c =>
                     c.Brand.ToLower() == brand &&
@@ -39,12 +40,14 @@ namespace BLL.Services.AI.Services
                     CarModelId = existing.Id,
                     Status = existing.Status,
                     IsNewlyCreated = false,
-                    VehicleTypeId = existing.VehicleTypeId
+                    VehicleTypeId = existing.VehicleTypeId,
+                    VehicleTypeName = existing.VehicleType?.Name
                 };
             }
 
             // 2. Avoid spamming duplicate Pending requests from repeated check-ins
             var pending = await _context.CarModels
+                .Include(c => c.VehicleType)
                 .FirstOrDefaultAsync(c =>
                     c.Status == "Pending" &&
                     c.Brand.ToLower() == brand &&
@@ -57,7 +60,8 @@ namespace BLL.Services.AI.Services
                     CarModelId = pending.Id,
                     Status = pending.Status,
                     IsNewlyCreated = false,
-                    VehicleTypeId = pending.VehicleTypeId
+                    VehicleTypeId = pending.VehicleTypeId,
+                    VehicleTypeName = pending.VehicleType?.Name
                 };
             }
 

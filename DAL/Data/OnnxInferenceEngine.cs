@@ -1,4 +1,4 @@
-﻿using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using SkiaSharp;
 
@@ -32,7 +32,7 @@ namespace DAL.Data
             using var bitmap = SKBitmap.Decode(imageBytes);
             using var resized = bitmap.Resize(
                 new SKImageInfo(ModelInputSize, ModelInputSize),
-                SKFilterQuality.High);
+                new SKSamplingOptions(SKFilterMode.Linear));
 
             var tensor = new DenseTensor<float>(
                 new[] { 1, 3, ModelInputSize, ModelInputSize });

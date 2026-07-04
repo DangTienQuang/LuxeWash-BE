@@ -2,15 +2,16 @@ using AutoWashPro.BLL.Extensions;
 using AutoWashPro.BLL.Services;
 using BLL.Helpers;
 using BLL.Services;
+using AutoWashPro.BLL.Services.Interface;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
+using BLL.Services.Interface;
+using CloudinaryDotNet;
+using AutoWashPro.DAL.Data;
 using BLL.Services.AI.Calculators;
 using BLL.Services.AI.Helpers;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.AI.Services;
-using BLL.Services.Interface;
-using CloudinaryDotNet;
-using DAL.Data;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -180,8 +181,9 @@ builder.Services.AddScoped<IFleetService, FleetService>();
 // ==============================================================================
 builder.Services.AddScoped<IStaffManagementService, StaffManagementService>();
 builder.Services.AddScoped<ICRMCampaignService, CRMCampaignService>();
+builder.Services.AddHttpClient<IWeatherService, WeatherService>();
+builder.Services.AddScoped<IOccupancyService, OccupancyService>();
 builder.Services.AddScoped<IAnnualTierService, AnnualTierService>();
-builder.Services.AddScoped<IDatabaseSeedingService, DatabaseSeedingService>();
 builder.Services.AddScoped<IFeatureGenerationService, FeatureGenerationService>();
 builder.Services.AddScoped<IScenarioEvaluationService, ScenarioEvaluationService>();
 builder.Services.AddSingleton<ICarDetectionService, CarDetectionService>();
@@ -283,12 +285,12 @@ app.UseAuthorization();
 app.MapControllers();
 
 // ==============================================================================
-// 10. DATABASE MIGRATION & SEEDING ON STARTUP
+// 10. DATABASE MIGRATION ON STARTUP
 // ==============================================================================
 using (var scope = app.Services.CreateScope())
 {
-    var seedingService = scope.ServiceProvider.GetRequiredService<IDatabaseSeedingService>();
-    await seedingService.InitializeAndSeedAsync();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AutoWashDbContext>();
+    await dbContext.Database.MigrateAsync();
 }
 
 app.Run();

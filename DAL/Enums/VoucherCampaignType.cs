@@ -8,6 +8,7 @@ namespace AutoWashPro.DAL.Enums
         Winback = 3,
         Vip = 4,
         Milestone = 5,
-        Welcome = 6
+        Welcome = 6,
+        Weather = 7
     }
 }

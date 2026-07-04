@@ -1,4 +1,4 @@
-﻿using BLL.Services.AI.Helpers;
+using BLL.Services.AI.Helpers;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.AI.Models;
 using Microsoft.Extensions.Configuration;
@@ -57,7 +57,7 @@ namespace BLL.Services.AI.Services
 
         private DenseTensor<float> Preprocess(SKBitmap bitmap)
         {
-            using var resized = bitmap.Resize(new SKImageInfo(InputSize, InputSize), SKFilterQuality.Medium);
+            using var resized = bitmap.Resize(new SKImageInfo(InputSize, InputSize), SKFilterQuality.High);
             var tensor = new DenseTensor<float>(new[] { 1, 3, InputSize, InputSize });
 
             for (int y = 0; y < InputSize; y++)
