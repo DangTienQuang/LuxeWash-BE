@@ -18,6 +18,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.27.0" />
     <PackageReference Include="payOS" Version="2.1.0" />
     <PackageReference Include="QuestPDF" Version="2026.5.0" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
@@ -37,7 +38,7 @@
     <None Update="Models\dict.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Models\license_plate.onnx">
+    <None Update="Models\license_plate_Anh.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Models\license_plate_old.onnx">

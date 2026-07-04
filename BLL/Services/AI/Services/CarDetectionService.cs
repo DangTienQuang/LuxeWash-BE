@@ -1,4 +1,4 @@
-﻿using BLL.Services.AI.Helpers;
+using BLL.Services.AI.Helpers;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.AI.Models;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +17,8 @@ namespace BLL.Services.AI.Services
     {
         private readonly InferenceSession _session;
         private readonly List<string> _classNames;
-        private const int InputSize = 416;
+        private readonly int _inputWidth = 640;
+        private readonly int _inputHeight = 640;
 
         public CarDetectionService(IConfiguration config)
         {
@@ -28,10 +29,17 @@ namespace BLL.Services.AI.Services
             _session = new InferenceSession(modelPath, options);
             _classNames = OnnxMetadataHelper.ExtractClassNames(_session);
 
+            var inputMeta = _session.InputMetadata.Values.FirstOrDefault();
+            if (inputMeta != null && inputMeta.Dimensions.Length >= 4)
+            {
+                if (inputMeta.Dimensions[2] > 0) _inputHeight = inputMeta.Dimensions[2];
+                if (inputMeta.Dimensions[3] > 0) _inputWidth = inputMeta.Dimensions[3];
+            }
+
             //Console.WriteLine($"Detector classes: {string.Join(", ", _classNames)}");
         }
 
-        public List<CarBoundingBox> DetectCars(byte[] imageBytes, float confidenceThreshold = 0.4f, float iouThreshold = 0.45f)
+        public List<CarBoundingBox> DetectCars(byte[] imageBytes, float confidenceThreshold = 0.25f, float iouThreshold = 0.45f)
         {
             using var original = SKBitmap.Decode(imageBytes);
             if (original == null)
@@ -47,18 +55,18 @@ namespace BLL.Services.AI.Services
             using var results = _session.Run(inputs);
             var output = results.First().AsTensor<float>();
 
-            return PostProcess(output, scaleX, scaleY, confidenceThreshold, iouThreshold);
+            return PostProcess(output, scaleX, scaleY, confidenceThreshold, iouThreshold, original.Width, original.Height);
         }
 
         private (DenseTensor<float> tensor, float scaleX, float scaleY) Preprocess(SKBitmap original)
         {
-            using var resized = original.Resize(new SKImageInfo(InputSize, InputSize), SKFilterQuality.Medium);
+            using var resized = original.Resize(new SKImageInfo(_inputWidth, _inputHeight), SKFilterQuality.High);
 
-            var tensor = new DenseTensor<float>(new[] { 1, 3, InputSize, InputSize });
+            var tensor = new DenseTensor<float>(new[] { 1, 3, _inputHeight, _inputWidth });
 
-            for (int y = 0; y < InputSize; y++)
+            for (int y = 0; y < _inputHeight; y++)
             {
-                for (int x = 0; x < InputSize; x++)
+                for (int x = 0; x < _inputWidth; x++)
                 {
                     var pixel = resized.GetPixel(x, y);
                     tensor[0, 0, y, x] = pixel.Red / 255f;
@@ -67,18 +75,18 @@ namespace BLL.Services.AI.Services
                 }
             }
 
-            float scaleX = original.Width / (float)InputSize;
-            float scaleY = original.Height / (float)InputSize;
+            float scaleX = original.Width / (float)_inputWidth;
+            float scaleY = original.Height / (float)_inputHeight;
 
             return (tensor, scaleX, scaleY);
         }
 
         private static readonly HashSet<string> AcceptedClasses = new(StringComparer.OrdinalIgnoreCase)
             {
-                "car"
+                "car", "pickup-truck", "vehicles", "vehicle", "bus", "truck", "suv", "van", "motorcycle", "bike", "bicycle", "automobile", "sedan", "hatchback", "mpv", "jeep", "minivan"
             };
 
-        private List<CarBoundingBox> PostProcess(Tensor<float> output, float scaleX, float scaleY, float confThreshold, float iouThreshold)
+        private List<CarBoundingBox> PostProcess(Tensor<float> output, float scaleX, float scaleY, float confThreshold, float iouThreshold, int imgWidth, int imgHeight)
         {
             int numAttrs = (int)output.Dimensions[1];
             int numClasses = numAttrs - 4;
@@ -103,26 +111,38 @@ namespace BLL.Services.AI.Services
 
                 if (bestScore < confThreshold) continue;
 
-                string? className = bestClassId >= 0 && bestClassId < _classNames.Count ? _classNames[bestClassId] : null;
-
-                // Filter irrelevant classes out BEFORE NMS, not after
-                if (className == null || !AcceptedClasses.Contains(className))
-                    continue;
+                string? className = bestClassId >= 0 && bestClassId < _classNames.Count ? _classNames[bestClassId] : "car";
 
                 float cx = output[0, 0, i];
                 float cy = output[0, 1, i];
                 float w = output[0, 2, i];
                 float h = output[0, 3, i];
 
+                float x1, y1, x2, y2;
+                if (cx <= 1.5f && cy <= 1.5f && w <= 1.5f && h <= 1.5f)
+                {
+                    x1 = (cx - w / 2f) * imgWidth;
+                    y1 = (cy - h / 2f) * imgHeight;
+                    x2 = (cx + w / 2f) * imgWidth;
+                    y2 = (cy + h / 2f) * imgHeight;
+                }
+                else
+                {
+                    x1 = (cx - w / 2f) * scaleX;
+                    y1 = (cy - h / 2f) * scaleY;
+                    x2 = (cx + w / 2f) * scaleX;
+                    y2 = (cy + h / 2f) * scaleY;
+                }
+
                 candidates.Add(new CarBoundingBox
                 {
-                    X1 = (cx - w / 2f) * scaleX,
-                    Y1 = (cy - h / 2f) * scaleY,
-                    X2 = (cx + w / 2f) * scaleX,
-                    Y2 = (cy + h / 2f) * scaleY,
+                    X1 = Math.Max(0, x1),
+                    Y1 = Math.Max(0, y1),
+                    X2 = Math.Min(imgWidth, x2),
+                    Y2 = Math.Min(imgHeight, y2),
                     Confidence = bestScore,
                     ClassId = bestClassId,
-                    ClassName = className
+                    ClassName = className ?? "car"
                 });
             }
 
