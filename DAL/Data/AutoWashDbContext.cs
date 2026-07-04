@@ -46,6 +46,15 @@ namespace AutoWashPro.DAL.Data
         public DbSet<FleetImportBatch> FleetImportBatches { get; set; }
         public DbSet<FleetImportError> FleetImportErrors { get; set; }
         public DbSet<FleetWashLog> FleetWashLogs { get; set; }
+        public DbSet<Material> Materials { get; set; }
+        public DbSet<Warehouse> Warehouses { get; set; }
+        public DbSet<MaterialBatch> MaterialBatches { get; set; }
+        public DbSet<WarehouseStock> WarehouseStocks { get; set; }
+        public DbSet<ServiceMaterialUsage> ServiceMaterialUsages { get; set; }
+        public DbSet<VehicleConditionMaterialMultiplier> VehicleConditionMaterialMultipliers { get; set; }
+        public DbSet<InventoryTransaction> InventoryTransactions { get; set; }
+        public DbSet<BookingMaterialUsage> BookingMaterialUsages { get; set; }
+        public DbSet<ExtraMaterialUsageRequest> ExtraMaterialUsageRequests { get; set; }
         public DbSet<CustomerFeatureProfile> CustomerFeatureProfiles { get; set; }
         public DbSet<CustomerBehaviorHistory> CustomerBehaviorHistories { get; set; }
         public DbSet<FeatureDefinition> FeatureDefinitions { get; set; }
@@ -298,6 +307,83 @@ namespace AutoWashPro.DAL.Data
                 .WithMany()
                 .HasForeignKey(b => b.FleetVehicleId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Warehouse>()
+                .HasIndex(w => new { w.Type, w.BranchId })
+                .IsUnique();
+
+            modelBuilder.Entity<Warehouse>()
+                .HasOne(w => w.Branch)
+                .WithMany()
+                .HasForeignKey(w => w.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WarehouseStock>()
+                .HasIndex(s => new { s.WarehouseId, s.MaterialId })
+                .IsUnique();
+
+            modelBuilder.Entity<MaterialBatch>()
+                .HasIndex(b => b.BatchCode)
+                .IsUnique();
+
+            modelBuilder.Entity<MaterialBatch>()
+                .HasOne(b => b.Warehouse)
+                .WithMany()
+                .HasForeignKey(b => b.WarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ServiceMaterialUsage>()
+                .HasIndex(u => new { u.ServiceId, u.VehicleTypeId, u.MaterialId })
+                .IsUnique();
+
+            modelBuilder.Entity<VehicleConditionMaterialMultiplier>()
+                .HasIndex(m => m.VehicleCondition)
+                .IsUnique();
+
+            modelBuilder.Entity<InventoryTransaction>()
+                .HasOne(t => t.Booking)
+                .WithMany()
+                .HasForeignKey(t => t.BookingId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<BookingMaterialUsage>()
+                .HasOne(u => u.Booking)
+                .WithMany()
+                .HasForeignKey(u => u.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<BookingMaterialUsage>()
+                .HasOne(u => u.BookingDetail)
+                .WithMany()
+                .HasForeignKey(u => u.BookingDetailId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<BookingMaterialUsage>()
+                .HasOne(u => u.MaterialBatch)
+                .WithMany()
+                .HasForeignKey(u => u.MaterialBatchId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ExtraMaterialUsageRequest>()
+                .HasIndex(r => new { r.BranchId, r.Status, r.CreatedAt });
+
+            modelBuilder.Entity<ExtraMaterialUsageRequest>()
+                .HasOne(r => r.Booking)
+                .WithMany()
+                .HasForeignKey(r => r.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ExtraMaterialUsageRequest>()
+                .HasOne(r => r.StaffUser)
+                .WithMany()
+                .HasForeignKey(r => r.StaffUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ExtraMaterialUsageRequest>()
+                .HasOne(r => r.ReviewedByManager)
+                .WithMany()
+                .HasForeignKey(r => r.ReviewedByManagerId)
+                .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<CustomerFeatureProfile>()
                 .HasOne(x => x.Customer)
                 .WithMany()
