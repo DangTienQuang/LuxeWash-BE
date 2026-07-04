@@ -6,7 +6,7 @@ using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services.Interface;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
-using DAL.Entities.AI;
+using DAL.Entities;
 using AutoWashPro.DAL.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

@@ -1,7 +1,8 @@
-﻿using AutoWashPro.DAL.Data;
+using AutoWashPro.DAL.Data;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.AI.Models;
-using DAL.Entities.AI;
+using AutoWashPro.DAL.Entities;
+using DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;

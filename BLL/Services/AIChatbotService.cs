@@ -1,9 +1,9 @@
-﻿using AutoWashPro.BLL.Services;
+using AutoWashPro.BLL.Services;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using BLL.Constants;
 using BLL.DTOs;
-using DAL.Entities.AI;
+using DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace BLL.Services

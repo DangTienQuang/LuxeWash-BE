@@ -1,7 +1,7 @@
-﻿using AutoWashPro.DAL.Entities;
+using AutoWashPro.DAL.Entities;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.AI.Models;
-using DAL.Entities.AI;
+using DAL.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;

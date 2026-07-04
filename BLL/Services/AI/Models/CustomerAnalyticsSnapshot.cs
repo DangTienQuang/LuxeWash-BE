@@ -1,6 +1,5 @@
-﻿using AutoWashPro.DAL.Entities;
+using AutoWashPro.DAL.Entities;
 using DAL.Entities;
-using DAL.Entities.AI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
