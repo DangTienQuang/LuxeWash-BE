@@ -14,5 +14,8 @@ namespace AutoWashPro.BLL.DTOs
         public string? PaymentMethod { get; set; }
         public decimal FinalAmount { get; set; }
         public string? OrderCode { get; set; }
+        public DateTime? ProcessingStartTime { get; set; }
+        public DateTime? CompletedTime { get; set; }
+        public int? ActualDurationMinutes { get; set; }
     }
 }

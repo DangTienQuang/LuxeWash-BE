@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.Constants;
+using AutoWashPro.BLL.Constants;
 using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Exceptions;
 using BLL.Helpers;
@@ -144,7 +144,10 @@ namespace AutoWashPro.BLL.Services
                     PaymentStatus = paymentStatus,
                     PaymentMethod = tx?.PaymentMethod,
                     OrderCode = tx?.OrderCode,
-                    FinalAmount = b.FinalAmount
+                    FinalAmount = b.FinalAmount,
+                    ProcessingStartTime = b.ProcessingStartTime,
+                    CompletedTime = b.CompletedTime,
+                    ActualDurationMinutes = b.ActualDurationMinutes
                 };
             }).ToList();
         }
@@ -165,6 +168,9 @@ namespace AutoWashPro.BLL.Services
                  if (booking.Status != "CheckedIn" && booking.Status != "Processing")
                      throw new BadRequestException("Can only start processing checked-in vehicles.");
                  booking.ProcessingStaffId = staffUserId;
+                 booking.ProcessingStartTime = DateTime.UtcNow;
+                 booking.CompletedTime = null;
+                 booking.ActualDurationMinutes = null;
             }
 
             if (newStatus == "Completed")
@@ -178,6 +184,16 @@ namespace AutoWashPro.BLL.Services
 
             var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
             booking.Status = newStatus;
+
+            if (isCompletingNow)
+            {
+                booking.CompletedTime = DateTime.UtcNow;
+                if (booking.ProcessingStartTime.HasValue)
+                {
+                    var duration = (int)Math.Round((booking.CompletedTime.Value - booking.ProcessingStartTime.Value).TotalMinutes);
+                    booking.ActualDurationMinutes = duration < 1 ? 1 : duration;
+                }
+            }
 
             if (newStatus == "Completed")
             {

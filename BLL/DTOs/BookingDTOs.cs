@@ -169,6 +169,9 @@ namespace AutoWashPro.BLL.DTOs
         public decimal PointDiscountAmount { get; set; }
         public decimal VoucherDiscountAmount { get; set; }
         public decimal FinalAmount { get; set; }
+        public DateTime? ProcessingStartTime { get; set; }
+        public DateTime? CompletedTime { get; set; }
+        public int? ActualDurationMinutes { get; set; }
     }
 
     public class AdminBookingResponseDTO : BookingResponseDTO

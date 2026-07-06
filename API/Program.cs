@@ -211,6 +211,7 @@ builder.Services.AddScoped<IScenarioExecutionLogger, ScenarioExecutionLogger>();
 
 builder.Services.AddHostedService<AutoWashPro.API.Workers.AnnualTierResetWorker>();
 builder.Services.AddHostedService<AutoWashPro.API.Workers.CRMCampaignWorker>();
+builder.Services.AddHostedService<AutoWashPro.API.Workers.AutoWashCompletionWorker>();
 
 // ==============================================================================
 // 8. SWAGGER CONFIGURATION

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoWashPro.BLL.DTOs;
@@ -27,5 +27,7 @@ namespace AutoWashPro.BLL.Services
         Task<bool> SendBookingConfirmationEmailAsync(int userId, int bookingId);
         Task<BookingResponseDTO> RescheduleBookingAsync(int userId, int bookingId, RescheduleBookingDTO request);
         Task<BookingPaymentStatusDTO> GetBookingPaymentStatusAsync(int bookingId);
+        Task<BookingResponseDTO> AutoCheckInAndStartProcessingAsync(string licensePlate, int branchId, bool autoStart);
+        Task<int> ProcessOverdueAutomatedWashesAsync();
     }
 }

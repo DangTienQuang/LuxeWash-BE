@@ -148,7 +148,10 @@ namespace AutoWashPro.BLL.Services
                     OriginalPrice = b.OriginalPrice,
                     PointDiscountAmount = b.PointDiscountAmount,
                     VoucherDiscountAmount = b.VoucherDiscountAmount,
-                    FinalAmount = b.FinalAmount
+                    FinalAmount = b.FinalAmount,
+                    ProcessingStartTime = b.ProcessingStartTime,
+                    CompletedTime = b.CompletedTime,
+                    ActualDurationMinutes = b.ActualDurationMinutes
                 })
                 .ToListAsync();
 
@@ -181,7 +184,10 @@ namespace AutoWashPro.BLL.Services
                 OriginalPrice = booking.OriginalPrice,
                 PointDiscountAmount = booking.PointDiscountAmount,
                 VoucherDiscountAmount = booking.VoucherDiscountAmount,
-                FinalAmount = booking.FinalAmount
+                FinalAmount = booking.FinalAmount,
+                ProcessingStartTime = booking.ProcessingStartTime,
+                CompletedTime = booking.CompletedTime,
+                ActualDurationMinutes = booking.ActualDurationMinutes
             };
         }
 
@@ -216,7 +222,10 @@ namespace AutoWashPro.BLL.Services
                     OriginalPrice = b.OriginalPrice,
                     PointDiscountAmount = b.PointDiscountAmount,
                     VoucherDiscountAmount = b.VoucherDiscountAmount,
-                    FinalAmount = b.FinalAmount
+                    FinalAmount = b.FinalAmount,
+                    ProcessingStartTime = b.ProcessingStartTime,
+                    CompletedTime = b.CompletedTime,
+                    ActualDurationMinutes = b.ActualDurationMinutes
                 })
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
@@ -575,7 +584,10 @@ namespace AutoWashPro.BLL.Services
                 OriginalPrice = booking.OriginalPrice,
                 PointDiscountAmount = booking.PointDiscountAmount,
                 VoucherDiscountAmount = booking.VoucherDiscountAmount,
-                FinalAmount = booking.FinalAmount
+                FinalAmount = booking.FinalAmount,
+                ProcessingStartTime = booking.ProcessingStartTime,
+                CompletedTime = booking.CompletedTime,
+                ActualDurationMinutes = booking.ActualDurationMinutes
             };
         }
         public async Task<bool> UpdateBookingStatusAsync(int bookingId, string newStatus)
@@ -981,7 +993,10 @@ namespace AutoWashPro.BLL.Services
                     OriginalPrice = booking.OriginalPrice,
                     PointDiscountAmount = booking.PointDiscountAmount,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
-                    FinalAmount = booking.FinalAmount
+                    FinalAmount = booking.FinalAmount,
+                    ProcessingStartTime = booking.ProcessingStartTime,
+                    CompletedTime = booking.CompletedTime,
+                    ActualDurationMinutes = booking.ActualDurationMinutes
                 };
             }
             catch (Exception)
@@ -1025,7 +1040,10 @@ namespace AutoWashPro.BLL.Services
                     OriginalPrice = b.OriginalPrice,
                     PointDiscountAmount = b.PointDiscountAmount,
                     VoucherDiscountAmount = b.VoucherDiscountAmount,
-                    FinalAmount = b.FinalAmount
+                    FinalAmount = b.FinalAmount,
+                    ProcessingStartTime = b.ProcessingStartTime,
+                    CompletedTime = b.CompletedTime,
+                    ActualDurationMinutes = b.ActualDurationMinutes
                 })
                 .ToListAsync();
         }
@@ -1996,7 +2014,10 @@ namespace AutoWashPro.BLL.Services
                     OriginalPrice = booking.OriginalPrice,
                     PointDiscountAmount = booking.PointDiscountAmount,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
-                    FinalAmount = booking.FinalAmount
+                    FinalAmount = booking.FinalAmount,
+                    ProcessingStartTime = booking.ProcessingStartTime,
+                    CompletedTime = booking.CompletedTime,
+                    ActualDurationMinutes = booking.ActualDurationMinutes
                 };
             }
             catch (Exception)
@@ -2004,6 +2025,136 @@ namespace AutoWashPro.BLL.Services
                 await transaction.RollbackAsync();
                 throw;
             }
+        }
+
+        public async Task<BookingResponseDTO> AutoCheckInAndStartProcessingAsync(string licensePlate, int branchId, bool autoStart)
+        {
+            var normalizedPlate = NormalizeLicensePlate(licensePlate);
+            if (string.IsNullOrEmpty(normalizedPlate))
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Biển số xe không hợp lệ.");
+
+            var startTime = DateTime.UtcNow.AddHours(-24);
+            var endTime = DateTime.UtcNow.AddHours(24);
+
+            var query = await _context.Bookings
+                .Include(b => b.BookingDetails)
+                    .ThenInclude(bd => bd.Service)
+                .Where(b => b.BranchId == branchId && b.ScheduledTime >= startTime && b.ScheduledTime <= endTime)
+                .ToListAsync();
+
+            var matches = query.Where(b => NormalizeLicensePlate(b.LicensePlate) == normalizedPlate).ToList();
+            if (matches.Count == 0)
+                throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Không tìm thấy lịch hẹn nào cho xe {licensePlate} tại chi nhánh này.");
+
+            var todayInVN = DateTime.UtcNow.ToVnTime().Date;
+            var todaysBookings = matches.Where(b => b.ScheduledTime.ToVnTime().Date == todayInVN && (b.Status == "Pending" || b.Status == "Confirmed" || b.Status == "CheckedIn")).ToList();
+
+            if (todaysBookings.Count == 0)
+                throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Xe {licensePlate} không có lịch hẹn hợp lệ trong ngày hôm nay ở trạng thái chờ rửa.");
+
+            var booking = todaysBookings.First();
+
+            if (booking.Status == "Pending" || booking.Status == "Confirmed")
+            {
+                if (booking.FinalAmount > 0 && !await HasCompletedBookingPaymentAsync(booking.BookingId))
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("Lịch hẹn chưa thanh toán, không thể check-in vào buồng tự động.");
+
+                booking.Status = "CheckedIn";
+                booking.UpdatedAt = DateTime.UtcNow;
+            }
+
+            if (autoStart && (booking.Status == "CheckedIn" || booking.Status == "Pending" || booking.Status == "Confirmed"))
+            {
+                booking.Status = "Processing";
+                booking.ProcessingStartTime = DateTime.UtcNow;
+                booking.CompletedTime = null;
+                booking.ActualDurationMinutes = null;
+                booking.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return new BookingResponseDTO
+            {
+                BookingId = booking.BookingId,
+                LicensePlate = normalizedPlate,
+                ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName).ToList(),
+                ScheduledTime = booking.ScheduledTime,
+                Status = booking.Status,
+                OriginalPrice = booking.OriginalPrice,
+                PointDiscountAmount = booking.PointDiscountAmount,
+                VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                FinalAmount = booking.FinalAmount,
+                ProcessingStartTime = booking.ProcessingStartTime,
+                CompletedTime = booking.CompletedTime,
+                ActualDurationMinutes = booking.ActualDurationMinutes
+            };
+        }
+
+        public async Task<int> ProcessOverdueAutomatedWashesAsync()
+        {
+            var now = DateTime.UtcNow;
+            var processingBookings = await _context.Bookings
+                .Include(b => b.BookingDetails)
+                .Include(b => b.Vehicle)
+                .Where(b => b.Status == "Processing" && b.ProcessingStartTime.HasValue)
+                .ToListAsync();
+
+            int completedCount = 0;
+
+            foreach (var booking in processingBookings)
+            {
+                int vehicleTypeId = booking.ActualVehicleTypeId ?? booking.Vehicle?.VehicleTypeId ?? 1;
+                var serviceIds = booking.BookingDetails.Select(bd => bd.ServiceId).ToList();
+
+                var servicePrices = await _context.ServicePrices
+                    .Where(sp => sp.BranchId == booking.BranchId && sp.VehicleTypeId == vehicleTypeId && serviceIds.Contains(sp.ServiceId))
+                    .ToListAsync();
+
+                int totalEstimatedMinutes = servicePrices.Sum(sp => sp.EstimatedDurationMinutes);
+                if (totalEstimatedMinutes <= 0) totalEstimatedMinutes = 30;
+
+                if (now >= booking.ProcessingStartTime.Value.AddMinutes(totalEstimatedMinutes))
+                {
+                    booking.Status = "Completed";
+                    booking.CompletedTime = now;
+                    var duration = (int)Math.Round((booking.CompletedTime.Value - booking.ProcessingStartTime.Value).TotalMinutes);
+                    booking.ActualDurationMinutes = duration < 1 ? 1 : duration;
+                    booking.UpdatedAt = now;
+
+                    await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(booking.BookingId);
+
+                    if (booking.UserId > 0)
+                    {
+                        var userProfile = await _context.CustomerProfiles
+                            .Include(cp => cp.Tier)
+                            .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
+
+                        if (userProfile?.Tier != null && booking.FinalAmount > 0)
+                        {
+                            int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
+                            if (pointsEarned > 0)
+                            {
+                                await _walletService.AwardCompletionPointsAsync(booking.UserId.Value, pointsEarned, booking.BookingId);
+                            }
+                        }
+
+                        if (userProfile != null)
+                        {
+                            userProfile.LastVisitDate = now;
+                        }
+                    }
+
+                    completedCount++;
+                }
+            }
+
+            if (completedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return completedCount;
         }
 
         private static long GeneratePayOsOrderCode()

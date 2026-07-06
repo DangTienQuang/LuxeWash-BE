@@ -17,5 +17,8 @@ namespace AutoWashPro.BLL.DTOs
         public bool IsBusinessLane { get; set; }
         public int? ProcessingStaffId { get; set; }
         public string? ProcessingStaffName { get; set; }
+        public DateTime? ProcessingStartTime { get; set; }
+        public DateTime? CompletedTime { get; set; }
+        public int? ActualDurationMinutes { get; set; }
     }
 }
