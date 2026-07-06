@@ -4,12 +4,39 @@ using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using System.Text.RegularExpressions;
 
 namespace AutoWashPro.BLL.Services
 {
     public class MaterialService : IMaterialService
     {
         private readonly AutoWashDbContext _context;
+        private static readonly Dictionary<string, string> UnitAliases = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ml"] = "milliliter",
+            ["milliliter"] = "milliliter",
+            ["milliliters"] = "milliliter",
+            ["millilitre"] = "milliliter",
+            ["millilitres"] = "milliliter",
+            ["l"] = "liter",
+            ["liter"] = "liter",
+            ["liters"] = "liter",
+            ["litre"] = "liter",
+            ["litres"] = "liter",
+            ["g"] = "gram",
+            ["gram"] = "gram",
+            ["grams"] = "gram",
+            ["kg"] = "kilogram",
+            ["kilogram"] = "kilogram",
+            ["kilograms"] = "kilogram",
+            ["piece"] = "piece",
+            ["pieces"] = "piece",
+            ["pcs"] = "piece",
+            ["pc"] = "piece",
+            ["cai"] = "piece"
+        };
+
+        private static readonly Regex UnitCodePattern = new("^[a-z0-9_\\-]+$", RegexOptions.Compiled);
 
         public MaterialService(AutoWashDbContext context)
         {
@@ -25,13 +52,64 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
         }
 
+        public async Task<List<MaterialUnitDTO>> GetMaterialUnitsAsync(bool includeInactive = false)
+        {
+            return await _context.MaterialUnits
+                .Where(u => includeInactive || u.IsActive)
+                .OrderBy(u => u.MeasurementType)
+                .ThenBy(u => u.DisplayName)
+                .Select(u => MapMaterialUnit(u))
+                .ToListAsync();
+        }
+
+        public async Task<MaterialUnitDTO> CreateMaterialUnitAsync(CreateMaterialUnitDTO dto)
+        {
+            var code = NormalizeUnitCode(dto.Code);
+            if (await _context.MaterialUnits.AnyAsync(u => u.Code == code))
+            {
+                throw new BadRequestException($"Material unit code '{code}' already exists.");
+            }
+
+            var unit = new MaterialUnit
+            {
+                Code = code,
+                DisplayName = dto.DisplayName.Trim(),
+                MeasurementType = dto.MeasurementType.Trim(),
+                IsActive = true
+            };
+
+            _context.MaterialUnits.Add(unit);
+            await _context.SaveChangesAsync();
+            return MapMaterialUnit(unit);
+        }
+
+        public async Task<MaterialUnitDTO> UpdateMaterialUnitAsync(int unitId, UpdateMaterialUnitDTO dto)
+        {
+            var unit = await _context.MaterialUnits.FindAsync(unitId)
+                ?? throw new NotFoundException("Material unit not found.");
+
+            if (!dto.IsActive && unit.IsActive && await _context.Materials.AnyAsync(m => m.Unit == unit.Code))
+            {
+                throw new BadRequestException("Cannot deactivate this material unit because it is being used by one or more materials.");
+            }
+
+            unit.DisplayName = dto.DisplayName.Trim();
+            unit.MeasurementType = dto.MeasurementType.Trim();
+            unit.IsActive = dto.IsActive;
+            unit.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return MapMaterialUnit(unit);
+        }
+
         public async Task<MaterialDTO> CreateMaterialAsync(CreateMaterialDTO dto)
         {
+            var normalizedUnit = await NormalizeUnitAsync(dto.Unit);
             var material = new Material
             {
                 Name = dto.Name.Trim(),
                 Category = dto.Category.Trim(),
-                Unit = dto.Unit.Trim(),
+                Unit = normalizedUnit,
                 Description = dto.Description,
                 RequiresExpiryTracking = dto.RequiresExpiryTracking,
                 DefaultMinStockLevel = dto.DefaultMinStockLevel,
@@ -49,9 +127,20 @@ namespace AutoWashPro.BLL.Services
             var material = await _context.Materials.FindAsync(materialId)
                 ?? throw new NotFoundException("Material not found.");
 
+            var normalizedUnit = NormalizeUnitInput(dto.Unit);
+            if (!string.Equals(material.Unit, normalizedUnit, StringComparison.OrdinalIgnoreCase))
+            {
+                await EnsureActiveUnitExistsAsync(dto.Unit);
+                await EnsureUnitCanBeChangedAsync(materialId);
+            }
+            else
+            {
+                normalizedUnit = material.Unit;
+            }
+
             material.Name = dto.Name.Trim();
             material.Category = dto.Category.Trim();
-            material.Unit = dto.Unit.Trim();
+            material.Unit = normalizedUnit;
             material.Description = dto.Description;
             material.RequiresExpiryTracking = dto.RequiresExpiryTracking;
             material.DefaultMinStockLevel = dto.DefaultMinStockLevel;
@@ -114,7 +203,8 @@ namespace AutoWashPro.BLL.Services
                     RemainingQuantity = b.RemainingQuantity,
                     UnitCost = b.UnitCost,
                     TotalCost = b.TotalCost,
-                    ExpiryDate = b.ExpiryDate,
+                    ManufactureDate = b.ManufactureDate.HasValue ? DateOnly.FromDateTime(b.ManufactureDate.Value) : null,
+                    ExpiryDate = b.ExpiryDate.HasValue ? DateOnly.FromDateTime(b.ExpiryDate.Value) : null,
                     SupplierName = b.SupplierName,
                     Status = b.Status,
                     ImportedAt = b.ImportedAt
@@ -187,6 +277,84 @@ namespace AutoWashPro.BLL.Services
                 ExpiryWarningDays = material.ExpiryWarningDays,
                 IsActive = material.IsActive
             };
+        }
+
+        private static MaterialUnitDTO MapMaterialUnit(MaterialUnit unit)
+        {
+            return new MaterialUnitDTO
+            {
+                UnitId = unit.UnitId,
+                Code = unit.Code,
+                DisplayName = unit.DisplayName,
+                MeasurementType = unit.MeasurementType,
+                IsActive = unit.IsActive
+            };
+        }
+
+        private async Task EnsureUnitCanBeChangedAsync(int materialId)
+        {
+            var hasBatches = await _context.MaterialBatches.AnyAsync(b => b.MaterialId == materialId);
+            var hasStocks = await _context.WarehouseStocks.AnyAsync(s => s.MaterialId == materialId);
+            var hasServiceUsages = await _context.ServiceMaterialUsages.AnyAsync(u => u.MaterialId == materialId);
+            var hasTransactions = await _context.InventoryTransactions.AnyAsync(t => t.MaterialId == materialId);
+            var hasBookingUsages = await _context.BookingMaterialUsages.AnyAsync(u => u.MaterialId == materialId);
+            var hasExtraUsageRequests = await _context.ExtraMaterialUsageRequests.AnyAsync(r => r.MaterialId == materialId);
+
+            if (hasBatches || hasStocks || hasServiceUsages || hasTransactions || hasBookingUsages || hasExtraUsageRequests)
+            {
+                throw new BadRequestException("Cannot change material unit because this material already has inventory, usage, or transaction history.");
+            }
+        }
+
+        private async Task<string> NormalizeUnitAsync(string unit)
+        {
+            var value = NormalizeUnitInput(unit);
+            await EnsureActiveUnitExistsAsync(value);
+            return value;
+        }
+
+        private string NormalizeUnitInput(string unit)
+        {
+            var value = NormalizeUnitCode(unit);
+            if (UnitAliases.TryGetValue(value, out var normalizedUnit))
+            {
+                value = normalizedUnit;
+            }
+
+            return value;
+        }
+
+        private async Task EnsureActiveUnitExistsAsync(string unit)
+        {
+            var value = NormalizeUnitInput(unit);
+            if (await _context.MaterialUnits.AnyAsync(u => u.Code == value && u.IsActive))
+            {
+                return;
+            }
+
+            var allowedUnits = await _context.MaterialUnits
+                .Where(u => u.IsActive)
+                .OrderBy(u => u.Code)
+                .Select(u => u.Code)
+                .ToListAsync();
+
+            throw new BadRequestException($"Invalid material unit '{unit}'. Please select one active unit code. Allowed units: {string.Join(", ", allowedUnits)}.");
+        }
+
+        private static string NormalizeUnitCode(string unit)
+        {
+            var value = unit.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new BadRequestException("Material unit code is required.");
+            }
+
+            if (!UnitCodePattern.IsMatch(value))
+            {
+                throw new BadRequestException("Material unit code can only contain lowercase letters, numbers, hyphen, or underscore.");
+            }
+
+            return value;
         }
 
     }
