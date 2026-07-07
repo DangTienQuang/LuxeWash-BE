@@ -890,12 +890,12 @@ namespace BLL.Services
                 washLog.Booking.UpdatedAt = DateTime.UtcNow;
             }
 
-            await _context.SaveChangesAsync();
-
             if (washLog.BookingId.HasValue)
             {
                 await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(washLog.BookingId.Value);
             }
+
+            await _context.SaveChangesAsync();
 
             return new FleetCheckoutResponseDTO
             {

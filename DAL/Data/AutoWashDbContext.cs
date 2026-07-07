@@ -46,6 +46,7 @@ namespace AutoWashPro.DAL.Data
         public DbSet<FleetImportError> FleetImportErrors { get; set; }
         public DbSet<FleetWashLog> FleetWashLogs { get; set; }
         public DbSet<Material> Materials { get; set; }
+        public DbSet<MaterialUnit> MaterialUnits { get; set; }
         public DbSet<Warehouse> Warehouses { get; set; }
         public DbSet<MaterialBatch> MaterialBatches { get; set; }
         public DbSet<WarehouseStock> WarehouseStocks { get; set; }
@@ -87,6 +88,10 @@ namespace AutoWashPro.DAL.Data
 
             modelBuilder.Entity<Voucher>()
                 .HasIndex(v => v.Code)
+                .IsUnique();
+
+            modelBuilder.Entity<MaterialUnit>()
+                .HasIndex(u => u.Code)
                 .IsUnique();
 
             modelBuilder.Entity<UserVoucher>()

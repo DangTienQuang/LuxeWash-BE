@@ -58,6 +58,8 @@ namespace AutoWashPro.BLL.Services
             var branchId = await GetManagerBranchIdAsync(managerUserId);
             var material = await ValidateMaterialForImportAsync(dto);
             var warehouse = await GetOrCreateBranchWarehouseAsync(branchId);
+            var manufactureDate = NormalizeDate(dto.ManufactureDate);
+            var expiryDate = NormalizeDate(dto.ExpiryDate);
 
             if (await _context.MaterialBatches.AnyAsync(b => b.BatchCode == dto.BatchCode.Trim()))
             {
@@ -75,8 +77,8 @@ namespace AutoWashPro.BLL.Services
                 RemainingQuantity = dto.Quantity,
                 UnitCost = dto.UnitCost,
                 TotalCost = dto.Quantity * dto.UnitCost,
-                ManufactureDate = dto.ManufactureDate,
-                ExpiryDate = dto.ExpiryDate,
+                ManufactureDate = manufactureDate,
+                ExpiryDate = expiryDate,
                 SupplierName = dto.SupplierName,
                 Status = "Active",
                 ImportedAt = DateTime.UtcNow
@@ -188,6 +190,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             MaterialBatch? batch = null;
+            decimal? adjustmentUnitCost = null;
             if (dto.MaterialBatchId.HasValue)
             {
                 batch = await _context.MaterialBatches
@@ -235,11 +238,50 @@ namespace AutoWashPro.BLL.Services
                 }
                 batch.RemainingQuantity -= decrease;
                 if (batch.RemainingQuantity == 0) batch.Status = "Depleted";
+                adjustmentUnitCost = batch.UnitCost;
+            }
+            else
+            {
+                var decrease = Math.Abs(dto.QuantityChange);
+                var remainingDecrease = decrease;
+                decimal costAmount = 0;
+                decimal adjustedFromBatches = 0;
+
+                var batches = await _context.MaterialBatches
+                    .Where(b => b.WarehouseId == warehouse.WarehouseId
+                        && b.MaterialId == material.MaterialId
+                        && b.RemainingQuantity > 0
+                        && b.Status == "Active")
+                    .OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue)
+                    .ThenBy(b => b.ImportedAt)
+                    .ToListAsync();
+
+                foreach (var fifoBatch in batches)
+                {
+                    if (remainingDecrease <= 0) break;
+
+                    var used = Math.Min(fifoBatch.RemainingQuantity, remainingDecrease);
+                    fifoBatch.RemainingQuantity -= used;
+                    if (fifoBatch.RemainingQuantity == 0) fifoBatch.Status = "Depleted";
+
+                    costAmount += used * fifoBatch.UnitCost;
+                    adjustedFromBatches += used;
+                    remainingDecrease -= used;
+                }
+
+                if (remainingDecrease > 0 && !branch.AllowNegativeStock)
+                {
+                    throw new BadRequestException("Batch remaining quantity is lower than adjustment decrease.");
+                }
+
+                adjustmentUnitCost = adjustedFromBatches > 0
+                    ? costAmount / adjustedFromBatches
+                    : await EstimateUnitCostAsync(material.MaterialId);
             }
 
             stock.CurrentQuantity = after;
             stock.UpdatedAt = DateTime.UtcNow;
-            var unitCost = batch?.UnitCost ?? await EstimateUnitCostAsync(material.MaterialId);
+            var unitCost = adjustmentUnitCost ?? batch?.UnitCost ?? await EstimateUnitCostAsync(material.MaterialId);
 
             _context.InventoryTransactions.Add(new InventoryTransaction
             {
@@ -294,10 +336,12 @@ namespace AutoWashPro.BLL.Services
         private async Task<Material> ValidateMaterialForImportAsync(ImportMaterialBatchDTO dto)
         {
             var material = await _context.Materials.FindAsync(dto.MaterialId) ?? throw new NotFoundException("Material not found.");
+            var manufactureDate = NormalizeDate(dto.ManufactureDate);
+            var expiryDate = NormalizeDate(dto.ExpiryDate);
             if (!material.IsActive) throw new BadRequestException("Cannot import inactive material.");
-            if (material.RequiresExpiryTracking && dto.ExpiryDate == null) throw new BadRequestException("Expiry date is required for this material.");
-            if (dto.ExpiryDate.HasValue && dto.ExpiryDate.Value.Date <= DateTime.UtcNow.Date) throw new BadRequestException("Expiry date must be in the future.");
-            if (dto.ManufactureDate.HasValue && dto.ExpiryDate.HasValue && dto.ManufactureDate.Value.Date > dto.ExpiryDate.Value.Date)
+            if (material.RequiresExpiryTracking && expiryDate == null) throw new BadRequestException("Expiry date is required for this material.");
+            if (expiryDate.HasValue && expiryDate.Value <= DateTime.UtcNow.Date) throw new BadRequestException("Expiry date must be in the future.");
+            if (manufactureDate.HasValue && expiryDate.HasValue && manufactureDate.Value > expiryDate.Value)
             {
                 throw new BadRequestException("Manufacture date cannot be after expiry date.");
             }
@@ -404,7 +448,8 @@ namespace AutoWashPro.BLL.Services
                 RemainingQuantity = batch.RemainingQuantity,
                 UnitCost = batch.UnitCost,
                 TotalCost = batch.TotalCost,
-                ExpiryDate = batch.ExpiryDate,
+                ManufactureDate = batch.ManufactureDate.HasValue ? DateOnly.FromDateTime(batch.ManufactureDate.Value) : null,
+                ExpiryDate = batch.ExpiryDate.HasValue ? DateOnly.FromDateTime(batch.ExpiryDate.Value) : null,
                 SupplierName = batch.SupplierName,
                 Status = batch.Status,
                 ImportedAt = batch.ImportedAt
@@ -441,6 +486,11 @@ namespace AutoWashPro.BLL.Services
         private static BranchInventorySettingDTO MapBranchInventorySetting(Branch branch)
         {
             return new BranchInventorySettingDTO { BranchId = branch.BranchId, BranchName = branch.Name, AllowNegativeStock = branch.AllowNegativeStock, NegativeStockLimit = branch.NegativeStockLimit };
+        }
+
+        private static DateTime? NormalizeDate(DateTime? value)
+        {
+            return value?.Date;
         }
     }
 }

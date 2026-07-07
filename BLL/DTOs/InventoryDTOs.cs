@@ -17,6 +17,38 @@ namespace AutoWashPro.BLL.DTOs
         public bool IsActive { get; set; }
     }
 
+    public class MaterialUnitDTO
+    {
+        public int UnitId { get; set; }
+        public string Code { get; set; } = null!;
+        public string DisplayName { get; set; } = null!;
+        public string MeasurementType { get; set; } = null!;
+        public bool IsActive { get; set; }
+    }
+
+    public class CreateMaterialUnitDTO
+    {
+        [Required, MaxLength(50)]
+        public string Code { get; set; } = null!;
+
+        [Required, MaxLength(100)]
+        public string DisplayName { get; set; } = null!;
+
+        [Required, MaxLength(50)]
+        public string MeasurementType { get; set; } = null!;
+    }
+
+    public class UpdateMaterialUnitDTO
+    {
+        [Required, MaxLength(100)]
+        public string DisplayName { get; set; } = null!;
+
+        [Required, MaxLength(50)]
+        public string MeasurementType { get; set; } = null!;
+
+        public bool IsActive { get; set; } = true;
+    }
+
     public class CreateMaterialDTO
     {
         [Required, MaxLength(100)]
@@ -25,7 +57,7 @@ namespace AutoWashPro.BLL.DTOs
         [Required, MaxLength(50)]
         public string Category { get; set; } = null!;
 
-        [Required, MaxLength(20)]
+        [Required, MaxLength(50)]
         public string Unit { get; set; } = null!;
 
         [MaxLength(500)]
@@ -94,7 +126,8 @@ namespace AutoWashPro.BLL.DTOs
         public decimal RemainingQuantity { get; set; }
         public decimal UnitCost { get; set; }
         public decimal TotalCost { get; set; }
-        public DateTime? ExpiryDate { get; set; }
+        public DateOnly? ManufactureDate { get; set; }
+        public DateOnly? ExpiryDate { get; set; }
         public string? SupplierName { get; set; }
         public string Status { get; set; } = null!;
         public DateTime ImportedAt { get; set; }

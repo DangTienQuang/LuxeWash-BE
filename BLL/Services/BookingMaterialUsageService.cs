@@ -349,10 +349,34 @@ namespace AutoWashPro.BLL.Services
 
         private async Task<Warehouse> GetBranchWarehouseAsync(int branchId)
         {
-            return await _context.Warehouses
+            var warehouse = await _context.Warehouses
                 .Include(w => w.Branch)
-                .FirstOrDefaultAsync(w => w.Type == "Branch" && w.BranchId == branchId)
-                ?? throw new BadRequestException("Branch warehouse has not received inventory yet.");
+                .FirstOrDefaultAsync(w => w.Type == "Branch" && w.BranchId == branchId);
+
+            if (warehouse != null)
+            {
+                return warehouse;
+            }
+
+            var branch = await _context.Branches.FindAsync(branchId)
+                ?? throw new NotFoundException("Branch not found.");
+
+            if (!branch.AllowNegativeStock)
+            {
+                throw new BadRequestException("Branch warehouse has not received inventory yet.");
+            }
+
+            warehouse = new Warehouse
+            {
+                Name = $"Kho {branch.Name}",
+                Type = "Branch",
+                BranchId = branchId,
+                Branch = branch,
+                IsActive = true
+            };
+            _context.Warehouses.Add(warehouse);
+            await _context.SaveChangesAsync();
+            return warehouse;
         }
 
         private async Task<decimal> GetConditionMultiplierAsync(VehicleCondition condition)
