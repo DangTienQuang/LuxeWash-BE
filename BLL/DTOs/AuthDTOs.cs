@@ -4,20 +4,20 @@ namespace AutoWashPro.BLL.DTOs
 {
     public class RegisterDTO
     {
-        [Required(ErrorMessage = "Số điện thoại không được để trống.")]
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Số điện thoại không hợp lệ.")]
+        [Required(ErrorMessage = "Phone number is required.")]
+        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
         public string PhoneNumber { get; set; }
 
-        [Required(ErrorMessage = "Email không được để trống.")]
-        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Email format is invalid.")]
         public string Email { get; set; }
 
-        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
-        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ hoa và 1 chữ số.")]
+        [Required(ErrorMessage = "Password is required.")]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Password must have at least 8 characters, including 1 uppercase letter and 1 digit.")]
         public string Password { get; set; }
 
-        [Required(ErrorMessage = "Họ tên không được để trống.")]
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Họ tên không được chỉ chứa khoảng trắng.")]
+        [Required(ErrorMessage = "Full name is required.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Full name cannot consist of only whitespace.")]
         public string FullName { get; set; }
     }
     public class ResendOtpDTO
@@ -26,10 +26,10 @@ namespace AutoWashPro.BLL.DTOs
     }
     public class LoginDTO
     {
-        [Required(ErrorMessage = "Số điện thoại hoặc Email không được để trống.")]
+        [Required(ErrorMessage = "Phone number or email is required.")]
         public string PhoneOrEmail { get; set; }
 
-        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
+        [Required(ErrorMessage = "Password is required.")]
         public string Password { get; set; }
     }
 
@@ -43,12 +43,12 @@ namespace AutoWashPro.BLL.DTOs
 
     public class VerifyOtpDTO
     {
-        [Required(ErrorMessage = "Email không được để trống.")]
-        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Email format is invalid.")]
         public string Email { get; set; }
 
-        [Required(ErrorMessage = "Mã OTP không được để trống.")]
-        [RegularExpression(@"^\d{6}$", ErrorMessage = "Mã OTP phải gồm 6 chữ số.")]
+        [Required(ErrorMessage = "OTP code is required.")]
+        [RegularExpression(@"^\d{6}$", ErrorMessage = "OTP code must be 6 digits.")]
         public string Otp { get; set; }
     }
 
@@ -63,42 +63,42 @@ namespace AutoWashPro.BLL.DTOs
     }
     public class RefreshTokenDTO
     {
-        [Required(ErrorMessage = "Access Token không được để trống.")]
+        [Required(ErrorMessage = "Access Token is required.")]
         public string AccessToken { get; set; }
 
-        [Required(ErrorMessage = "Refresh Token không được để trống.")]
+        [Required(ErrorMessage = "Refresh Token is required.")]
         public string RefreshToken { get; set; }
     }
 
     public class ChangePasswordDTO
     {
-        [Required(ErrorMessage = "Mật khẩu cũ không được để trống.")]
+        [Required(ErrorMessage = "Old password is required.")]
         public string OldPassword { get; set; }
 
-        [Required(ErrorMessage = "Mật khẩu mới không được để trống.")]
-        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Mật khẩu mới phải có ít nhất 8 ký tự, gồm 1 chữ hoa và 1 chữ số.")]
+        [Required(ErrorMessage = "New password is required.")]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "New password must have at least 8 characters, including 1 uppercase letter and 1 digit.")]
         public string NewPassword { get; set; }
     }
 
     public class ForgotPasswordDTO
     {
-        [Required(ErrorMessage = "Email không được để trống.")]
-        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Email format is invalid.")]
         public string Email { get; set; }
     }
 
     public class ResetPasswordDTO
     {
-        [Required(ErrorMessage = "Email không được để trống.")]
-        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Email format is invalid.")]
         public string Email { get; set; }
 
-        [Required(ErrorMessage = "Mã OTP không được để trống.")]
-        [RegularExpression(@"^\d{6}$", ErrorMessage = "Mã OTP phải gồm 6 chữ số.")]
+        [Required(ErrorMessage = "OTP code is required.")]
+        [RegularExpression(@"^\d{6}$", ErrorMessage = "OTP code must be 6 digits.")]
         public string Otp { get; set; }
 
-        [Required(ErrorMessage = "Mật khẩu mới không được để trống.")]
-        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Mật khẩu mới phải có ít nhất 8 ký tự, gồm 1 chữ hoa và 1 chữ số.")]
+        [Required(ErrorMessage = "New password is required.")]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "New password must have at least 8 characters, including 1 uppercase letter and 1 digit.")]
         public string NewPassword { get; set; }
     }
 }

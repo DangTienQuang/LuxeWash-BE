@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,8 +9,8 @@ namespace BLL.DTOs.Business
     public class RescheduleBusinessBookingDTO
     {
         public int BookingId { get; set; }
-        public DateTime NewScheduledDate { get; set; }  // new date
-        public int NewSlotId { get; set; }   // new slot id (could be same or different)
+        public DateTime NewScheduledDate { get; set; }
+        public int NewSlotId { get; set; }
     }
 
     public class RescheduleBusinessResponseDTO

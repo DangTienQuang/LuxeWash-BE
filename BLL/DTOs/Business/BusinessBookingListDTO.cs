@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -26,8 +26,8 @@ namespace BLL.DTOs.Business
         public string WashType { get; set; } = string.Empty;
         public string? LaneName { get; set; }
         public string? BranchName { get; set; }
-        public DateTime? ScheduledTime { get; set; }   // from Booking (pre-checkin)
-        public DateTime? CheckInTime { get; set; }      // from WashLog (post-checkin)
+        public DateTime? ScheduledTime { get; set; }
+        public DateTime? CheckInTime { get; set; }
         public DateTime? CompletedTime { get; set; }
         public decimal WashCost { get; set; }
     }

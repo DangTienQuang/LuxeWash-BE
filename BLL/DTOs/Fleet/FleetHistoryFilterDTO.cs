@@ -1,4 +1,4 @@
-﻿namespace BLL.DTOs.Fleet
+namespace BLL.DTOs.Fleet
 {
     public class FleetHistoryFilterDTO
     {
@@ -44,6 +44,6 @@
         public string Status { get; set; } = null!;
         public decimal WashCost { get; set; }
         public int? BookingId { get; set; }
-        public string WashType { get; set; } = null!; // Booking / WalkIn
+        public string WashType { get; set; } = null!;
     }
 }

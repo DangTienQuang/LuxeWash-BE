@@ -24,7 +24,7 @@ namespace AutoWashPro.BLL.DTOs
         [Required]
         public TimeSpan EndTime { get; set; }
 
-        [Range(1, int.MaxValue, ErrorMessage = "Sức chứa (MaxCapacity) phải lớn hơn 0.")]
+        [Range(1, int.MaxValue, ErrorMessage = "MaxCapacity must be greater than 0.")]
         public int MaxCapacity { get; set; } = 3;
 
         public bool IsVipOnly { get; set; } = false;
@@ -41,7 +41,7 @@ namespace AutoWashPro.BLL.DTOs
         [Required]
         public TimeSpan EndTime { get; set; }
 
-        [Range(1, int.MaxValue, ErrorMessage = "Sức chứa (MaxCapacity) phải lớn hơn 0.")]
+        [Range(1, int.MaxValue, ErrorMessage = "MaxCapacity must be greater than 0.")]
         public int MaxCapacity { get; set; }
 
         public bool IsVipOnly { get; set; }

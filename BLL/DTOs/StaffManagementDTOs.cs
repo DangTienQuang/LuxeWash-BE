@@ -21,18 +21,18 @@ namespace AutoWashPro.BLL.DTOs
     public class CreateStaffDTO
     {
         [Required]
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Số điện thoại không hợp lệ.")]
+        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
         public string PhoneNumber { get; set; } = string.Empty;
 
         [EmailAddress]
         public string? Email { get; set; }
 
         [Required]
-        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ hoa và 1 chữ số.")]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Password must have at least 8 characters, including 1 uppercase letter and 1 digit.")]
         public string Password { get; set; } = string.Empty;
 
         [Required]
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Họ tên không được chỉ chứa khoảng trắng.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Full name cannot consist of only whitespace.")]
         public string FullName { get; set; } = string.Empty;
 
         public string? Position { get; set; }
@@ -41,10 +41,10 @@ namespace AutoWashPro.BLL.DTOs
 
     public class UpdateStaffDTO
     {
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Họ tên không được chỉ chứa khoảng trắng.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Full name cannot consist of only whitespace.")]
         public string? FullName { get; set; }
 
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Số điện thoại không hợp lệ.")]
+        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
         public string? PhoneNumber { get; set; }
 
         [EmailAddress]
@@ -66,7 +66,7 @@ namespace AutoWashPro.BLL.DTOs
     public class CreateWorkShiftDTO
     {
         [Required]
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Tên ca không được chỉ chứa khoảng trắng.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Shift name cannot consist of only whitespace.")]
         public string ShiftName { get; set; } = string.Empty;
 
         [Required]

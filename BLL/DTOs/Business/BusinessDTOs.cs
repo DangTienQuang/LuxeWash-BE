@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -22,20 +22,19 @@ namespace BLL.DTOs.Business
 
     public class RegisterBusinessUserRequest
     {
-        // --- User credentials ---
-        [Required(ErrorMessage = "Số điện thoại không được để trống.")]
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Số điện thoại không hợp lệ.")]
+        [Required(ErrorMessage = "Phone number is required.")]
+        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
         public string PhoneNumber { get; set; } = null!;
 
-        [Required(ErrorMessage = "Email không được để trống.")]
-        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Email format is invalid.")]
         public string Email { get; set; } = null!;
 
-        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
-        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Mật khẩu phải có ít nhất 8 ký tự, gồm 1 chữ hoa và 1 chữ số.")]
+        [Required(ErrorMessage = "Password is required.")]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Password must have at least 8 characters, including 1 uppercase letter and 1 digit.")]
         public string Password { get; set; } = null!;
 
-        [Required(ErrorMessage = "Tên công ty không được để trống.")]
+        [Required(ErrorMessage = "Company name is required.")]
         [MaxLength(100)]
         public string CompanyName { get; set; } = null!;
 
@@ -45,7 +44,7 @@ namespace BLL.DTOs.Business
         public string? RepresentativeName { get; set; }
         public int? PaymentTermDays { get; set; }
 
-        [Required(ErrorMessage = "Vui lòng cung cấp giấy phép kinh doanh.")]
+        [Required(ErrorMessage = "Please provide the business license.")]
         public IFormFile BusinessLicense { get; set; } = null!;
         public IFormFile? AuthorizationLetter { get; set; }
     }

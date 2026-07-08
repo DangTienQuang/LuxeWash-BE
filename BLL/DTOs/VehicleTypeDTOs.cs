@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace AutoWashPro.BLL.DTOs
 {
@@ -12,8 +12,8 @@ namespace AutoWashPro.BLL.DTOs
 
     public class CreateVehicleTypeDTO
     {
-        [Required(ErrorMessage = "Tên loại xe không được để trống.")]
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Tên loại xe không được chỉ chứa khoảng trắng.")]
+        [Required(ErrorMessage = "Vehicle type name is required.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Vehicle type name cannot consist of only whitespace.")]
         public string Name { get; set; }
 
         public string? Description { get; set; }

@@ -31,16 +31,16 @@ namespace AutoWashPro.BLL.DTOs
 
     public class RedeemVoucherRequestDTO
     {
-        [Required(ErrorMessage = "Voucher ID không được để trống.")]
+        [Required(ErrorMessage = "Voucher ID is required.")]
         public int VoucherId { get; set; }
     }
 
     public class ConsumeVoucherRequestDTO
     {
-        [Required(ErrorMessage = "User ID không được để trống.")]
+        [Required(ErrorMessage = "User ID is required.")]
         public int UserId { get; set; }
 
-        [Required(ErrorMessage = "Mã Voucher không được để trống.")]
+        [Required(ErrorMessage = "Voucher code is required.")]
         public required string VoucherCode { get; set; }
     }
 
@@ -71,12 +71,12 @@ namespace AutoWashPro.BLL.DTOs
 
     public class CreateOrUpdateVoucherDTO
     {
-        [Required(ErrorMessage = "Mã voucher không được để trống.")]
+        [Required(ErrorMessage = "Voucher code is required.")]
         [MaxLength(50)]
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Mã voucher không được chỉ chứa khoảng trắng.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Voucher code cannot consist of only whitespace.")]
         public required string Code { get; set; }
 
-        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Số tiền giảm không hợp lệ.")]
+        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Discount amount is invalid.")]
         public decimal DiscountAmount { get; set; }
 
         [Range(0, int.MaxValue)]
@@ -95,7 +95,7 @@ namespace AutoWashPro.BLL.DTOs
 
         public AutoWashPro.BLL.Enums.VoucherTypeEnum VoucherType { get; set; } = AutoWashPro.BLL.Enums.VoucherTypeEnum.Discount;
         public string? ImageUrl { get; set; }
-        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Giá trị đơn tối thiểu không hợp lệ.")]
+        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Minimum order amount is invalid.")]
         public decimal MinOrderAmount { get; set; } = 0;
         public bool IsActive { get; set; } = true;
         public int? RequiredTierId { get; set; }
@@ -108,10 +108,10 @@ namespace AutoWashPro.BLL.DTOs
     {
         [Required]
         [MaxLength(50)]
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Mã voucher không được chỉ chứa khoảng trắng.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Voucher code cannot consist of only whitespace.")]
         public required string Code { get; set; }
 
-        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Số tiền giảm không hợp lệ.")]
+        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Discount amount is invalid.")]
         public decimal DiscountAmount { get; set; }
 
         [Range(0, int.MaxValue)]
@@ -126,7 +126,7 @@ namespace AutoWashPro.BLL.DTOs
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
 
-        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Giá trị đơn tối thiểu không hợp lệ.")]
+        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Minimum order amount is invalid.")]
         public decimal MinOrderAmount { get; set; } = 0;
 
         public string? ImageUrl { get; set; }
@@ -223,7 +223,7 @@ namespace AutoWashPro.BLL.DTOs
 
     public class GrantVoucherRequestDTO
     {
-        [Required(ErrorMessage = "Danh sách User ID không được để trống.")]
+        [Required(ErrorMessage = "User ID list is required.")]
         public List<int> UserIds { get; set; } = new();
     }
 }

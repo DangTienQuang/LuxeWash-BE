@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -33,8 +33,8 @@ namespace AutoWashPro.BLL.DTOs
 
     public class CreateVehicleDTO
     {
-        [Required(ErrorMessage = "Biển số xe không được để trống.")]
-        [RegularExpression(@"^[0-9]{2}[A-Z0-9]-[0-9]{3,5}(\.[0-9]{2})?$", ErrorMessage = "Biển số xe không hợp lệ (VD: 51H-123.45).")]
+        [Required(ErrorMessage = "License plate is required.")]
+        [RegularExpression(@"^[0-9]{2}[A-Z0-9]-[0-9]{3,5}(\.[0-9]{2})?$", ErrorMessage = "License plate format is invalid (e.g., 51H-123.45).")]
         public string LicensePlate { get; set; }
 
         public int? VehicleTypeId { get; set; }
@@ -57,20 +57,20 @@ namespace AutoWashPro.BLL.DTOs
 
     public class UpdateUserProfileDTO
     {
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Họ tên không được chỉ chứa khoảng trắng.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Full name cannot consist of only whitespace.")]
         public string? FullName { get; set; }
 
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Số điện thoại không hợp lệ.")]
+        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
         public string? PhoneNumber { get; set; }
-        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [EmailAddress(ErrorMessage = "Email format is invalid.")]
         public string? Email { get; set; }
         public DateTime? DateOfBirth { get; set; }
     }
 
     public class UpdateUserStatusDTO
     {
-        [Required(ErrorMessage = "Trạng thái không được để trống.")]
-        [RegularExpression("^(Active|Blocked)$", ErrorMessage = "Trạng thái chỉ được phép là 'Active' hoặc 'Blocked'.")]
+        [Required(ErrorMessage = "Status is required.")]
+        [RegularExpression("^(Active|Blocked)$", ErrorMessage = "Status must be 'Active' or 'Blocked'.")]
         public string Status { get; set; }
     }
 
@@ -121,13 +121,13 @@ namespace AutoWashPro.BLL.DTOs
 
     public class UpdateVehicleTypeAdminDTO
     {
-        [Required(ErrorMessage = "Vui lòng chọn loại xe.")]
+        [Required(ErrorMessage = "Please select a vehicle type.")]
         public int VehicleTypeId { get; set; }
     }
 
     public class ApproveVehicleTypeRequestDTO
     {
-        [StringLength(50, ErrorMessage = "Tên loại xe tối đa 50 ký tự.")]
+        [StringLength(50, ErrorMessage = "Vehicle type name cannot exceed 50 characters.")]
         public string? CustomizedTypeName { get; set; }
 
         public string? Description { get; set; }

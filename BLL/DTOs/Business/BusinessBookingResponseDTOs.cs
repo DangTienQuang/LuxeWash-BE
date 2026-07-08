@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -33,7 +33,7 @@ namespace BLL.DTOs.Business
 
     public class MultiVehicleBookingResponseDTO
     {
-        public int BookingGroupId { get; set; }      // first BookingId in the group
+        public int BookingGroupId { get; set; }
         public int TotalVehicles { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = string.Empty;

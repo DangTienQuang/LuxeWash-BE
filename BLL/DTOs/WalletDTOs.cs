@@ -15,7 +15,7 @@ namespace AutoWashPro.BLL.DTOs
     public class TopUpRequestDTO
     {
         [Required]
-        [Range(typeof(decimal), "1", "1000000000", ErrorMessage = "Số tiền nạp không hợp lệ.")]
+        [Range(typeof(decimal), "1", "1000000000", ErrorMessage = "Top-up amount is invalid.")]
         public decimal Amount { get; set; }
 
         [Required]
@@ -36,10 +36,10 @@ namespace AutoWashPro.BLL.DTOs
     public class PaymentQrRequestDTO
     {
         [Required]
-        [RegularExpression("^(Topup|TopUp|BookingPayment|Booking)$", ErrorMessage = "PaymentType chỉ hỗ trợ Topup hoặc BookingPayment.")]
+        [RegularExpression("^(Topup|TopUp|BookingPayment|Booking)$", ErrorMessage = "PaymentType only supports Topup or BookingPayment.")]
         public required string PaymentType { get; set; }
 
-        [Range(typeof(decimal), "1", "1000000000", ErrorMessage = "Số tiền thanh toán không hợp lệ.")]
+        [Range(typeof(decimal), "1", "1000000000", ErrorMessage = "Payment amount is invalid.")]
         public decimal? Amount { get; set; }
 
         public int? BookingId { get; set; }

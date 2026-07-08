@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace AutoWashPro.BLL.DTOs
 {
@@ -13,17 +13,17 @@ namespace AutoWashPro.BLL.DTOs
 
     public class CreateTierDTO
     {
-        [Required(ErrorMessage = "Tên hạng không được để trống.")]
-        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Tên hạng không được chỉ chứa khoảng trắng.")]
+        [Required(ErrorMessage = "Tier name is required.")]
+        [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Tier name cannot consist of only whitespace.")]
         public string TierName { get; set; }
 
-        [Range(1.0, 5.0, ErrorMessage = "Hệ số nhân điểm phải từ 1.0 đến 5.0.")]
+        [Range(1.0, 5.0, ErrorMessage = "Point multiplier must be between 1.0 and 5.0.")]
         public double PointMultiplier { get; set; }
 
-        [Range(1, 30, ErrorMessage = "Số ngày đặt trước phải từ 1 đến 30 ngày.")]
+        [Range(1, 30, ErrorMessage = "Booking window must be between 1 and 30 days.")]
         public int BookingWindowDays { get; set; }
 
-        [Range(0, int.MaxValue, ErrorMessage = "Điểm tối thiểu không hợp lệ.")]
+        [Range(0, int.MaxValue, ErrorMessage = "Minimum accumulated points is invalid.")]
         public int MinAccumulatedPoints { get; set; }
     }
 

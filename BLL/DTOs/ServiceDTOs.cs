@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace AutoWashPro.BLL.DTOs
@@ -22,13 +22,13 @@ namespace AutoWashPro.BLL.DTOs
     }
     public class CreateOrUpdateServiceDTO
     {
-        [Required(ErrorMessage = "Tên dịch vụ không được để trống.")]
+        [Required(ErrorMessage = "Service name is required.")]
         public string ServiceName { get; set; }
 
         public string? Description { get; set; }
 
-        [Required(ErrorMessage = "Phải cấu hình ít nhất 1 mức giá cho dịch vụ.")]
-        [MinLength(1, ErrorMessage = "Phải cấu hình ít nhất 1 mức giá cho dịch vụ.")]
+        [Required(ErrorMessage = "Must configure at least 1 price for the service.")]
+        [MinLength(1, ErrorMessage = "Must configure at least 1 price for the service.")]
         public List<CreateServicePriceDTO> Prices { get; set; }
     }
 
@@ -41,11 +41,11 @@ namespace AutoWashPro.BLL.DTOs
         public int BranchId { get; set; }
 
         [Required]
-        [Range(0, double.MaxValue, ErrorMessage = "Giá tiền không hợp lệ.")]
+        [Range(0, double.MaxValue, ErrorMessage = "Price is invalid.")]
         public decimal Price { get; set; }
 
         [Required]
-        [Range(5, 600, ErrorMessage = "Thời gian thực hiện (phút) phải từ 5 đến 600.")]
+        [Range(5, 600, ErrorMessage = "Estimated duration (minutes) must be between 5 and 600.")]
         public int EstimatedDurationMinutes { get; set; }
     }
 }

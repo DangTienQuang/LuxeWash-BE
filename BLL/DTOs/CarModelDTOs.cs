@@ -32,10 +32,10 @@ namespace AutoWashPro.BLL.DTOs
 
     public class RequestCarModelDTO
     {
-        [Required(ErrorMessage = "Vui lòng nhập hãng xe.")]
+        [Required(ErrorMessage = "Please enter the car brand.")]
         public string Brand { get; set; }
 
-        [Required(ErrorMessage = "Vui lòng nhập tên dòng xe.")]
+        [Required(ErrorMessage = "Please enter the car model name.")]
         public string Name { get; set; }
 
         public int? Year { get; set; }
@@ -46,7 +46,7 @@ namespace AutoWashPro.BLL.DTOs
 
     public class ApproveCarModelDTO
     {
-        [Required(ErrorMessage = "Vui lòng chọn loại xe để phê duyệt.")]
+        [Required(ErrorMessage = "Please select a vehicle type to approve.")]
         public int VehicleTypeId { get; set; }
     }
 }
