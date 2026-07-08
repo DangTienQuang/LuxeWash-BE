@@ -18,7 +18,7 @@ namespace AutoWashPro.DAL.Entities
         public string Category { get; set; } = null!;
 
         [Required]
-        [MaxLength(20)]
+        [MaxLength(50)]
         public string Unit { get; set; } = null!;
 
         [MaxLength(500)]
