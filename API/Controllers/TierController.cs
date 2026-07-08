@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -30,7 +30,7 @@ namespace AutoWashPro.API.Controllers
         public async Task<IActionResult> CreateTier([FromBody] CreateTierDTO request)
         {
             var result = await _tierService.CreateTierAsync(request);
-            return Created("", new { statusCode = 201, message = "Tạo hạng thành công.", data = result });
+            return Created("", new { statusCode = 201, message = "Tier created successfully.", data = result });
         }
 
         [Authorize(Roles = "Admin")]
@@ -38,7 +38,7 @@ namespace AutoWashPro.API.Controllers
         public async Task<IActionResult> UpdateTier(int id, [FromBody] UpdateTierDTO request)
         {
             var result = await _tierService.UpdateTierAsync(id, request);
-            return Ok(new { statusCode = 200, message = "Cập nhật cấu hình hạng thành công.", data = result });
+            return Ok(new { statusCode = 200, message = "Tier configuration updated successfully.", data = result });
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -25,18 +25,29 @@ namespace AutoWashPro.BLL.Services
             var user = await _context.Users
                 .Include(u => u.CustomerProfile)
                     .ThenInclude(cp => cp.Tier)
+                .Include(u => u.StaffProfile)
+                .Include(u => u.ManagerProfile)
+                .Include(u => u.EmployeeProfile)
+                .Include(u => u.BusinessProfile)
                 .Include(u => u.Vehicles)
                     .ThenInclude(v => v.VehicleType)
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
             if (user == null) throw new NotFoundException("Không tìm thấy người dùng.");
 
+            var fullName = user.CustomerProfile?.FullName
+                        ?? user.StaffProfile?.FullName
+                        ?? user.ManagerProfile?.FullName
+                        ?? user.EmployeeProfile?.FullName
+                        ?? user.BusinessProfile?.CompanyName
+                        ?? user.PhoneNumber;
+
             return new UserProfileDTO
             {
                 UserId = user.UserId,
                 Email = user.Email,     
                 Status = user.Status,   
-                FullName = user.CustomerProfile?.FullName,
+                FullName = fullName,
                 PhoneNumber = user.PhoneNumber,
                 TierName = user.CustomerProfile?.Tier?.TierName,
                 TotalPoint = user.CustomerProfile?.TotalPoint ?? 0,
@@ -54,18 +65,46 @@ namespace AutoWashPro.BLL.Services
         {
             var user = await _context.Users
                 .Include(u => u.CustomerProfile)
+                .Include(u => u.StaffProfile)
+                .Include(u => u.ManagerProfile)
+                .Include(u => u.EmployeeProfile)
+                .Include(u => u.BusinessProfile)
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
-            if (user == null || user.CustomerProfile == null)
+            if (user == null)
                 throw new NotFoundException("Không tìm thấy dữ liệu người dùng.");
 
             bool isUpdated = false;
-            if (!string.IsNullOrWhiteSpace(request.FullName) && user.CustomerProfile.FullName != request.FullName.Trim())
+            if (!string.IsNullOrWhiteSpace(request.FullName))
             {
-                user.CustomerProfile.FullName = request.FullName.Trim();
-                isUpdated = true;
+                var newName = request.FullName.Trim();
+                if (user.CustomerProfile != null && user.CustomerProfile.FullName != newName)
+                {
+                    user.CustomerProfile.FullName = newName;
+                    isUpdated = true;
+                }
+                if (user.StaffProfile != null && user.StaffProfile.FullName != newName)
+                {
+                    user.StaffProfile.FullName = newName;
+                    isUpdated = true;
+                }
+                if (user.ManagerProfile != null && user.ManagerProfile.FullName != newName)
+                {
+                    user.ManagerProfile.FullName = newName;
+                    isUpdated = true;
+                }
+                if (user.EmployeeProfile != null && user.EmployeeProfile.FullName != newName)
+                {
+                    user.EmployeeProfile.FullName = newName;
+                    isUpdated = true;
+                }
+                if (user.BusinessProfile != null && user.BusinessProfile.CompanyName != newName)
+                {
+                    user.BusinessProfile.CompanyName = newName;
+                    isUpdated = true;
+                }
             }
-            if (request.DateOfBirth.HasValue)
+            if (request.DateOfBirth.HasValue && user.CustomerProfile != null)
             {
                 if (user.CustomerProfile.DateOfBirth.HasValue && user.CustomerProfile.DateOfBirth.Value.Date != request.DateOfBirth.Value.Date)
                 {

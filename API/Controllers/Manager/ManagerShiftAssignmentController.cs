@@ -28,21 +28,21 @@ namespace API.Controllers.Manager
         public async Task<IActionResult> CreateShiftAssignment([FromBody] CreateShiftAssignmentDTO request)
         {
             var result = await _staffService.CreateShiftAssignmentAsync(request);
-            return Created("", new { statusCode = 201, message = "Phan cong ca thanh cong.", data = result });
+            return Created("", new { statusCode = 201, message = "Shift assigned successfully.", data = result });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateShiftAssignment(int id, [FromBody] UpdateShiftAssignmentDTO request)
         {
             var result = await _staffService.UpdateShiftAssignmentAsync(id, request);
-            return Ok(new { statusCode = 200, message = "Cap nhat phan cong ca thanh cong.", data = result });
+            return Ok(new { statusCode = 200, message = "Shift assignment updated successfully.", data = result });
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteShiftAssignment(int id)
         {
             await _staffService.DeleteShiftAssignmentAsync(id);
-            return Ok(new { statusCode = 200, message = "Xoa phan cong ca thanh cong." });
+            return Ok(new { statusCode = 200, message = "Shift assignment deleted successfully." });
         }
     }
 }

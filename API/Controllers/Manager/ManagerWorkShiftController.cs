@@ -28,21 +28,21 @@ namespace API.Controllers.Manager
         public async Task<IActionResult> CreateWorkShift([FromBody] CreateWorkShiftDTO request)
         {
             var result = await _staffService.CreateWorkShiftAsync(request);
-            return Created("", new { statusCode = 201, message = "Tao ca lam viec thanh cong.", data = result });
+            return Created("", new { statusCode = 201, message = "Work shift created successfully.", data = result });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateWorkShift(int id, [FromBody] UpdateWorkShiftDTO request)
         {
             var result = await _staffService.UpdateWorkShiftAsync(id, request);
-            return Ok(new { statusCode = 200, message = "Cap nhat ca lam viec thanh cong.", data = result });
+            return Ok(new { statusCode = 200, message = "Work shift updated successfully.", data = result });
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteWorkShift(int id)
         {
             await _staffService.DeleteWorkShiftAsync(id);
-            return Ok(new { statusCode = 200, message = "Xoa hoac ngung su dung ca lam viec thanh cong." });
+            return Ok(new { statusCode = 200, message = "Work shift deleted or deactivated successfully." });
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using BLL.DTOs.Business;
+using BLL.DTOs.Business;
 using BLL.Helpers;
 using BLL.Services;
 using BLL.Services.Interface;
@@ -69,7 +69,7 @@ namespace API.Controllers.User
             return Ok(new
             {
                 statusCode = 200,
-                message = "Tạo hoá đơn tháng thành công.",
+                message = "Monthly invoice generated successfully.",
                 InvoiceId = invoiceId
             });
         }

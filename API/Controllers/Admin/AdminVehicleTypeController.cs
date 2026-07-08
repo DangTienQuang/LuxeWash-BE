@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,21 +23,21 @@ namespace API.Controllers.Admin
         public async Task<IActionResult> Create([FromBody] CreateVehicleTypeDTO request)
         {
             var result = await _typeService.CreateAsync(request);
-            return Created("", new { statusCode = 201, message = "Thêm loại xe thành công.", data = result });
+            return Created("", new { statusCode = 201, message = "Vehicle type added successfully.", data = result });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] CreateVehicleTypeDTO request)
         {
             await _typeService.UpdateAsync(id, request);
-            return Ok(new { statusCode = 200, message = "Cập nhật loại xe thành công." });
+            return Ok(new { statusCode = 200, message = "Vehicle type updated successfully." });
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             await _typeService.DeleteAsync(id);
-            return Ok(new { statusCode = 200, message = "Xóa loại xe thành công." });
+            return Ok(new { statusCode = 200, message = "Vehicle type deleted successfully." });
         }
 
         [AllowAnonymous]

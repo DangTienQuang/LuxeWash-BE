@@ -35,7 +35,7 @@ namespace AutoWashPro.API.Controllers
         {
             var userId = ClaimHelper.GetUserId(User);
             await _voucherService.RedeemVoucherAsync(userId, request.VoucherId);
-            return Ok(new { statusCode = 200, message = "Đổi voucher thành công." });
+            return Ok(new { statusCode = 200, message = "Voucher redeemed successfully." });
         }
     }
 }

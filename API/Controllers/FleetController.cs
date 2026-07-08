@@ -1,4 +1,4 @@
-﻿using AutoWashPro.DAL.Entities;
+using AutoWashPro.DAL.Entities;
 using BLL.DTOs;
 using BLL.DTOs.Fleet;
 using BLL.Helpers;
@@ -46,7 +46,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Nhập danh sách phương tiện thành công.",
+                message = "Fleet vehicle list imported successfully.",
                 data = result
             });
         }
@@ -81,7 +81,6 @@ namespace API.Controllers
             });
         }
 
-        // Staff review vehicle
         [Authorize(Roles = "Admin")]
         [HttpPost("staff/approve/{id}")]
         public async Task<IActionResult> ApproveVehicle(int id)
@@ -91,11 +90,10 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Phương tiện đã được phê duyệt."
+                message = "Vehicle approved successfully."
             });
         }
 
-        // Staff reject vehicle
         [Authorize(Roles = "Admin")]
         [HttpPost("staff/reject/{id}")]
         public async Task<IActionResult> RejectVehicle(int id, [FromBody] ReviewFleetImportDTO dto)
@@ -105,7 +103,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Phương tiện đã bị từ chối."
+                message = "Vehicle rejected successfully."
             });
         }
 
@@ -161,7 +159,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Phương tiện đã được tiếp nhận thành công.",
+                message = "Vehicle received successfully.",
                 data = result
             });
         }
@@ -175,7 +173,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Phương tiện xuất bãi thành công."
+                message = "Vehicle departed successfully."
             });
         }
 
@@ -190,7 +188,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Phương tiện đã chuyển sang trạng thái xử lý."
+                message = "Vehicle moved to processing status."
             });
         }
 
@@ -266,7 +264,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Check Out thành công.",
+                message = "Check out completed successfully.",
                 data = result
             });
         }

@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,7 +33,7 @@ namespace AutoWashPro.API.Controllers
         {
             int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
             await _vehicleService.AddVehicleAsync(userId, request);
-            return Created("", new { statusCode = 201, message = "Thêm xe thành công." });
+            return Created("", new { statusCode = 201, message = "Vehicle added successfully." });
         }
 
         [HttpPut("{licensePlate}")]
@@ -41,7 +41,7 @@ namespace AutoWashPro.API.Controllers
         {
             int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
             await _vehicleService.UpdateVehicleAsync(userId, licensePlate, request);
-            return Ok(new { statusCode = 200, message = "Cập nhật thông tin xe thành công." });
+            return Ok(new { statusCode = 200, message = "Vehicle information updated successfully." });
         }
 
         [HttpDelete("{licensePlate}")]
@@ -49,7 +49,7 @@ namespace AutoWashPro.API.Controllers
         {
             int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
             await _vehicleService.DeleteVehicleAsync(userId, licensePlate);
-            return Ok(new { statusCode = 200, message = "Đã xóa phương tiện khỏi hồ sơ." });
+            return Ok(new { statusCode = 200, message = "Vehicle removed from profile successfully." });
         }
 
         [Authorize(Roles = "Admin")] 
@@ -57,7 +57,7 @@ namespace AutoWashPro.API.Controllers
         public async Task<IActionResult> RecognizeVehicle(string licensePlate)
         {
             var result = await _vehicleService.RecognizeVehicleAsync(licensePlate);
-            return Ok(new { statusCode = 200, message = "Nhận diện thành công", data = result });
+            return Ok(new { statusCode = 200, message = "Recognition successful", data = result });
         }
     }
 }

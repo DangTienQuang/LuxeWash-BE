@@ -33,7 +33,7 @@ namespace API.Controllers.User
         {
             var userId = ClaimHelper.GetUserId(User);
             var result = await _walletService.CreateTopUpLinkAsync(userId, request);
-            return Ok(new { statusCode = 200, message = "Tạo QR nạp tiền thành công.", data = result });
+            return Ok(new { statusCode = 200, message = "Top-up QR code created successfully.", data = result });
         }
 
         [HttpPost("top-up/callback")]

@@ -31,14 +31,14 @@ namespace API.Controllers.Staff
         public async Task<IActionResult> UpdateBookingStatus(int id, [FromQuery] string newStatus)
         {
             await _bookingService.UpdateBookingStatusAsync(id, newStatus);
-            return Ok(new { statusCode = 200, message = $"Đã cập nhật trạng thái thành: {newStatus}" });
+            return Ok(new { statusCode = 200, message = $"Booking status updated to: {newStatus}" });
         }
 
         [HttpPut("status-by-license-plate")]
         public async Task<IActionResult> UpdateBookingStatusByLicensePlate([FromBody] UpdateBookingStatusByPlateDTO request)
         {
             var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(request.LicensePlate, request.NewStatus);
-            return Ok(new { statusCode = 200, message = $"Đã cập nhật trạng thái xe {request.LicensePlate} thành: {request.NewStatus}", data = result });
+            return Ok(new { statusCode = 200, message = $"Vehicle {request.LicensePlate} status updated to: {request.NewStatus}", data = result });
         }
         [HttpGet("by-license-plate/{licensePlate}")]
         public async Task<IActionResult> GetBookingsByLicensePlate(string licensePlate)
@@ -46,7 +46,7 @@ namespace API.Controllers.Staff
             var branchIdClaim = User.FindFirst("BranchId")?.Value;
             if (string.IsNullOrEmpty(branchIdClaim) || !int.TryParse(branchIdClaim, out int branchId))
             {
-                throw new AutoWashPro.BLL.Exceptions.UnauthorizedException("Không tìm thấy thông tin chi nhánh (BranchId) trong token.");
+                throw new AutoWashPro.BLL.Exceptions.UnauthorizedException("Branch information (BranchId) not found in token.");
             }
 
             var result = await _bookingService.LookupLicensePlateAsync(licensePlate, branchId);
@@ -56,21 +56,21 @@ namespace API.Controllers.Staff
         public async Task<IActionResult> MarkAsNoShow(int id)
         {
             await _bookingService.MarkAsNoShowAsync(id);
-            return Ok(new { statusCode = 200, message = "Đã đánh dấu khách No-Show thành công." });
+            return Ok(new { statusCode = 200, message = "Customer marked as No-Show successfully." });
         }
 
         [HttpPut("{detailId}/report-mismatch")]
         public async Task<IActionResult> ReportMismatch(int detailId, [FromQuery] AutoWashPro.BLL.Enums.VehicleConditionEnum condition, [FromQuery] int actualTypeId)
         {
             await _bookingService.ReportMismatchAsync(detailId, condition, actualTypeId);
-            return Ok(new { statusCode = 200, message = "Đã cập nhật tình trạng xe và tính lại phụ phí thành công." });
+            return Ok(new { statusCode = 200, message = "Vehicle condition updated and surcharge recalculated successfully." });
         }
         [HttpPost("force-cancel")]
         [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> ForceCancelBookings([FromBody] ForceCancelRequestDTO request)
         {
             await _bookingService.ForceCancelBookingsAsync(request);
-            return Ok(new { statusCode = 200, message = "Đã hủy các lịch hẹn thành công, hoàn tiền và gửi email thông báo tới khách hàng." });
+            return Ok(new { statusCode = 200, message = "Bookings cancelled successfully. Refunds processed and notification emails sent to customers." });
         }
     }
 }

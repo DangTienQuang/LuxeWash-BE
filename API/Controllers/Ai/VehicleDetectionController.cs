@@ -12,7 +12,6 @@ namespace API.Controllers.Ai
         private readonly ILicensePlateService _plateService;
         private readonly ICarRecognitionService _carRecognitionService;
 
-        // 1. Khai báo thêm Service nhận diện xe
         private readonly ICarDetectionService _detectionService;
 
         public VehicleDetectionController(
@@ -30,7 +29,7 @@ namespace API.Controllers.Ai
         public async Task<IActionResult> DetectPlate(IFormFile image)
         {
             if (image == null || image.Length == 0)
-                throw new BadRequestException("Vui lòng cung cấp ảnh.");
+                throw new BadRequestException("Please provide an image.");
 
             using var ms = new MemoryStream();
             await image.CopyToAsync(ms);
@@ -38,7 +37,7 @@ namespace API.Controllers.Ai
             var result = await _plateService.DetectPlateAsync(ms.ToArray());
 
             if (!result.Detected)
-                throw new NotFoundException("Không phát hiện được biển số.");
+                throw new NotFoundException("License plate could not be detected.");
 
             return Ok(new
             {
@@ -57,7 +56,7 @@ namespace API.Controllers.Ai
         public async Task<IActionResult> DetectDualPlate(IFormFile? frontImage, IFormFile? backImage)
         {
             if (frontImage == null && backImage == null)
-                throw new BadRequestException("Cần cung cấp ít nhất một ảnh.");
+                throw new BadRequestException("At least one image must be provided.");
 
             byte[]? frontBytes = null;
             byte[]? backBytes = null;
@@ -79,7 +78,7 @@ namespace API.Controllers.Ai
             var result = await _plateService.DetectDualPlateAsync(frontBytes, backBytes);
 
             if (!result.Detected)
-                throw new NotFoundException("Không phát hiện được biển số.");
+                throw new NotFoundException("License plate could not be detected.");
 
             return Ok(new
             {
@@ -111,7 +110,7 @@ namespace API.Controllers.Ai
         public async Task<IActionResult> Recognize(IFormFile image)
         {
             if (image == null || image.Length == 0)
-                throw new InvalidOperationException("Vui lòng tải lên ảnh xe");
+                throw new InvalidOperationException("Please upload a vehicle image");
 
             using var ms = new MemoryStream();
             await image.CopyToAsync(ms);
@@ -121,7 +120,7 @@ namespace API.Controllers.Ai
             return Ok(new
             {
                 statusCode = 200,
-                message = "Nhận diện xe thành công",
+                message = "Vehicle recognized successfully",
                 data = results.Select(r => new
                 {
                     vehicleType = r.VehicleTypeName ?? r.PredictedVehicleType,
@@ -145,7 +144,7 @@ namespace API.Controllers.Ai
         {
             if (imageFile == null || imageFile.Length == 0)
             {
-                return BadRequest(new { statusCode = 400, message = "Vui lòng tải lên một bức ảnh." });
+                return BadRequest(new { statusCode = 400, message = "Please upload an image." });
             }
 
             using var memoryStream = new MemoryStream();
@@ -163,7 +162,7 @@ namespace API.Controllers.Ai
                     success = true,
                     hasCar = true,
                     carCount = boundingBoxes.Count,
-                    message = "Đã phát hiện thấy xe ô tô trong khung hình!",
+                    message = "Vehicle detected in frame!",
                     boxes = boundingBoxes
                 });
             }
@@ -175,7 +174,7 @@ namespace API.Controllers.Ai
                     success = true,
                     hasCar = false,
                     carCount = 0,
-                    message = "Không có xe nào trong khu vực camera."
+                    message = "No vehicle detected in camera area."
                 });
             }
         }

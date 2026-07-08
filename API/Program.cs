@@ -181,7 +181,7 @@ builder.Services.AddScoped<IServiceMaterialUsageService, ServiceMaterialUsageSer
 builder.Services.AddScoped<IInventoryTransferService, InventoryTransferService>();
 builder.Services.AddScoped<IBookingMaterialUsageService, BookingMaterialUsageService>();
 builder.Services.AddScoped<IInventoryReportService, InventoryReportService>();
-builder.Services.AddScoped<IDataSeedingService, DataSeedingService>();
+
 // ==============================================================================
 // 7. BACKGROUND WORKERS
 // ==============================================================================
@@ -221,7 +221,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
-        Description = "Chỉ cần dán Token (JWT) vào đây. Hệ thống sẽ tự động thêm 'Bearer ' đằng trước.",
+        Description = "Paste the JWT token here. The system will automatically prepend 'Bearer '.",
         Name = "Authorization",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
@@ -292,23 +292,12 @@ app.UseAuthorization();
 app.MapControllers();
 
 // ==============================================================================
-// 10. DATABASE MIGRATION & DATA SEEDING ON STARTUP
+// 10. DATABASE MIGRATION ON STARTUP
 // ==============================================================================
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AutoWashDbContext>();
     await dbContext.Database.MigrateAsync();
-
-    try
-    {
-        var seeder = scope.ServiceProvider.GetRequiredService<IDataSeedingService>();
-        await seeder.SeedTestBookingForAIAsync("30A-888.88");
-    }
-    catch (Exception ex)
-    {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding test data for AI camera.");
-    }
 }
 
 app.Run();

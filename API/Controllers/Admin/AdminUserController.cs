@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -40,8 +40,8 @@ namespace API.Controllers.Admin
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateUserStatusDTO request)
         {
             await _userService.UpdateCustomerStatusAsync(id, request.Status);
-            var statusVn = request.Status == "Active" ? "Mở khóa" : "Khóa";
-            return Ok(new { statusCode = 200, message = $"{statusVn} tài khoản thành công." });
+            var statusMsg = request.Status == "Active" ? "Unlocked" : "Locked";
+            return Ok(new { statusCode = 200, message = $"{statusMsg} account successfully." });
         }
 
         [HttpPost("sync-points")]
@@ -49,7 +49,7 @@ namespace API.Controllers.Admin
         public async Task<IActionResult> SyncCustomerPoints()
         {
             await _userService.SyncCustomerProfilePointsAsync();
-            return Ok(new { statusCode = 200, message = "Đồng bộ điểm khách hàng thành công." });
+            return Ok(new { statusCode = 200, message = "Customer points synced successfully." });
         }
     }
 }

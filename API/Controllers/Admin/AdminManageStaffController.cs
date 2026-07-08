@@ -36,14 +36,14 @@ namespace API.Controllers.Admin
         public async Task<IActionResult> CreateStaff([FromBody] CreateStaffDTO request)
         {
             var result = await _staffService.CreateStaffWithRoleAsync(request, UserRoles.Staff);
-            return Created("", new { statusCode = 201, message = "Tao staff thanh cong.", data = result });
+            return Created("", new { statusCode = 201, message = "Staff created successfully.", data = result });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStaff(int id, [FromBody] UpdateStaffDTO request)
         {
             var result = await _staffService.UpdateStaffByRoleAsync(id, UserRoles.Staff, request);
-            return Ok(new { statusCode = 200, message = "Cap nhat staff thanh cong.", data = result });
+            return Ok(new { statusCode = 200, message = "Staff updated successfully.", data = result });
         }
 
         [HttpPut("{id}/status")]
@@ -51,14 +51,14 @@ namespace API.Controllers.Admin
         {
             await _staffService.GetStaffByRoleAsync(id, UserRoles.Staff);
             await _staffService.UpdateStaffStatusAsync(id, request.Status);
-            return Ok(new { statusCode = 200, message = "Cap nhat trang thai staff thanh cong." });
+            return Ok(new { statusCode = 200, message = "Staff status updated successfully." });
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteStaff(int id)
         {
             await _staffService.SoftDeleteStaffByRoleAsync(id, UserRoles.Staff);
-            return Ok(new { statusCode = 200, message = "Xoa staff thanh cong (soft delete)." });
+            return Ok(new { statusCode = 200, message = "Staff deleted successfully (soft delete)." });
         }
     }
 }

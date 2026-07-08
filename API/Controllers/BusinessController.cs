@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.Exceptions;
+using AutoWashPro.BLL.Exceptions;
 using BLL.DTOs;
 using BLL.DTOs.Business;
 using BLL.DTOs.Fleet;
@@ -42,7 +42,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Đăng ký tài khoản doanh nghiệp thành công. Đang chờ quản trị viên phê duyệt.",
+                message = "Business account registered successfully. Awaiting administrator approval.",
                 data = result
             });
         }
@@ -56,7 +56,7 @@ namespace API.Controllers
             var result = await _businessService.GetByUserIdAsync(userId);
 
             if (result == null)
-                throw new NotFoundException("Không tìm thấy hồ sơ cho doanh nghiệp.");
+                throw new NotFoundException("Business profile not found.");
 
             return Ok(new
             {
@@ -80,7 +80,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Đã xét duyệt hồ sơ cho doanh nghiệp."
+                message = "Business profile reviewed successfully."
             });
         }
 
@@ -103,12 +103,12 @@ namespace API.Controllers
         public async Task<IActionResult> GetApplicationDetail(int businessProfileId)
         {
             if (businessProfileId <= 0)
-                throw new BadRequestException("Profile ID không hợp lệ.");
+                throw new BadRequestException("Profile ID is invalid.");
 
             var result = await _businessService.GetBusinessApplicationDetailAsync(businessProfileId);
 
             if (result == null)
-                throw new NotFoundException($"Không tìm thấy Hồ sơ có ID {businessProfileId}.");
+                throw new NotFoundException($"Profile with ID {businessProfileId} not found.");
 
             return Ok(new
             {
@@ -161,7 +161,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Đổi lịch đặt thành công.",
+                message = "Booking rescheduled successfully.",
                 data = result
             });
         }
@@ -255,7 +255,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Huỷ đặt lịch thành công."
+                message = "Booking cancelled successfully."
             });
         }
 
@@ -333,7 +333,7 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Phân làn rửa cho phương tiện thành công."
+                message = "Lane assigned to vehicle successfully."
             });
         }
 

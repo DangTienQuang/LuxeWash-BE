@@ -35,7 +35,7 @@ namespace API.Controllers.Manager
         public async Task<IActionResult> ReviewShiftSwapRequest(int id, [FromBody] ReviewRequestDTO request)
         {
             var result = await _staffService.ReviewShiftSwapRequestAsync(id, GetUserId(), request);
-            return Ok(new { statusCode = 200, message = "Duyet yeu cau doi ca thanh cong.", data = result });
+            return Ok(new { statusCode = 200, message = "Shift swap request reviewed successfully.", data = result });
         }
     }
 }

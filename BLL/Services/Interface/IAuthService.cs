@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using AutoWashPro.BLL.DTOs;
 
 namespace AutoWashPro.BLL.Services
@@ -11,5 +11,8 @@ namespace AutoWashPro.BLL.Services
         Task<AuthResponseDTO> RefreshTokenAsync(RefreshTokenDTO request);
         Task<bool> ChangePasswordAsync(int userId, ChangePasswordDTO request);
         Task<RegisterPendingResponseDTO> ResendOtpAsync(ResendOtpDTO request);
+        Task LogoutAsync(int userId);
+        Task ForgotPasswordAsync(ForgotPasswordDTO request);
+        Task ResetPasswordAsync(ResetPasswordDTO request);
     }
 }

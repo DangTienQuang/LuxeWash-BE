@@ -29,21 +29,21 @@ namespace API.Controllers.Admin
         public async Task<IActionResult> UpdateVehicleType(string licensePlate, [FromBody] UpdateVehicleTypeAdminDTO request)
         {
             await _vehicleService.UpdateVehicleTypeByAdminAsync(licensePlate, request.VehicleTypeId);
-            return Ok(new { statusCode = 200, message = "Cập nhật loại xe thành công." });
+            return Ok(new { statusCode = 200, message = "Vehicle type updated successfully." });
         }
 
         [HttpPost("{licensePlate}/approve-new-type")]
         public async Task<IActionResult> ApproveNewVehicleType(string licensePlate, [FromBody] ApproveVehicleTypeRequestDTO request)
         {
             await _vehicleService.ApproveNewVehicleTypeAsync(licensePlate, request);
-            return Ok(new { statusCode = 200, message = "Yêu cầu thêm loại xe đã được duyệt thành công." });
+            return Ok(new { statusCode = 200, message = "New vehicle type request approved successfully." });
         }
 
         [HttpPost("{licensePlate}/reject-new-type")]
         public async Task<IActionResult> RejectNewVehicleType(string licensePlate)
         {
             await _vehicleService.RejectNewVehicleTypeAsync(licensePlate);
-            return Ok(new { statusCode = 200, message = "Yêu cầu thêm loại xe đã bị từ chối." });
+            return Ok(new { statusCode = 200, message = "New vehicle type request rejected." });
         }
     }
 }

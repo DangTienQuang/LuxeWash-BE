@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.Constants;
+using AutoWashPro.BLL.Constants;
 using AutoWashPro.BLL.DTOs;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
@@ -446,6 +446,97 @@ namespace AutoWashPro.BLL.Services
                 throw new SecurityTokenException("Token không hợp lệ.");
 
             return principal;
+        }
+
+        public async Task LogoutAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) throw new NotFoundException("Không tìm thấy người dùng.");
+
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = null;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task ForgotPasswordAsync(ForgotPasswordDTO request)
+        {
+            var normalizedEmail = request.Email.Trim().ToLower();
+            var user = await _context.Users
+                .Include(u => u.CustomerProfile)
+                .Include(u => u.StaffProfile)
+                .Include(u => u.ManagerProfile)
+                .Include(u => u.EmployeeProfile)
+                .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalizedEmail);
+
+            if (user == null)
+                throw new NotFoundException("Không tìm thấy tài khoản nào với email này.");
+
+            if (user.Status != UserStatuses.Active)
+                throw new BadRequestException("Tài khoản chưa được kích hoạt hoặc đã bị khóa.");
+
+            var otp = GenerateOtp();
+            var otpHash = HashOtp(otp);
+            var otpExpiresAt = DateTime.UtcNow.AddMinutes(10);
+
+            user.EmailVerificationOtpHash = otpHash;
+            user.EmailVerificationOtpExpiresAt = otpExpiresAt;
+            await _context.SaveChangesAsync();
+
+            var fullName = GetFullName(user);
+
+            try
+            {
+                await SendForgotPasswordOtpEmailAsync(normalizedEmail, fullName, otp, otpExpiresAt);
+            }
+            catch (Exception ex)
+            {
+                throw new BadRequestException($"Không thể gửi email OTP đặt lại mật khẩu. Lỗi: {ex.Message}");
+            }
+        }
+
+        public async Task ResetPasswordAsync(ResetPasswordDTO request)
+        {
+            var normalizedEmail = request.Email.Trim().ToLower();
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalizedEmail);
+
+            if (user == null)
+                throw new NotFoundException("Không tìm thấy tài khoản nào với email này.");
+
+            if (user.Status != UserStatuses.Active)
+                throw new BadRequestException("Tài khoản chưa được kích hoạt hoặc đã bị khóa.");
+
+            if (string.IsNullOrWhiteSpace(user.EmailVerificationOtpHash) || user.EmailVerificationOtpExpiresAt == null)
+                throw new BadRequestException("Chưa có yêu cầu đặt lại mật khẩu. Vui lòng gửi yêu cầu quên mật khẩu trước.");
+
+            if (user.EmailVerificationOtpExpiresAt <= DateTime.UtcNow)
+                throw new BadRequestException("Mã OTP đã hết hạn. Vui lòng gửi lại yêu cầu quên mật khẩu.");
+
+            if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(request.Otp), StringComparison.Ordinal))
+                throw new BadRequestException("Mã OTP không chính xác.");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.EmailVerificationOtpHash = null;
+            user.EmailVerificationOtpExpiresAt = null;
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = null;
+            await _context.SaveChangesAsync();
+        }
+
+        private Task SendForgotPasswordOtpEmailAsync(string email, string fullName, string otp, DateTime otpExpiresAt)
+        {
+            var html = $@"
+                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>
+                    <h2 style='color: #dc3545; text-align: center;'>SMARTWASH ĐẶT LẠI MẬT KHẨU</h2>
+                    <p>Xin chào <b>{fullName}</b>,</p>
+                    <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản SmartWash của bạn. Mã OTP xác thực:</p>
+                    <div style='font-size: 32px; font-weight: bold; letter-spacing: 6px; text-align: center; padding: 16px; background: #fff3f3; border-radius: 8px; color: #dc3545;'>{otp}</div>
+                    <p>Mã này có hiệu lực trong 10 phút, đến <b>{otpExpiresAt.ToLocalTime():dd/MM/yyyy HH:mm}</b>.</p>
+                    <p style='color: #888;'>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email và đổi mật khẩu ngay lập tức nếu bạn nghi ngờ tài khoản bị xâm phạm.</p>
+                    <p>Trân trọng,<br><b>Đội ngũ SmartWash</b></p>
+                </div>";
+
+            return _emailService.SendEmailAsync(email, "[SmartWash] Mã OTP đặt lại mật khẩu", html);
         }
     }
 }

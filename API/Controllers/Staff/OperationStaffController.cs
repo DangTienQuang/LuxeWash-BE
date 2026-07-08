@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,13 +47,13 @@ namespace API.Controllers.Staff
         public async Task<IActionResult> SwapShiftByPhone([FromBody] SwapLaneByPhoneDTO dto)
         {
             await _staffService.SwapShiftByPhoneAsync(GetUserId(), dto);
-            return Ok(new { Message = "Đổi ca làm việc thành công." });
+            return Ok(new { Message = "Shift swapped successfully." });
         }
         [HttpPost("bookings/{bookingId}/checkin")]
         public async Task<IActionResult> StaffCheckin(int bookingId)
         {
             await _staffService.CheckInBookingAsync(GetUserId(), bookingId);
-            return Ok(new { Message = "Check-in xe thành công và đã phân vào làn của bạn." });
+            return Ok(new { Message = "Vehicle checked in and assigned to your lane successfully." });
         }
         [HttpPut("bookings/{bookingId}/status")]
         public async Task<IActionResult> UpdateBookingStatus(int bookingId, [FromBody] UpdateBookingStatusDTO dto)

@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -39,7 +39,7 @@ namespace API.Controllers.Admin
             try
             {
                 var result = await _serviceService.CreateServiceAsync(request);
-                return Created("", new { statusCode = 201, message = "Tạo dịch vụ thành công", data = result });
+                return Created("", new { statusCode = 201, message = "Service created successfully", data = result });
             }
             catch (Exception ex)
             {
@@ -53,7 +53,7 @@ namespace API.Controllers.Admin
             try
             {
                 await _serviceService.UpdateServiceAsync(id, request);
-                return Ok(new { statusCode = 200, message = "Cập nhật dịch vụ thành công." });
+                return Ok(new { statusCode = 200, message = "Service updated successfully." });
             }
             catch (Exception ex)
             {
@@ -67,7 +67,7 @@ namespace API.Controllers.Admin
             try
             {
                 await _serviceService.DeleteServiceAsync(id);
-                return Ok(new { statusCode = 200, message = "Thay đổi trạng thái dịch vụ thành công." });
+                return Ok(new { statusCode = 200, message = "Service status changed successfully." });
             }
             catch (Exception ex)
             {

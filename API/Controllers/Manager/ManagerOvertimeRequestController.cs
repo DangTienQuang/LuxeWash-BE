@@ -35,7 +35,7 @@ namespace API.Controllers.Manager
         public async Task<IActionResult> ReviewOvertimeRequest(int id, [FromBody] ReviewRequestDTO request)
         {
             var result = await _staffService.ReviewOvertimeRequestAsync(id, GetUserId(), request);
-            return Ok(new { statusCode = 200, message = "Duyet yeu cau tang ca thanh cong.", data = result });
+            return Ok(new { statusCode = 200, message = "Overtime request reviewed successfully.", data = result });
         }
     }
 }

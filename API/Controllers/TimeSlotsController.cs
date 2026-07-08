@@ -29,21 +29,21 @@ namespace AutoWashPro.API.Controllers
         public async Task<IActionResult> CreateTimeSlot([FromBody] CreateTimeSlotDTO request)
         {
             var result = await _timeSlotService.CreateTimeSlotAsync(request);
-            return Created("", new { statusCode = 201, message = "Tạo khung giờ thành công.", data = result });
+            return Created("", new { statusCode = 201, message = "Time slot created successfully.", data = result });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateTimeSlot(int id, [FromBody] UpdateTimeSlotDTO request)
         {
             var result = await _timeSlotService.UpdateTimeSlotAsync(id, request);
-            return Ok(new { statusCode = 200, message = "Cập nhật khung giờ thành công.", data = result });
+            return Ok(new { statusCode = 200, message = "Time slot updated successfully.", data = result });
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTimeSlot(int id)
         {
             await _timeSlotService.DeleteTimeSlotAsync(id);
-            return Ok(new { statusCode = 200, message = "Xoá khung giờ thành công." });
+            return Ok(new { statusCode = 200, message = "Time slot deleted successfully." });
         }
     }
 }

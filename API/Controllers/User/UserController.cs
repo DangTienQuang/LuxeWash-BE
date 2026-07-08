@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -41,7 +41,7 @@ namespace API.Controllers.User
             int userId = int.Parse(userIdClaim);
             await _userService.UpdateProfileAsync(userId, request);
 
-            return Ok(new { statusCode = 200, message = "Cập nhật thông tin cá nhân thành công." });
+            return Ok(new { statusCode = 200, message = "Personal information updated successfully." });
         }
     }
 }

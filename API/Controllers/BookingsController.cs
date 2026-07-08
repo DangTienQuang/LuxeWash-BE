@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -29,7 +29,7 @@ namespace AutoWashPro.API.Controllers
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
             {
-                throw new AutoWashPro.BLL.Exceptions.UnauthorizedException("Không tìm thấy thông tin xác thực (UserId). Vui lòng đăng nhập lại.");
+                throw new AutoWashPro.BLL.Exceptions.UnauthorizedException("Authentication information not found (UserId). Please log in again.");
             }
             return userId;
         }
@@ -42,12 +42,10 @@ namespace AutoWashPro.API.Controllers
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
-        // ĐỔI SANG POST ĐỂ NHẬN JSON BODY TỪ FRONTEND
         [HttpPost("available-slots")]
         public async Task<IActionResult> GetAvailableSlots([FromBody] CheckAvailableSlotsRequestDTO request)
         {
             int userId = GetUserId();
-            // Đảm bảo Service của bạn cũng đã đổi tham số nhận vào thành CheckAvailableSlotsRequestDTO nhé!
             var result = await _bookingService.GetAvailableSlotsAsync(userId, request);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
@@ -55,28 +53,21 @@ namespace AutoWashPro.API.Controllers
         [Authorize]
         public IActionResult TriggerConfirmationEmail(int bookingId)
         {
-            // Lấy UserId từ Token (Giả sử bạn dùng ClaimHelper)
             var userId = ClaimHelper.GetUserId(User);
 
-            // Bắn một Background Task độc lập với luồng HTTP hiện tại
             _ = Task.Run(async () =>
             {
-                // TẠO MỘT SCOPE MỚI: Rất quan trọng để DbContext không bị Dispose khi API trả về 202
                 using (var scope = _serviceProvider.CreateScope())
                 {
-                    // Xin hệ thống cấp cho 1 instance IBookingService MỚI, đi kèm với 1 DbContext MỚI
                     var scopedBookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
                     
-                    // Thực thi hàm gửi mail bằng instance mới này
                     await scopedBookingService.SendBookingConfirmationEmailAsync(userId, bookingId);
                 }
             });
 
-            // Lập tức trả về cho Frontend mà không cần chờ mail gửi xong
-            // Dùng 202 Accepted: Báo cho FE biết "Hệ thống đã ghi nhận yêu cầu và đang xử lý ngầm"
             return Accepted(new { 
                 statusCode = 202, 
-                message = "Hệ thống đang tiến hành gửi email xác nhận." 
+                message = "The system is processing the confirmation email." 
             });
         }
         [HttpPost]
@@ -86,8 +77,8 @@ namespace AutoWashPro.API.Controllers
             var result = await _bookingService.CreateBookingAsync(userId, request);
             var message = string.Equals(request.PaymentMethod, "PayOS", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(request.PaymentMethod, "QR", StringComparison.OrdinalIgnoreCase)
-                ? "Đặt lịch thành công. Vui lòng tạo QR để thanh toán."
-                : "Đặt lịch và thanh toán bằng ví thành công.";
+                ? "Booking created successfully. Please generate a QR code to complete payment."
+                : "Booking created and payment via wallet completed successfully.";
             return Created("", new { statusCode = 201, message, data = result });
         }
 
@@ -96,7 +87,7 @@ namespace AutoWashPro.API.Controllers
         {
             int userId = GetUserId();
             var result = await _bookingService.CreateBookingPaymentLinkAsync(userId, id, request);
-            return Ok(new { statusCode = 200, message = "Tạo QR thanh toán booking thành công.", data = result });
+            return Ok(new { statusCode = 200, message = "Booking payment QR code created successfully.", data = result });
         }
 
         [Authorize(Roles = "Staff,Manager,Admin")]
@@ -105,7 +96,7 @@ namespace AutoWashPro.API.Controllers
         {
             int staffId = GetUserId();
             var result = await _bookingService.CreateWalkInBookingAsync(staffId, request);
-            return Created("", new { statusCode = 201, message = "Tạo lịch vãng lai thành công.", data = result });
+            return Created("", new { statusCode = 201, message = "Walk-in booking created successfully.", data = result });
         }
 
         [HttpGet("me")]
@@ -137,7 +128,7 @@ namespace AutoWashPro.API.Controllers
         {
             int userId = GetUserId();
             await _bookingService.CancelBookingAsync(userId, id);
-            return Ok(new { statusCode = 200, message = "Đã hủy lịch thành công." });
+            return Ok(new { statusCode = 200, message = "Booking cancelled successfully." });
         }
 
         [HttpPut("{id}/reschedule")]
@@ -145,7 +136,7 @@ namespace AutoWashPro.API.Controllers
         {
             int userId = GetUserId();
             var result = await _bookingService.RescheduleBookingAsync(userId, id, request);
-            return Ok(new { statusCode = 200, message = "Đã thay đổi lịch hẹn thành công.", data = result });
+            return Ok(new { statusCode = 200, message = "Booking rescheduled successfully.", data = result });
         }
 
         [Authorize(Roles = "Staff,Manager,Admin")]
@@ -154,7 +145,7 @@ namespace AutoWashPro.API.Controllers
         {
             int staffId = GetUserId();
             await _bookingService.UpdateVehicleConditionAsync(staffId, id, request);
-            return Ok(new { statusCode = 200, message = "Đã cập nhật tình trạng xe và áp dụng phụ phí thành công." });
+            return Ok(new { statusCode = 200, message = "Vehicle condition updated and surcharge applied successfully." });
         }
 
         [HttpGet("{id}/payment-status")]

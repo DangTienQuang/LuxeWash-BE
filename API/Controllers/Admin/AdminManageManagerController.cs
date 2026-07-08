@@ -36,14 +36,14 @@ namespace API.Controllers.Admin
         public async Task<IActionResult> CreateManager([FromBody] CreateStaffDTO request)
         {
             var result = await _staffService.CreateStaffWithRoleAsync(request, UserRoles.Manager);
-            return Created("", new { statusCode = 201, message = "Tao manager thanh cong.", data = result });
+            return Created("", new { statusCode = 201, message = "Manager created successfully.", data = result });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateManager(int id, [FromBody] UpdateStaffDTO request)
         {
             var result = await _staffService.UpdateStaffByRoleAsync(id, UserRoles.Manager, request);
-            return Ok(new { statusCode = 200, message = "Cap nhat manager thanh cong.", data = result });
+            return Ok(new { statusCode = 200, message = "Manager updated successfully.", data = result });
         }
 
         [HttpPut("{id}/status")]
@@ -51,14 +51,14 @@ namespace API.Controllers.Admin
         {
             await _staffService.GetStaffByRoleAsync(id, UserRoles.Manager);
             await _staffService.UpdateStaffStatusAsync(id, request.Status);
-            return Ok(new { statusCode = 200, message = "Cap nhat trang thai manager thanh cong." });
+            return Ok(new { statusCode = 200, message = "Manager status updated successfully." });
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteManager(int id)
         {
             await _staffService.SoftDeleteStaffByRoleAsync(id, UserRoles.Manager);
-            return Ok(new { statusCode = 200, message = "Xoa manager thanh cong (soft delete)." });
+            return Ok(new { statusCode = 200, message = "Manager deleted successfully (soft delete)." });
         }
     }
 }

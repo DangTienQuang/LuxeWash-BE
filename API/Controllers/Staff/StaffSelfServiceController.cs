@@ -42,7 +42,7 @@ namespace API.Controllers.Staff
         public async Task<IActionResult> CreateOvertimeRequest([FromBody] CreateOvertimeRequestDTO request)
         {
             var result = await _staffService.CreateOvertimeRequestAsync(GetUserId(), request);
-            return Created("", new { statusCode = 201, message = "Gửi yêu cầu tăng ca thành công.", data = result });
+            return Created("", new { statusCode = 201, message = "Overtime request submitted successfully.", data = result });
         }
 
         [HttpGet("shift-swap-requests")]
@@ -56,7 +56,7 @@ namespace API.Controllers.Staff
         public async Task<IActionResult> CreateShiftSwapRequest([FromBody] CreateShiftSwapRequestDTO request)
         {
             var result = await _staffService.CreateShiftSwapRequestAsync(GetUserId(), request);
-            return Created("", new { statusCode = 201, message = "Gửi yêu cầu đổi ca thành công.", data = result });
+            return Created("", new { statusCode = 201, message = "Shift swap request submitted successfully.", data = result });
         }
     }
 }

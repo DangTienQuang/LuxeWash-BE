@@ -27,8 +27,8 @@ namespace API.Controllers.AI
                 {
                     statusCode = 200,
                     message = autoStart 
-                        ? $"Xe {plate} hợp lệ! Đã mở barie và tự động bắt đầu chu trình rửa xe." 
-                        : $"Xe {plate} hợp lệ! Đã mở barie check-in vào xưởng.",
+                        ? $"Vehicle {plate} is valid! Barrier opened and wash cycle started automatically." 
+                        : $"Vehicle {plate} is valid! Barrier opened for check-in.",
                     data = result
                 });
             }

@@ -22,7 +22,7 @@ namespace API.Controllers.Staff
         public async Task<IActionResult> ConsumePhysicalVoucher([FromBody] ConsumeVoucherRequestDTO request)
         {
             var result = await _voucherService.ConsumePhysicalVoucherAsync(request.UserId, request.VoucherCode);
-            return Ok(new { statusCode = 200, message = "Đổi quà hiện vật thành công." });
+            return Ok(new { statusCode = 200, message = "Physical voucher redeemed successfully." });
         }
     }
 }
