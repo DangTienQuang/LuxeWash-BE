@@ -159,6 +159,14 @@ namespace AutoWashPro.BLL.Services
             foreach (var booking in bookings)
             {
                 booking.PaymentStatus = GetPaymentStatus(paymentStatuses, booking.BookingId);
+                if (booking.ProcessingStartTime.HasValue)
+                {
+                    booking.ProcessingStartTime = booking.ProcessingStartTime.Value.ToVnTime();
+                }
+                if (booking.CompletedTime.HasValue)
+                {
+                    booking.CompletedTime = booking.CompletedTime.Value.ToVnTime();
+                }
             }
 
             return bookings;
@@ -185,8 +193,8 @@ namespace AutoWashPro.BLL.Services
                 PointDiscountAmount = booking.PointDiscountAmount,
                 VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount,
-                ProcessingStartTime = booking.ProcessingStartTime,
-                CompletedTime = booking.CompletedTime,
+                ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                 ActualDurationMinutes = booking.ActualDurationMinutes
             };
         }
@@ -234,6 +242,14 @@ namespace AutoWashPro.BLL.Services
             {
                 var paymentStatuses = await GetPaymentStatusesByBookingIdsAsync(new List<int> { preBooked.BookingId });
                 preBooked.PaymentStatus = GetPaymentStatus(paymentStatuses, preBooked.BookingId);
+                if (preBooked.ProcessingStartTime.HasValue)
+                {
+                    preBooked.ProcessingStartTime = preBooked.ProcessingStartTime.Value.ToVnTime();
+                }
+                if (preBooked.CompletedTime.HasValue)
+                {
+                    preBooked.CompletedTime = preBooked.CompletedTime.Value.ToVnTime();
+                }
 
                 return new SmartLicensePlateResponseDTO
                 {
@@ -585,8 +601,8 @@ namespace AutoWashPro.BLL.Services
                 PointDiscountAmount = booking.PointDiscountAmount,
                 VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount,
-                ProcessingStartTime = booking.ProcessingStartTime,
-                CompletedTime = booking.CompletedTime,
+                ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                 ActualDurationMinutes = booking.ActualDurationMinutes
             };
         }
@@ -994,8 +1010,8 @@ namespace AutoWashPro.BLL.Services
                     PointDiscountAmount = booking.PointDiscountAmount,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
                     FinalAmount = booking.FinalAmount,
-                    ProcessingStartTime = booking.ProcessingStartTime,
-                    CompletedTime = booking.CompletedTime,
+                    ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                    CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                     ActualDurationMinutes = booking.ActualDurationMinutes
                 };
             }
@@ -1027,7 +1043,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId)
         {
-            return await _context.Bookings
+            var bookings = await _context.Bookings
                 .Where(b => b.UserId == userId)
                 .OrderByDescending(b => b.ScheduledTime)
                 .Select(b => new BookingResponseDTO
@@ -1046,6 +1062,14 @@ namespace AutoWashPro.BLL.Services
                     ActualDurationMinutes = b.ActualDurationMinutes
                 })
                 .ToListAsync();
+
+            foreach (var b in bookings)
+            {
+                if (b.ProcessingStartTime.HasValue) b.ProcessingStartTime = b.ProcessingStartTime.Value.ToVnTime();
+                if (b.CompletedTime.HasValue) b.CompletedTime = b.CompletedTime.Value.ToVnTime();
+            }
+
+            return bookings;
         }
 
         public async Task<bool> CancelBookingAsync(int userId, int bookingId)
@@ -2052,8 +2076,8 @@ namespace AutoWashPro.BLL.Services
                     PointDiscountAmount = booking.PointDiscountAmount,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
                     FinalAmount = booking.FinalAmount,
-                    ProcessingStartTime = booking.ProcessingStartTime,
-                    CompletedTime = booking.CompletedTime,
+                    ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                    CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                     ActualDurationMinutes = booking.ActualDurationMinutes
                 };
             }
@@ -2122,8 +2146,8 @@ namespace AutoWashPro.BLL.Services
                 PointDiscountAmount = booking.PointDiscountAmount,
                 VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount,
-                ProcessingStartTime = booking.ProcessingStartTime,
-                CompletedTime = booking.CompletedTime,
+                ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                 ActualDurationMinutes = booking.ActualDurationMinutes
             };
         }

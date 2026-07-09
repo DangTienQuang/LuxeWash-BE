@@ -164,8 +164,8 @@ namespace AutoWashPro.BLL.Services
                 ProcessingStaffId = b.ProcessingStaffId,
                 ProcessingStaffName = b.ProcessingStaff?.EmployeeProfile?.FullName,
                 IsBusinessLane = b.ProcessingLane != null && b.ProcessingLane.IsBusinessLane,
-                ProcessingStartTime = b.ProcessingStartTime,
-                CompletedTime = b.CompletedTime,
+                ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                 ActualDurationMinutes = b.ActualDurationMinutes
             }).ToList();
         }
