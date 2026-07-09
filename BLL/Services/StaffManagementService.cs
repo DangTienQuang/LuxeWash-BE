@@ -81,11 +81,11 @@ namespace AutoWashPro.BLL.Services
 
             var phone = request.PhoneNumber.Trim();
             var exists = await _context.Users.AnyAsync(u => u.PhoneNumber == phone);
-            if (exists) throw new BadRequestException("Số điện thoại này đã được đăng ký.");
+            if (exists) throw new BadRequestException("This phone number is already registered.");
 
             var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim().ToLower();
             if (email != null && await _context.Users.AnyAsync(u => u.Email == email))
-                throw new BadRequestException("Email này đã được sử dụng.");
+                throw new BadRequestException("This email is already in use.");
 
             var user = new User
             {
@@ -129,7 +129,7 @@ namespace AutoWashPro.BLL.Services
             {
                 var phone = request.PhoneNumber.Trim();
                 if (await _context.Users.AnyAsync(u => u.UserId != staffUserId && u.PhoneNumber == phone))
-                    throw new BadRequestException("Số điện thoại này đã được sử dụng.");
+                    throw new BadRequestException("This phone number is already in use.");
                 user.PhoneNumber = phone;
             }
 
@@ -137,7 +137,7 @@ namespace AutoWashPro.BLL.Services
             {
                 var email = request.Email.Trim().ToLower();
                 if (await _context.Users.AnyAsync(u => u.UserId != staffUserId && u.Email == email))
-                    throw new BadRequestException("Email này đã được sử dụng.");
+                    throw new BadRequestException("This email is already in use.");
                 user.Email = email;
             }
 
@@ -179,7 +179,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<bool> UpdateStaffStatusAsync(int staffUserId, string status)
         {
             if (status != UserStatuses.Active && status != UserStatuses.Blocked)
-                throw new BadRequestException("Trạng thái chỉ được phép là Active hoặc Blocked.");
+                throw new BadRequestException("Status can only be Active or Blocked.");
 
             var user = await GetStaffUserAsync(staffUserId);
             user.Status = status;
@@ -212,7 +212,7 @@ namespace AutoWashPro.BLL.Services
 
             var name = request.ShiftName.Trim();
             if (await _context.WorkShifts.AnyAsync(s => s.ShiftName.ToLower() == name.ToLower()))
-                throw new BadRequestException("Tên ca đã tồn tại.");
+                throw new BadRequestException("Shift name already exists.");
 
             var shift = new WorkShift
             {
@@ -232,11 +232,11 @@ namespace AutoWashPro.BLL.Services
             ValidateTimeRange(request.StartTime, request.EndTime);
 
             var shift = await _context.WorkShifts.FindAsync(workShiftId);
-            if (shift == null) throw new NotFoundException("Không tìm thấy ca làm việc.");
+            if (shift == null) throw new NotFoundException("Work shift not found.");
 
             var name = request.ShiftName.Trim();
             if (await _context.WorkShifts.AnyAsync(s => s.WorkShiftId != workShiftId && s.ShiftName.ToLower() == name.ToLower()))
-                throw new BadRequestException("Tên ca đã tồn tại.");
+                throw new BadRequestException("Shift name already exists.");
 
             shift.ShiftName = name;
             shift.StartTime = request.StartTime;
@@ -249,7 +249,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<bool> DeleteWorkShiftAsync(int workShiftId)
         {
             var shift = await _context.WorkShifts.FindAsync(workShiftId);
-            if (shift == null) throw new NotFoundException("Không tìm thấy ca làm việc.");
+            if (shift == null) throw new NotFoundException("Work shift not found.");
 
             var hasAssignments = await _context.StaffShiftAssignments.AnyAsync(a => a.WorkShiftId == workShiftId);
             if (hasAssignments)
@@ -285,7 +285,7 @@ namespace AutoWashPro.BLL.Services
         {
             var staff = await GetStaffUserAsync(request.StaffUserId);
             var shift = await _context.WorkShifts.FindAsync(request.WorkShiftId);
-            if (shift == null || !shift.IsActive) throw new NotFoundException("Không tìm thấy ca làm việc đang hoạt động.");
+            if (shift == null || !shift.IsActive) throw new NotFoundException("Active work shift not found.");
 
             await EnsureNoAssignmentConflictAsync(request.StaffUserId, request.WorkShiftId, request.WorkDate.Date, null);
 
@@ -306,10 +306,10 @@ namespace AutoWashPro.BLL.Services
         public async Task<ShiftAssignmentResponseDTO> UpdateShiftAssignmentAsync(int assignmentId, UpdateShiftAssignmentDTO request)
         {
             var assignment = await _context.StaffShiftAssignments.FindAsync(assignmentId);
-            if (assignment == null) throw new NotFoundException("Không tìm thấy phân công ca.");
+            if (assignment == null) throw new NotFoundException("Shift assignment not found.");
 
             var shift = await _context.WorkShifts.FindAsync(request.WorkShiftId);
-            if (shift == null || !shift.IsActive) throw new NotFoundException("Không tìm thấy ca làm việc đang hoạt động.");
+            if (shift == null || !shift.IsActive) throw new NotFoundException("Active work shift not found.");
 
             await EnsureNoAssignmentConflictAsync(assignment.StaffUserId, request.WorkShiftId, request.WorkDate.Date, assignmentId);
 
@@ -326,12 +326,12 @@ namespace AutoWashPro.BLL.Services
         public async Task<bool> DeleteShiftAssignmentAsync(int assignmentId)
         {
             var assignment = await _context.StaffShiftAssignments.FindAsync(assignmentId);
-            if (assignment == null) throw new NotFoundException("Không tìm thấy phân công ca.");
+            if (assignment == null) throw new NotFoundException("Shift assignment not found.");
 
             var hasPendingSwap = await _context.ShiftSwapRequests.AnyAsync(s =>
                 s.Status == "Pending" && (s.FromAssignmentId == assignmentId || s.ToAssignmentId == assignmentId));
             if (hasPendingSwap)
-                throw new BadRequestException("Không thể xóa phân công đang có yêu cầu đổi ca chờ duyệt.");
+                throw new BadRequestException("Cannot delete shift assignment with a pending swap request.");
 
             _context.StaffShiftAssignments.Remove(assignment);
             await _context.SaveChangesAsync();
@@ -378,8 +378,8 @@ namespace AutoWashPro.BLL.Services
         public async Task<OvertimeRequestResponseDTO> ReviewOvertimeRequestAsync(int requestId, int managerUserId, ReviewRequestDTO request)
         {
             var overtime = await _context.OvertimeRequests.FindAsync(requestId);
-            if (overtime == null) throw new NotFoundException("Không tìm thấy yêu cầu tăng ca.");
-            if (overtime.Status != "Pending") throw new BadRequestException("Yêu cầu này đã được xử lý.");
+            if (overtime == null) throw new NotFoundException("Overtime request not found.");
+            if (overtime.Status != "Pending") throw new BadRequestException("This request has already been processed.");
 
             overtime.Status = request.IsApproved ? "Approved" : "Rejected";
             overtime.ReviewedByUserId = managerUserId;
@@ -412,20 +412,20 @@ namespace AutoWashPro.BLL.Services
         public async Task<ShiftSwapRequestResponseDTO> CreateShiftSwapRequestAsync(int staffUserId, CreateShiftSwapRequestDTO request)
         {
             if (request.FromAssignmentId == request.ToAssignmentId)
-                throw new BadRequestException("Không thể đổi cùng một ca.");
+                throw new BadRequestException("Cannot swap the same shift.");
 
             var from = await BaseAssignmentQuery().FirstOrDefaultAsync(a => a.AssignmentId == request.FromAssignmentId);
             var to = await BaseAssignmentQuery().FirstOrDefaultAsync(a => a.AssignmentId == request.ToAssignmentId);
-            if (from == null || to == null) throw new NotFoundException("Không tìm thấy ca cần đổi.");
-            if (from.StaffUserId != staffUserId) throw new BadRequestException("Bạn chỉ có thể gửi yêu cầu đổi từ ca của chính mình.");
+            if (from == null || to == null) throw new NotFoundException("Shift to swap not found.");
+            if (from.StaffUserId != staffUserId) throw new BadRequestException("You can only submit swap requests from your own shift.");
             if (from.WorkDate == to.WorkDate && from.WorkShiftId == to.WorkShiftId)
-                throw new BadRequestException("Không thể đổi hai phân công trong cùng một ca và cùng một ngày.");
+                throw new BadRequestException("Cannot swap two assignments in the same shift on the same day.");
             if (from.Status != "Scheduled" || to.Status != "Scheduled")
-                throw new BadRequestException("Chỉ có thể đổi các ca đang ở trạng thái Scheduled.");
+                throw new BadRequestException("Can only swap shifts in Scheduled status.");
 
             var pendingExists = await _context.ShiftSwapRequests.AnyAsync(s =>
                 s.Status == "Pending" && (s.FromAssignmentId == request.FromAssignmentId || s.ToAssignmentId == request.ToAssignmentId));
-            if (pendingExists) throw new BadRequestException("Một trong hai ca đang có yêu cầu đổi ca chờ duyệt.");
+            if (pendingExists) throw new BadRequestException("One of the shifts currently has a pending swap request.");
 
             var swap = new ShiftSwapRequest
             {
@@ -448,8 +448,8 @@ namespace AutoWashPro.BLL.Services
                 .Include(s => s.ToAssignment)
                 .FirstOrDefaultAsync(s => s.ShiftSwapRequestId == requestId);
 
-            if (swap == null) throw new NotFoundException("Không tìm thấy yêu cầu đổi ca.");
-            if (swap.Status != "Pending") throw new BadRequestException("Yêu cầu này đã được xử lý.");
+            if (swap == null) throw new NotFoundException("Shift swap request not found.");
+            if (swap.Status != "Pending") throw new BadRequestException("This request has already been processed.");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -492,7 +492,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(u => u.EmployeeProfile).ThenInclude(e => e.Branch)
                 .FirstOrDefaultAsync(u => u.UserId == userId && (u.Role == UserRoles.Staff || u.Role == UserRoles.Manager));
 
-            if (user == null) throw new NotFoundException("Không tìm thấy nhân sự.");
+            if (user == null) throw new NotFoundException("Staff member not found.");
             return user;
         }
 
@@ -510,12 +510,12 @@ namespace AutoWashPro.BLL.Services
                 && a.WorkShiftId == workShiftId
                 && a.WorkDate == workDate.Date);
 
-            if (exists) throw new BadRequestException("Nhân sự đã được phân công ca này trong ngày đã chọn.");
+            if (exists) throw new BadRequestException("Employee is already assigned to this shift on the selected date.");
         }
 
         private static void ValidateTimeRange(TimeSpan start, TimeSpan end)
         {
-            if (start >= end) throw new BadRequestException("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
+            if (start >= end) throw new BadRequestException("Start time must be earlier than end time.");
         }
 
         private IQueryable<StaffShiftAssignment> BaseAssignmentQuery()
@@ -554,21 +554,21 @@ namespace AutoWashPro.BLL.Services
         private async Task<ShiftAssignmentResponseDTO> GetAssignmentDtoAsync(int assignmentId)
         {
             var assignment = await BaseAssignmentQuery().FirstOrDefaultAsync(a => a.AssignmentId == assignmentId);
-            if (assignment == null) throw new NotFoundException("Không tìm thấy phân công ca.");
+            if (assignment == null) throw new NotFoundException("Shift assignment not found.");
             return MapAssignment(assignment);
         }
 
         private async Task<OvertimeRequestResponseDTO> GetOvertimeDtoAsync(int requestId)
         {
             var request = await BaseOvertimeQuery().FirstOrDefaultAsync(o => o.OvertimeRequestId == requestId);
-            if (request == null) throw new NotFoundException("Không tìm thấy yêu cầu tăng ca.");
+            if (request == null) throw new NotFoundException("Overtime request not found.");
             return MapOvertime(request);
         }
 
         private async Task<ShiftSwapRequestResponseDTO> GetSwapDtoAsync(int requestId)
         {
             var request = await BaseSwapQuery().FirstOrDefaultAsync(s => s.ShiftSwapRequestId == requestId);
-            if (request == null) throw new NotFoundException("Không tìm thấy yêu cầu đổi ca.");
+            if (request == null) throw new NotFoundException("Shift swap request not found.");
             return MapSwap(request);
         }
 

@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Exceptions;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
@@ -56,7 +56,7 @@ namespace AutoWashPro.BLL.Services
             {
                 var carModel = await _context.CarModels.FirstOrDefaultAsync(c => c.Id == request.CarModelId.Value && c.IsActive && c.Status != "Rejected");
                 if (carModel == null)
-                    throw new BadRequestException("Dòng xe bạn chọn không tồn tại hoặc đã ngừng hỗ trợ.");
+                    throw new BadRequestException("Selected car model does not exist or is no longer supported.");
 
                 if (carModel.VehicleTypeId.HasValue)
                 {
@@ -64,10 +64,10 @@ namespace AutoWashPro.BLL.Services
                 }
             }
 
-            if (!finalVehicleTypeId.HasValue) throw new BadRequestException("Vui lòng chọn loại xe.");
+            if (!finalVehicleTypeId.HasValue) throw new BadRequestException("Please select a vehicle type.");
 
             var vehicleType = await _context.VehicleTypes.FirstOrDefaultAsync(t => t.Id == finalVehicleTypeId.Value);
-            if (vehicleType == null) throw new BadRequestException("Loại xe không hợp lệ.");
+            if (vehicleType == null) throw new BadRequestException("Invalid vehicle type.");
 
             string finalPhotoUrl = request.RegistrationPhotoUrl;
 
@@ -76,24 +76,24 @@ namespace AutoWashPro.BLL.Services
                 finalPhotoUrl = await _photoService.UploadImageAsync(request.PhotoFile);
             }
 
-            if (vehicleType.Name.Contains("Khác", StringComparison.OrdinalIgnoreCase) ||
+            if (vehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase) ||
                 vehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(finalPhotoUrl))
                 {
-                    throw new BadRequestException("Bạn bắt buộc phải tải lên hình ảnh thực tế của xe khi chọn loại xe Khác.");
+                    throw new BadRequestException("You must upload an actual photo of the vehicle when selecting 'Other' vehicle type.");
                 }
 
                 if (string.IsNullOrWhiteSpace(request.UserNote))
                 {
-                    throw new BadRequestException("Vui lòng để lại ghi chú tên dòng xe của bạn để chúng tôi hỗ trợ cập nhật.");
+                    throw new BadRequestException("Please leave a note of your car model name so we can support updating it.");
                 }
             }
 
             var vehicleCount = await _context.Vehicles.CountAsync(v => v.UserId == userId && !v.IsDeleted);
             if (vehicleCount >= 5)
             {
-                throw new BadRequestException("Hồ sơ cá nhân chỉ được liên kết tối đa 5 xe. Vui lòng liên hệ bộ phận CSKH nếu bạn có nhu cầu rửa đội xe lớn.");
+                throw new BadRequestException("Personal profile can link a maximum of 5 vehicles. Please contact Customer Support if you have a larger fleet.");
             }
 
             var normalizedPlate = NormalizeLicensePlate(request.LicensePlate);
@@ -105,7 +105,7 @@ namespace AutoWashPro.BLL.Services
             {
                 var carModelExists = await _context.CarModels.AnyAsync(c => c.Id == request.CarModelId.Value && c.IsActive);
                 if (!carModelExists)
-                    throw new BadRequestException("Dòng xe bạn chọn không tồn tại hoặc đã ngừng hỗ trợ.");
+                    throw new BadRequestException("Selected car model does not exist or is no longer supported.");
 
                 finalCarModelId = request.CarModelId.Value;
                 finalCarModel = null;
@@ -113,7 +113,7 @@ namespace AutoWashPro.BLL.Services
             else
             {
                 if (string.IsNullOrWhiteSpace(request.CarModel))
-                    throw new BadRequestException("Vui lòng nhập tên dòng xe của bạn khi chọn mục 'Khác'.");
+                    throw new BadRequestException("Please enter your car model name when selecting 'Other'.");
 
                 finalCarModelId = null;
                 finalCarModel = request.CarModel.Trim();
@@ -124,7 +124,7 @@ namespace AutoWashPro.BLL.Services
             {
                 if (!existingVehicle.IsDeleted)
                 {
-                    throw new BadRequestException("Biển số xe này đã tồn tại trong hệ thống.");
+                    throw new BadRequestException("This license plate already exists in the system.");
                 }
 
                 existingVehicle.IsDeleted = false;
@@ -161,7 +161,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(v => v.VehicleType)
                 .Include(v => v.User)
                     .ThenInclude(u => u.CustomerProfile)
-                .Where(v => (!v.IsDeleted) && (v.VehicleType.Name.Contains("Khác") || v.VehicleType.Name.Contains("Other")))
+                .Where(v => (!v.IsDeleted) && (v.VehicleType.Name.Contains("Other") || v.VehicleType.Name.Contains("Other")))
                 .Select(v => new AdminOtherVehicleDTO
                 {
                     LicensePlate = v.LicensePlate,
@@ -188,12 +188,12 @@ namespace AutoWashPro.BLL.Services
                     .Include(v => v.User)
                     .FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && !v.IsDeleted);
 
-                if (vehicle == null) throw new NotFoundException("Không tìm thấy phương tiện.");
+                if (vehicle == null) throw new NotFoundException("Vehicle not found.");
 
-                if (!vehicle.VehicleType.Name.Contains("Khác", StringComparison.OrdinalIgnoreCase) &&
+                if (!vehicle.VehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase) &&
                     !vehicle.VehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new BadRequestException("Phương tiện này không nằm trong danh sách yêu cầu chờ duyệt loại xe.");
+                    throw new BadRequestException("This vehicle is not in the pending vehicle type approval list.");
                 }
 
                 var finalTypeName = string.IsNullOrWhiteSpace(request.CustomizedTypeName)
@@ -202,13 +202,13 @@ namespace AutoWashPro.BLL.Services
 
                 if (string.IsNullOrWhiteSpace(finalTypeName))
                 {
-                     throw new BadRequestException("Tên loại xe không được để trống. Vui lòng cung cấp tên loại xe.");
+                     throw new BadRequestException("Vehicle type name cannot be empty. Please provide a vehicle type name.");
                 }
 
                 finalTypeName = finalTypeName.Trim();
                 if (finalTypeName.Length > 50)
                 {
-                    throw new BadRequestException("Tên loại xe không được vượt quá 50 ký tự.");
+                    throw new BadRequestException("Vehicle type name cannot exceed 50 characters.");
                 }
                 var description = string.IsNullOrWhiteSpace(request.Description)
                     ? "Approved from user request"
@@ -243,8 +243,8 @@ namespace AutoWashPro.BLL.Services
 
                 if (vehicle.User != null && !string.IsNullOrWhiteSpace(vehicle.User.Email))
                 {
-                    var subject = "Yêu cầu thêm loại xe mới đã được duyệt";
-                    var message = $"Chào bạn,<br/><br/>Yêu cầu thêm loại xe cho phương tiện mang biển số <b>{vehicle.LicensePlate}</b> của bạn đã được quản trị viên duyệt thành công. Loại xe của bạn hiện tại là <b>{finalTypeName}</b>.<br/><br/>Trân trọng,<br/>Đội ngũ AutoWashPro.";
+                    var subject = "Request to add new vehicle type approved";
+                    var message = $"Hello,<br/><br/>Your request to add a vehicle type for vehicle with license plate <b>{vehicle.LicensePlate}</b> has been successfully approved by the administrator. Your vehicle type is now <b>{finalTypeName}</b>.<br/><br/>Best regards,<br/>AutoWashPro Team.";
                     _ = Task.Run(() => _emailService.SendEmailAsync(vehicle.User.Email, subject, message));
                 }
 
@@ -266,12 +266,12 @@ namespace AutoWashPro.BLL.Services
                 .Include(v => v.User)
                 .FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && !v.IsDeleted);
 
-            if (vehicle == null) throw new NotFoundException("Không tìm thấy phương tiện.");
+            if (vehicle == null) throw new NotFoundException("Vehicle not found.");
 
-            if (!vehicle.VehicleType.Name.Contains("Khác", StringComparison.OrdinalIgnoreCase) &&
+            if (!vehicle.VehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase) &&
                 !vehicle.VehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase))
             {
-                throw new BadRequestException("Phương tiện này không nằm trong danh sách yêu cầu chờ duyệt loại xe.");
+                throw new BadRequestException("This vehicle is not in the pending vehicle type approval list.");
             }
 
             vehicle.IsDeleted = true;
@@ -279,8 +279,8 @@ namespace AutoWashPro.BLL.Services
 
             if (vehicle.User != null && !string.IsNullOrWhiteSpace(vehicle.User.Email))
             {
-                var subject = "Yêu cầu thêm phương tiện bị từ chối";
-                var message = $"Chào bạn,<br/><br/>Yêu cầu thêm phương tiện mang biển số <b>{vehicle.LicensePlate}</b> của bạn đã bị từ chối do thông tin loại xe không hợp lệ. Vui lòng đăng ký lại phương tiện với thông tin chính xác.<br/><br/>Trân trọng,<br/>Đội ngũ AutoWashPro.";
+                var subject = "Request to add vehicle rejected";
+                var message = $"Hello,<br/><br/>Your request to add vehicle with license plate <b>{vehicle.LicensePlate}</b> has been rejected due to invalid vehicle type information. Please re-register the vehicle with correct details.<br/><br/>Best regards,<br/>AutoWashPro Team.";
                 _ = Task.Run(() => _emailService.SendEmailAsync(vehicle.User.Email, subject, message));
             }
 
@@ -292,10 +292,10 @@ namespace AutoWashPro.BLL.Services
             licensePlate = NormalizeLicensePlate(Uri.UnescapeDataString(licensePlate));
 
             var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && !v.IsDeleted);
-            if (vehicle == null) throw new NotFoundException("Không tìm thấy phương tiện.");
+            if (vehicle == null) throw new NotFoundException("Vehicle not found.");
 
             var typeExists = await _context.VehicleTypes.AnyAsync(t => t.Id == newVehicleTypeId);
-            if (!typeExists) throw new BadRequestException("Loại xe mới không hợp lệ.");
+            if (!typeExists) throw new BadRequestException("New vehicle type is invalid.");
 
             vehicle.VehicleTypeId = newVehicleTypeId;
             // Optionally clear the RegistrationPhotoUrl and UserNote if they are no longer "Other"
@@ -312,7 +312,7 @@ namespace AutoWashPro.BLL.Services
             licensePlate = NormalizeLicensePlate(Uri.UnescapeDataString(licensePlate));
 
             var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
-            if (vehicle == null) throw new NotFoundException("Không tìm thấy phương tiện hoặc bạn không có quyền thao tác trên xe này.");
+            if (vehicle == null) throw new NotFoundException("Vehicle not found or you do not have permission to modify this vehicle.");
 
             int? finalVehicleTypeId = request.VehicleTypeId > 0 ? request.VehicleTypeId : null;
 
@@ -320,7 +320,7 @@ namespace AutoWashPro.BLL.Services
             {
                 var carModel = await _context.CarModels.FirstOrDefaultAsync(c => c.Id == request.CarModelId.Value && c.IsActive && c.Status != "Rejected");
                 if (carModel == null)
-                    throw new BadRequestException("Dòng xe bạn chọn không tồn tại hoặc đã ngừng hỗ trợ.");
+                    throw new BadRequestException("Selected car model does not exist or is no longer supported.");
 
                 if (carModel.VehicleTypeId.HasValue)
                 {
@@ -328,10 +328,10 @@ namespace AutoWashPro.BLL.Services
                 }
             }
 
-            if (!finalVehicleTypeId.HasValue) throw new BadRequestException("Vui lòng chọn loại xe.");
+            if (!finalVehicleTypeId.HasValue) throw new BadRequestException("Please select a vehicle type.");
 
             var vehicleType = await _context.VehicleTypes.FirstOrDefaultAsync(t => t.Id == finalVehicleTypeId.Value);
-            if (vehicleType == null) throw new BadRequestException("Loại xe không hợp lệ.");
+            if (vehicleType == null) throw new BadRequestException("Invalid vehicle type.");
 
             string finalPhotoUrl = vehicle.RegistrationPhotoUrl;
             if (request.PhotoFile != null && request.PhotoFile.Length > 0)
@@ -339,17 +339,17 @@ namespace AutoWashPro.BLL.Services
                 finalPhotoUrl = await _photoService.UploadImageAsync(request.PhotoFile);
             }
 
-            if (vehicleType.Name.Contains("Khác", StringComparison.OrdinalIgnoreCase) ||
+            if (vehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase) ||
                 vehicleType.Name.Contains("Other", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(finalPhotoUrl))
                 {
-                    throw new BadRequestException("Bạn bắt buộc phải tải lên hình ảnh thực tế của xe khi chọn loại xe Khác.");
+                    throw new BadRequestException("You must upload an actual photo of the vehicle when selecting 'Other' vehicle type.");
                 }
 
                 if (string.IsNullOrWhiteSpace(request.UserNote) && string.IsNullOrWhiteSpace(vehicle.UserNote))
                 {
-                    throw new BadRequestException("Vui lòng để lại ghi chú tên dòng xe của bạn để chúng tôi hỗ trợ cập nhật.");
+                    throw new BadRequestException("Please leave a note of your car model name so we can support updating it.");
                 }
             }
 
@@ -360,7 +360,7 @@ namespace AutoWashPro.BLL.Services
             {
                 var carModelExists = await _context.CarModels.AnyAsync(c => c.Id == request.CarModelId.Value && c.IsActive);
                 if (!carModelExists)
-                    throw new BadRequestException("Dòng xe bạn chọn không tồn tại hoặc đã ngừng hỗ trợ.");
+                    throw new BadRequestException("Selected car model does not exist or is no longer supported.");
 
                 finalCarModelId = request.CarModelId.Value;
                 finalCarModel = null;
@@ -368,7 +368,7 @@ namespace AutoWashPro.BLL.Services
             else
             {
                 if (string.IsNullOrWhiteSpace(request.CarModel))
-                    throw new BadRequestException("Vui lòng nhập tên dòng xe của bạn khi chọn mục 'Khác'.");
+                    throw new BadRequestException("Please enter your car model name when selecting 'Other'.");
 
                 finalCarModelId = null;
                 finalCarModel = request.CarModel.Trim();
@@ -395,7 +395,7 @@ namespace AutoWashPro.BLL.Services
             licensePlate = NormalizeLicensePlate(Uri.UnescapeDataString(licensePlate));
 
             var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
-            if (vehicle == null) throw new NotFoundException("Không tìm thấy phương tiện hoặc bạn không có quyền xóa xe này.");
+            if (vehicle == null) throw new NotFoundException("Vehicle not found or you do not have permission to delete this vehicle.");
 
             vehicle.IsDeleted = true;
             await _context.SaveChangesAsync();
@@ -415,10 +415,10 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && !v.IsDeleted);
 
             if (vehicle == null)
-                throw new NotFoundException("Biển số xe chưa được đăng ký trên hệ thống.");
+                throw new NotFoundException("License plate is not registered in the system.");
 
             if (vehicle.User == null || vehicle.User.CustomerProfile == null)
-                throw new BadRequestException("Lỗi dữ liệu: Xe không có thông tin chủ sở hữu.");
+                throw new BadRequestException("Data error: Vehicle has no owner information.");
 
             var today = DateTime.UtcNow.Date;
 

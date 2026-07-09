@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -57,7 +57,7 @@ namespace AutoWashPro.BLL.Services
                     .ThenInclude(sp => sp.VehicleType)
                 .FirstOrDefaultAsync(s => s.ServiceId == id);
 
-            if (service == null) throw new Exception("Không tìm thấy dịch vụ.");
+            if (service == null) throw new Exception("Service not found.");
             return MapToDTO(service);
         }
 
@@ -65,7 +65,7 @@ namespace AutoWashPro.BLL.Services
         {
             var vehicleTypeIds = request.Prices.Select(p => p.VehicleTypeId).Distinct().ToList();
             var existingTypesCount = await _context.VehicleTypes.CountAsync(vt => vehicleTypeIds.Contains(vt.Id));
-            if (existingTypesCount != vehicleTypeIds.Count) throw new Exception("Một hoặc nhiều loại xe không hợp lệ.");
+            if (existingTypesCount != vehicleTypeIds.Count) throw new Exception("One or more vehicle types are invalid.");
 
             var service = new Service
             {
@@ -93,11 +93,11 @@ namespace AutoWashPro.BLL.Services
                 .Include(s => s.ServicePrices)
                 .FirstOrDefaultAsync(s => s.ServiceId == id);
 
-            if (service == null) throw new Exception("Không tìm thấy dịch vụ.");
+            if (service == null) throw new Exception("Service not found.");
 
             var vehicleTypeIds = request.Prices.Select(p => p.VehicleTypeId).Distinct().ToList();
             var existingTypesCount = await _context.VehicleTypes.CountAsync(vt => vehicleTypeIds.Contains(vt.Id));
-            if (existingTypesCount != vehicleTypeIds.Count) throw new Exception("Một hoặc nhiều loại xe không hợp lệ.");
+            if (existingTypesCount != vehicleTypeIds.Count) throw new Exception("One or more vehicle types are invalid.");
 
             service.ServiceName = request.ServiceName;
             service.Description = request.Description;
@@ -119,7 +119,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<bool> DeleteServiceAsync(int id)
         {
             var service = await _context.Services.FindAsync(id);
-            if (service == null) throw new Exception("Không tìm thấy dịch vụ.");
+            if (service == null) throw new Exception("Service not found.");
             service.IsActive = !service.IsActive;
             await _context.SaveChangesAsync();
             return true;

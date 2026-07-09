@@ -55,7 +55,7 @@ namespace AutoWashPro.BLL.Services
 
             if (assignment == null)
             {
-                throw new BadRequestException("Bạn chưa được phân công vào làn nào trong hôm nay. Không thể check-in.");
+                throw new BadRequestException("You are not assigned to any lane today. Cannot check in.");
             }
 
             var booking = await _context.Bookings
@@ -63,12 +63,12 @@ namespace AutoWashPro.BLL.Services
 
             if (booking == null)
             {
-                throw new NotFoundException("Không tìm thấy thông tin đặt lịch.");
+                throw new NotFoundException("Booking information not found.");
             }
 
             if (booking.Status != "Pending")
             {
-                throw new BadRequestException("Chỉ có thể check-in cho xe đang ở trạng thái chờ (Pending).");
+                throw new BadRequestException("Can only check in vehicles in Pending status.");
             }
 
             booking.ProcessingLaneId = assignment.LaneId;
@@ -145,8 +145,8 @@ namespace AutoWashPro.BLL.Services
                     PaymentMethod = tx?.PaymentMethod,
                     OrderCode = tx?.OrderCode,
                     FinalAmount = b.FinalAmount,
-                    ProcessingStartTime = b.ProcessingStartTime,
-                    CompletedTime = b.CompletedTime,
+                    ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                    CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                     ActualDurationMinutes = b.ActualDurationMinutes
                 };
             }).ToList();
@@ -235,7 +235,7 @@ namespace AutoWashPro.BLL.Services
 
             if (targetStaff == null)
             {
-                throw new BadRequestException("Không tìm thấy nhân viên với số điện thoại này hoặc nhân viên không khả dụng.");
+                throw new BadRequestException("Employee with this phone number not found or unavailable.");
             }
 
             var targetDate = dto.Date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
@@ -248,7 +248,7 @@ namespace AutoWashPro.BLL.Services
 
             if (currentAssignment == null || targetAssignment == null)
             {
-                throw new BadRequestException("Một trong hai nhân viên không có lịch phân công vào ngày này để đổi.");
+                throw new BadRequestException("One of the two employees does not have a shift assigned on this date to swap.");
             }
 
             // Swap lane IDs

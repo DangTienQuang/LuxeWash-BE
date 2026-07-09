@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Exceptions;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
@@ -39,12 +39,12 @@ namespace BLL.Services
 
             if (business == null)
             {
-                throw new BadRequestException("Tài khoản của doanh nghiệp chưa được phê duyệt.");
+                throw new BadRequestException("Business account has not been approved.");
             }
 
             if (file == null || file.Length == 0)
             {
-                throw new BadRequestException("Vui lòng tải lên file Excel.");
+                throw new BadRequestException("Please upload an Excel file.");
             }
 
             var fileUrl =
@@ -74,7 +74,7 @@ namespace BLL.Services
 
             if (worksheet?.Dimension == null)
             {
-                throw new BadRequestException("File Excel không có dữ liệu.");
+                throw new BadRequestException("The Excel file contains no data.");
             }
             int rowCount = worksheet.Dimension.Rows;
 
@@ -107,19 +107,19 @@ namespace BLL.Services
 
                 if (string.IsNullOrWhiteSpace(licensePlate))
                 {
-                    errors.Add("Biển số xe không được để trống.");
+                    errors.Add("License plate cannot be empty.");
                 }
 
                 if (importedPlates.Contains(licensePlate))
                 {
-                    errors.Add("Biển số xe bị trùng trong file.");
+                    errors.Add("Duplicate license plate found in file.");
                 }
 
                 bool existed = await _context.FleetVehicles.AnyAsync(x => x.LicensePlate == licensePlate);
 
                 if (existed)
                 {
-                    errors.Add("Biển số đã tồn tại trong hệ thống.");
+                    errors.Add("License plate already exists in the system.");
                 }
 
                 importedPlates.Add(licensePlate);
@@ -129,7 +129,7 @@ namespace BLL.Services
 
                 if (vehicleType == null)
                 {
-                    errors.Add($"Không tìm thấy Loại xe '{vehicleTypeName}' trong hệ thống.");
+                    errors.Add($"Vehicle Type '{vehicleTypeName}' not found in the system.");
                 }
 
                 if (errors.Any())
@@ -212,7 +212,7 @@ namespace BLL.Services
 
             if (batch == null)
             {
-                throw new NotFoundException("Không tìm thấy lô nhập phương tiện.");
+                throw new NotFoundException("Vehicle import batch not found.");
             }
 
             var errors = await _context.FleetImportErrors
@@ -242,7 +242,7 @@ namespace BLL.Services
 
             if (business == null)
             {
-                throw new NotFoundException("Không tìm thấy hồ sơ doanh nghiệp.");
+                throw new NotFoundException("Business profile not found.");
             }
 
             return await _context.FleetVehicles
@@ -304,7 +304,7 @@ namespace BLL.Services
 
             if (vehicle == null)
             {
-                throw new NotFoundException("Không tìm thấy phương tiện trong đội xe.");
+                throw new NotFoundException("Vehicle not found in the fleet.");
             }
 
             vehicle.Status = "Active";
@@ -318,7 +318,7 @@ namespace BLL.Services
 
             if (vehicle == null)
             {
-                throw new NotFoundException("Không tìm thấy phương tiện trong đội xe.");
+                throw new NotFoundException("Vehicle not found in the fleet.");
             }
 
             vehicle.Status = "Rejected";
@@ -409,7 +409,7 @@ namespace BLL.Services
 
             if (business == null)
             {
-                throw new NotFoundException("Không tìm thấy hồ sơ doanh nghiệp.");
+                throw new NotFoundException("Business profile not found.");
             }
 
             var today = DateTime.Today;
@@ -461,7 +461,7 @@ namespace BLL.Services
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
 
             if (business == null)
-                throw new NotFoundException("Không tìm thấy hồ sơ doanh nghiệp.");
+                throw new NotFoundException("Business profile not found.");
 
             return await _context.FleetWashLogs
                 .Include(x => x.Booking)
@@ -488,7 +488,7 @@ namespace BLL.Services
 
             if (string.IsNullOrWhiteSpace(url))
             {
-                throw new NotFoundException("Chưa cấu hình đưuòng dẫn tải file template.");
+                throw new NotFoundException("Template file download path not configured.");
             }
 
             return await Task.FromResult(new FleetTemplateDTO
@@ -501,7 +501,7 @@ namespace BLL.Services
         public async Task<LaneDTO> CreateBusinessLaneAsync(CreateBusinessLaneDTO dto)
         {
             var branch = await _context.Branches.FindAsync(dto.BranchId);
-            if (branch == null) throw new NotFoundException("Không tìm thấy chi nhánh.");
+            if (branch == null) throw new NotFoundException("Branch not found.");
 
             var lane = new Lane
             {

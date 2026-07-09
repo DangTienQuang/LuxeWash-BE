@@ -10,10 +10,10 @@ namespace BLL.Helpers
         {
             var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
-                throw new Exception("Unauthorized: Không tìm thấy User ID trong token.");
+                throw new Exception("Unauthorized: User ID not found in token.");
 
             if (!int.TryParse(userIdClaim, out int userId))
-                throw new Exception("Unauthorized: User ID không hợp lệ.");
+                throw new Exception("Unauthorized: Invalid User ID.");
 
             return userId;
         }

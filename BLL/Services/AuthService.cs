@@ -41,15 +41,15 @@ namespace AutoWashPro.BLL.Services
 
                 if (existingUser != null && existingUser.Status != UserStatuses.Pending)
                 {
-                    if (existingUser.PhoneNumber == request.PhoneNumber) throw new BadRequestException("Số điện thoại này đã được đăng ký.");
-                    throw new BadRequestException("Email này đã được đăng ký.");
+                    if (existingUser.PhoneNumber == request.PhoneNumber) throw new BadRequestException("This phone number is already registered.");
+                    throw new BadRequestException("This email is already registered.");
                 }
 
                 var emailUsedByOtherUser = await _context.Users.AnyAsync(u =>
                     u.Email != null
                     && u.Email.ToLower() == normalizedEmail
                     && (existingUser == null || u.UserId != existingUser.UserId));
-                if (emailUsedByOtherUser) throw new BadRequestException("Email này đã được đăng ký.");
+                if (emailUsedByOtherUser) throw new BadRequestException("This email is already registered.");
 
                 var defaultTier = await _context.Tiers.FirstOrDefaultAsync(t => t.MinAccumulatedPoints == 0);
 
@@ -74,7 +74,7 @@ namespace AutoWashPro.BLL.Services
                 if (existingUser != null)
                 {
                     if (existingUser.PhoneNumber != request.PhoneNumber && string.Equals(existingUser.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
-                        throw new BadRequestException("Email này đang chờ xác thực cho tài khoản khác.");
+                        throw new BadRequestException("This email is pending verification for another account.");
 
                     user = existingUser;
                     user.Email = normalizedEmail;
@@ -132,7 +132,7 @@ namespace AutoWashPro.BLL.Services
                 }
                 catch (Exception ex)
                 {
-                    throw new BadRequestException($"Đăng ký bị từ chối do không thể gửi email OTP. Lỗi máy chủ Email: {ex.Message}");
+                    throw new BadRequestException($"Registration rejected because OTP email could not be sent. Email server error: {ex.Message}");
                 }
 
                 await transaction.CommitAsync();
@@ -148,7 +148,7 @@ namespace AutoWashPro.BLL.Services
             catch (DbUpdateException)
             {
                 await transaction.RollbackAsync();
-                throw new BadRequestException("Số điện thoại hoặc email này đã được đăng ký.");
+                throw new BadRequestException("This phone number or email is already registered.");
             }
             catch
             {
@@ -167,13 +167,13 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(u => u.PhoneNumber == loginInput || (u.Email != null && u.Email.ToLower() == loginInput));
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-                throw new UnauthorizedException("Số điện thoại/Email hoặc mật khẩu không chính xác.");
+                throw new UnauthorizedException("Incorrect phone number/email or password.");
 
             if (user.Status == UserStatuses.Pending)
-                throw new UnauthorizedException("Tài khoản chưa xác thực email. Vui lòng nhập mã OTP đã gửi tới email.");
+                throw new UnauthorizedException("Account email not verified. Please enter the OTP code sent to your email.");
 
             if (user.Status != UserStatuses.Active)
-                throw new UnauthorizedException("Tài khoản đã bị khóa hoặc không hoạt động.");
+                throw new UnauthorizedException("Account is locked or inactive.");
 
             var token = CreateJwtToken(user);
             var refreshToken = GenerateRefreshToken();
@@ -200,14 +200,14 @@ namespace AutoWashPro.BLL.Services
                 .Include(u => u.CustomerProfile)
                 .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalizedEmail);
 
-            if (user == null) throw new NotFoundException("Không tìm thấy tài khoản với email này.");
-            if (user.Status != UserStatuses.Pending) throw new BadRequestException("Tài khoản này không ở trạng thái chờ xác thực.");
+            if (user == null) throw new NotFoundException("Account with this email not found.");
+            if (user.Status != UserStatuses.Pending) throw new BadRequestException("This account is not in a pending verification state.");
             if (string.IsNullOrWhiteSpace(user.EmailVerificationOtpHash) || user.EmailVerificationOtpExpiresAt == null)
-                throw new BadRequestException("Tài khoản chưa có mã OTP xác thực. Vui lòng đăng ký lại.");
+                throw new BadRequestException("Account does not have a verification OTP code. Please register again.");
             if (user.EmailVerificationOtpExpiresAt <= DateTime.UtcNow)
-                throw new BadRequestException("Mã OTP đã hết hạn. Vui lòng đăng ký lại để nhận mã mới.");
+                throw new BadRequestException("OTP code has expired. Please register again to receive a new code.");
             if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(request.Otp), StringComparison.Ordinal))
-                throw new BadRequestException("Mã OTP không chính xác.");
+                throw new BadRequestException("Incorrect OTP code.");
 
             user.Status = UserStatuses.Active;
             user.EmailVerificationOtpHash = null;
@@ -254,10 +254,10 @@ namespace AutoWashPro.BLL.Services
         public async Task<AuthResponseDTO> RefreshTokenAsync(RefreshTokenDTO request)
         {
             var principal = GetPrincipalFromExpiredToken(request.AccessToken);
-            if (principal == null) throw new UnauthorizedException("Access token không hợp lệ.");
+            if (principal == null) throw new UnauthorizedException("Invalid access token.");
 
             var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim)) throw new UnauthorizedException("Token không chứa thông tin User.");
+            if (string.IsNullOrEmpty(userIdClaim)) throw new UnauthorizedException("Token does not contain User information.");
 
             int userId = int.Parse(userIdClaim);
             var user = await _context.Users
@@ -268,7 +268,7 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
             if (user == null || user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
-                throw new UnauthorizedException("Refresh token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.");
+                throw new UnauthorizedException("Refresh token is invalid or expired. Please log in again.");
 
             var newAccessToken = CreateJwtToken(user);
             var newRefreshToken = GenerateRefreshToken();
@@ -290,13 +290,13 @@ namespace AutoWashPro.BLL.Services
         public async Task<bool> ChangePasswordAsync(int userId, ChangePasswordDTO request)
         {
             if (request.OldPassword == request.NewPassword)
-                throw new BadRequestException("Mật khẩu mới không được trùng với mật khẩu cũ.");
+                throw new BadRequestException("New password cannot be the same as the old password.");
 
             var user = await _context.Users.FindAsync(userId);
-            if (user == null) throw new NotFoundException("Không tìm thấy người dùng.");
+            if (user == null) throw new NotFoundException("User not found.");
 
             if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash))
-                throw new BadRequestException("Mật khẩu cũ không chính xác.");
+                throw new BadRequestException("Incorrect old password.");
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             await _context.SaveChangesAsync();
@@ -380,7 +380,7 @@ namespace AutoWashPro.BLL.Services
                     <p>Trân trọng,<br><b>Đội ngũ SmartWash</b></p>
                 </div>";
 
-            return _emailService.SendEmailAsync(email, "[SmartWash] Mã OTP xác thực đăng ký", html);
+            return _emailService.SendEmailAsync(email, "[SmartWash] Registration Verification OTP Code", html);
         }
         public async Task<RegisterPendingResponseDTO> ResendOtpAsync(ResendOtpDTO request)
         {
@@ -392,10 +392,10 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalizedEmail);
 
             if (user == null)
-                throw new NotFoundException("Không tìm thấy tài khoản nào đăng ký bằng email này.");
+                throw new NotFoundException("No account registered with this email found.");
 
             if (user.Status != UserStatuses.Pending)
-                throw new BadRequestException("Tài khoản đã được xác thực hoặc đang ở trạng thái không hợp lệ.");
+                throw new BadRequestException("Account is already verified or in an invalid state.");
 
             // Sinh OTP mới và set lại thời gian 10 phút
             var otp = GenerateOtp();
@@ -408,14 +408,14 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
 
             // Gửi email mới
-            var fullName = user.CustomerProfile?.FullName ?? "Quý khách";
+            var fullName = user.CustomerProfile?.FullName ?? "Valued Customer";
             try
             {
                 await SendRegistrationOtpEmailAsync(normalizedEmail, fullName, otp, otpExpiresAt);
             }
             catch (Exception ex)
             {
-                throw new BadRequestException($"Không thể gửi email OTP mới. Lỗi máy chủ Email: {ex.Message}");
+                throw new BadRequestException($"Could not send new OTP email. Email server error: {ex.Message}");
             }
 
             // Trả về response y hệt như lúc Register để FE hiển thị lại bộ đếm ngược
@@ -443,7 +443,7 @@ namespace AutoWashPro.BLL.Services
             var jwtSecurityToken = securityToken as JwtSecurityToken;
 
             if (jwtSecurityToken == null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                throw new SecurityTokenException("Token không hợp lệ.");
+                throw new SecurityTokenException("Invalid token.");
 
             return principal;
         }
@@ -451,7 +451,7 @@ namespace AutoWashPro.BLL.Services
         public async Task LogoutAsync(int userId)
         {
             var user = await _context.Users.FindAsync(userId);
-            if (user == null) throw new NotFoundException("Không tìm thấy người dùng.");
+            if (user == null) throw new NotFoundException("User not found.");
 
             user.RefreshToken = null;
             user.RefreshTokenExpiryTime = null;
@@ -469,10 +469,10 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalizedEmail);
 
             if (user == null)
-                throw new NotFoundException("Không tìm thấy tài khoản nào với email này.");
+                throw new NotFoundException("No account found with this email.");
 
             if (user.Status != UserStatuses.Active)
-                throw new BadRequestException("Tài khoản chưa được kích hoạt hoặc đã bị khóa.");
+                throw new BadRequestException("Account is not activated or is locked.");
 
             var otp = GenerateOtp();
             var otpHash = HashOtp(otp);
@@ -490,7 +490,7 @@ namespace AutoWashPro.BLL.Services
             }
             catch (Exception ex)
             {
-                throw new BadRequestException($"Không thể gửi email OTP đặt lại mật khẩu. Lỗi: {ex.Message}");
+                throw new BadRequestException($"Could not send password reset OTP email. Error: {ex.Message}");
             }
         }
 
@@ -501,19 +501,19 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalizedEmail);
 
             if (user == null)
-                throw new NotFoundException("Không tìm thấy tài khoản nào với email này.");
+                throw new NotFoundException("No account found with this email.");
 
             if (user.Status != UserStatuses.Active)
-                throw new BadRequestException("Tài khoản chưa được kích hoạt hoặc đã bị khóa.");
+                throw new BadRequestException("Account is not activated or is locked.");
 
             if (string.IsNullOrWhiteSpace(user.EmailVerificationOtpHash) || user.EmailVerificationOtpExpiresAt == null)
-                throw new BadRequestException("Chưa có yêu cầu đặt lại mật khẩu. Vui lòng gửi yêu cầu quên mật khẩu trước.");
+                throw new BadRequestException("No password reset request found. Please submit a forgot password request first.");
 
             if (user.EmailVerificationOtpExpiresAt <= DateTime.UtcNow)
-                throw new BadRequestException("Mã OTP đã hết hạn. Vui lòng gửi lại yêu cầu quên mật khẩu.");
+                throw new BadRequestException("OTP code has expired. Please submit another forgot password request.");
 
             if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(request.Otp), StringComparison.Ordinal))
-                throw new BadRequestException("Mã OTP không chính xác.");
+                throw new BadRequestException("Incorrect OTP code.");
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             user.EmailVerificationOtpHash = null;
@@ -536,7 +536,7 @@ namespace AutoWashPro.BLL.Services
                     <p>Trân trọng,<br><b>Đội ngũ SmartWash</b></p>
                 </div>";
 
-            return _emailService.SendEmailAsync(email, "[SmartWash] Mã OTP đặt lại mật khẩu", html);
+            return _emailService.SendEmailAsync(email, "[SmartWash] Password Reset OTP Code", html);
         }
     }
 }

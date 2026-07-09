@@ -56,29 +56,29 @@ namespace AutoWashPro.BLL.Services
             try
             {
                 var voucher = await _context.Vouchers.Include(v => v.RequiredTier).FirstOrDefaultAsync(v => v.VoucherId == voucherId);
-                if (voucher == null) throw new NotFoundException("Voucher không tồn tại.");
+                if (voucher == null) throw new NotFoundException("Voucher does not exist.");
                 ValidateVoucherAvailability(voucher);
 
                 if (voucher.RequiredTierId.HasValue)
                 {
                     var userProfile = await _context.CustomerProfiles.Include(cp => cp.Tier).FirstOrDefaultAsync(cp => cp.UserId == userId);
-                    if (userProfile == null) throw new NotFoundException("Không tìm thấy hồ sơ người dùng.");
+                    if (userProfile == null) throw new NotFoundException("User profile not found.");
 
                     var requiredTier = await _context.Tiers.FindAsync(voucher.RequiredTierId.Value);
                     if (requiredTier != null && userProfile.Tier != null
                         && userProfile.Tier.MinAccumulatedPoints < requiredTier.MinAccumulatedPoints)
                     {
-                        throw new BadRequestException($"Bạn cần đạt hạng {voucher.RequiredTier?.TierName} để đổi voucher này.");
+                        throw new BadRequestException($"You need to reach tier {voucher.RequiredTier?.TierName} to redeem this voucher.");
                     }
                 }
 
                 var existingUserVoucher = await _context.UserVouchers
                     .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VoucherId == voucherId && uv.TriggerKey == null);
-                if (existingUserVoucher != null) throw new BadRequestException("Bạn đã sở hữu voucher này rồi.");
+                if (existingUserVoucher != null) throw new BadRequestException("You already own this voucher.");
 
                 if (voucher.PointsRequired > 0)
                 {
-                    await _walletService.DeductSpendablePointsAsync(userId, voucher.PointsRequired, $"Đổi voucher: {voucher.Code}");
+                    await _walletService.DeductSpendablePointsAsync(userId, voucher.PointsRequired, $"Redeem voucher: {voucher.Code}");
                 }
 
                 _context.UserVouchers.Add(new UserVoucher
@@ -97,7 +97,7 @@ namespace AutoWashPro.BLL.Services
             catch (DbUpdateException)
             {
                 await transaction.RollbackAsync();
-                throw new BadRequestException("Bạn đã sở hữu voucher này rồi, không thể thao tác quá nhanh.");
+                throw new BadRequestException("You already own this voucher; please do not request too rapidly.");
             }
             catch
             {
@@ -122,7 +122,7 @@ namespace AutoWashPro.BLL.Services
             if (userIds == null || !userIds.Any()) return;
 
             var voucher = await _context.Vouchers.FindAsync(voucherId);
-            if (voucher == null) throw new NotFoundException("Voucher không tồn tại.");
+            if (voucher == null) throw new NotFoundException("Voucher does not exist.");
 
             var existingUserIds = await _context.UserVouchers
                 .Where(uv => uv.VoucherId == voucherId && userIds.Contains(uv.UserId) && uv.TriggerKey == null)
@@ -149,11 +149,11 @@ namespace AutoWashPro.BLL.Services
         public async Task<AdminVoucherDTO> CreateVoucherAsync(CreateOrUpdateVoucherDTO request)
         {
             if (request.ExpiryDate.ToUniversalTime() <= DateTime.UtcNow)
-                throw new BadRequestException("Ngày hết hạn phải lớn hơn hiện tại.");
+                throw new BadRequestException("Expiration date must be in the future.");
 
             var code = request.Code.Trim().ToUpperInvariant();
             if (await _context.Vouchers.AnyAsync(v => v.Code == code))
-                throw new BadRequestException("Mã voucher đã tồn tại.");
+                throw new BadRequestException("Voucher code already exists.");
 
             await ValidateTierAsync(request.RequiredTierId);
 
@@ -188,14 +188,14 @@ namespace AutoWashPro.BLL.Services
         public async Task<AdminVoucherDTO> UpdateVoucherAsync(int id, CreateOrUpdateVoucherDTO request)
         {
             if (request.ExpiryDate.ToUniversalTime() <= DateTime.UtcNow)
-                throw new BadRequestException("Ngày hết hạn phải lớn hơn hiện tại.");
+                throw new BadRequestException("Expiration date must be in the future.");
 
             var voucher = await _context.Vouchers.Include(v => v.RequiredTier).FirstOrDefaultAsync(v => v.VoucherId == id);
-            if (voucher == null) throw new NotFoundException("Không tìm thấy voucher.");
+            if (voucher == null) throw new NotFoundException("Voucher not found.");
 
             var code = request.Code.Trim().ToUpperInvariant();
             if (await _context.Vouchers.AnyAsync(v => v.Code == code && v.VoucherId != id))
-                throw new BadRequestException("Mã voucher đã tồn tại.");
+                throw new BadRequestException("Voucher code already exists.");
 
             await ValidateTierAsync(request.RequiredTierId);
 
@@ -225,11 +225,11 @@ namespace AutoWashPro.BLL.Services
         public async Task<bool> DeleteVoucherAsync(int id)
         {
             var voucher = await _context.Vouchers.FindAsync(id);
-            if (voucher == null) throw new NotFoundException("Không tìm thấy voucher.");
+            if (voucher == null) throw new NotFoundException("Voucher not found.");
 
             var hasOwners = await _context.UserVouchers.AnyAsync(uv => uv.VoucherId == id);
             if (hasOwners)
-                throw new BadRequestException("Không thể xóa voucher đã có khách nhận. Vui lòng tắt hoạt động hoặc để hết hạn.");
+                throw new BadRequestException("Cannot delete voucher that customers have claimed. Please deactivate it or let it expire.");
 
             _context.Vouchers.Remove(voucher);
             await _context.SaveChangesAsync();
@@ -274,14 +274,14 @@ namespace AutoWashPro.BLL.Services
                 .Include(uv => uv.Voucher)
                 .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.Voucher.Code == voucherCode.Trim());
 
-            if (userVoucher == null) throw new NotFoundException("Mã voucher không tồn tại trong hệ thống hoặc khách chưa lấy mã này.");
+            if (userVoucher == null) throw new NotFoundException("Voucher code does not exist or customer has not claimed it.");
             if (userVoucher.Voucher.VoucherType != VoucherType.PhysicalGift)
-                throw new BadRequestException("Voucher này không phải loại quà tặng hiện vật.");
+                throw new BadRequestException("This voucher is not a physical gift voucher.");
 
             ValidateVoucherAvailability(userVoucher.Voucher);
-            if (userVoucher.ExpiryDate < DateTime.UtcNow) throw new BadRequestException("Voucher này đã hết hạn.");
+            if (userVoucher.ExpiryDate < DateTime.UtcNow) throw new BadRequestException("This voucher has expired.");
             if (userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser)
-                throw new BadRequestException("Mã voucher này đã hết lượt sử dụng.");
+                throw new BadRequestException("This voucher code has run out of usage limit.");
 
             userVoucher.UsageCount += 1;
             userVoucher.IsUsed = userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser;
@@ -295,10 +295,10 @@ namespace AutoWashPro.BLL.Services
 
         private static void ValidateVoucherAvailability(Voucher voucher)
         {
-            if (!voucher.IsActive) throw new BadRequestException("Voucher chưa được kích hoạt.");
-            if (voucher.StartDate.HasValue && voucher.StartDate.Value > DateTime.UtcNow) throw new BadRequestException("Voucher chưa đến thời gian áp dụng.");
-            if (voucher.ExpiryDate < DateTime.UtcNow) throw new BadRequestException("Voucher đã hết hạn.");
-            if (voucher.MaxUsages > 0 && voucher.CurrentUsageCount >= voucher.MaxUsages) throw new BadRequestException("Voucher đã hết lượt sử dụng.");
+            if (!voucher.IsActive) throw new BadRequestException("Voucher is not activated.");
+            if (voucher.StartDate.HasValue && voucher.StartDate.Value > DateTime.UtcNow) throw new BadRequestException("Voucher is not yet valid.");
+            if (voucher.ExpiryDate < DateTime.UtcNow) throw new BadRequestException("Voucher has expired.");
+            if (voucher.MaxUsages > 0 && voucher.CurrentUsageCount >= voucher.MaxUsages) throw new BadRequestException("Voucher usage limit has been reached.");
         }
 
         private static DateTime CalculateUserVoucherExpiry(Voucher voucher, DateTime receivedDate)
@@ -314,7 +314,7 @@ namespace AutoWashPro.BLL.Services
         {
             if (!tierId.HasValue) return;
             var tierExists = await _context.Tiers.AnyAsync(t => t.TierId == tierId.Value);
-            if (!tierExists) throw new BadRequestException("Hạng yêu cầu không tồn tại.");
+            if (!tierExists) throw new BadRequestException("Required tier does not exist.");
         }
 
         private async Task LoadTierAsync(Voucher voucher)

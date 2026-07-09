@@ -74,7 +74,7 @@ namespace AutoWashPro.BLL.Services
         {
             var userExists = await _context.Users.AnyAsync(u => u.UserId == userId);
             if (!userExists)
-                throw new NotFoundException("Không tìm thấy người dùng tương ứng với token. Vui lòng đăng nhập lại.");
+                throw new NotFoundException("User corresponding to token not found. Please log in again.");
 
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
             if (wallet == null)
@@ -87,7 +87,7 @@ namespace AutoWashPro.BLL.Services
                 }
                 catch (DbUpdateException ex)
                 {
-                    throw new BadRequestException($"Không thể tạo ví cho người dùng. Lỗi DB: {ex.InnerException?.Message ?? ex.Message}");
+                    throw new BadRequestException($"Could not create wallet for user. DB Error: {ex.InnerException?.Message ?? ex.Message}");
                 }
             }
 
@@ -101,7 +101,7 @@ namespace AutoWashPro.BLL.Services
             if (paymentType == "Topup")
             {
                 if (!request.Amount.HasValue || request.Amount.Value <= 0)
-                    throw new BadRequestException("Vui lòng nhập số tiền nạp ví hợp lệ.");
+                    throw new BadRequestException("Please enter a valid wallet deposit amount.");
 
                 amount = request.Amount.Value;
                 transactionType = "Topup";
@@ -111,19 +111,19 @@ namespace AutoWashPro.BLL.Services
             else
             {
                 if (!request.BookingId.HasValue)
-                    throw new BadRequestException("Vui lòng truyền BookingId khi thanh toán booking.");
+                    throw new BadRequestException("Please provide BookingId when paying for a booking.");
 
                 var booking = await _context.Bookings
                     .FirstOrDefaultAsync(b => b.BookingId == request.BookingId.Value && b.UserId == userId);
 
                 if (booking == null)
-                    throw new NotFoundException("Không tìm thấy lịch hẹn hoặc bạn không có quyền thanh toán.");
+                    throw new NotFoundException("Booking not found or you do not have permission to pay.");
 
                 if (booking.Status == "Cancelled" || booking.Status == "CancelledBySystem" || booking.Status == "NoShow")
-                    throw new BadRequestException("Không thể thanh toán cho lịch hẹn đã hủy hoặc no-show.");
+                    throw new BadRequestException("Cannot pay for a cancelled or no-show booking.");
 
                 if (await HasCompletedBookingPaymentAsync(booking.BookingId))
-                    throw new BadRequestException("Lịch hẹn này đã được thanh toán.");
+                    throw new BadRequestException("This booking has already been paid.");
 
                 if (booking.FinalAmount <= 0)
                 {
@@ -166,7 +166,7 @@ namespace AutoWashPro.BLL.Services
             }
             catch (DbUpdateException ex)
             {
-                throw new BadRequestException($"Không thể tạo giao dịch thanh toán. Kiểm tra bảng Transactions đã có các cột OrderCode, ReferenceBookingId, Status chưa. Lỗi DB: {ex.InnerException?.Message ?? ex.Message}");
+                throw new BadRequestException($"Could not create payment transaction. Check if Transactions table has OrderCode, ReferenceBookingId, Status columns. DB Error: {ex.InnerException?.Message ?? ex.Message}");
             }
 
             var paymentRequest = new CreatePaymentLinkRequest
@@ -206,7 +206,7 @@ namespace AutoWashPro.BLL.Services
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Webhook PayOS khong hop le.");
-                throw new UnauthorizedException("Webhook PayOS không hợp lệ.");
+                throw new UnauthorizedException("Invalid PayOS webhook.");
             }
 
             if (webhookData.Code != "00" || !webhookData.Success)
@@ -228,7 +228,7 @@ namespace AutoWashPro.BLL.Services
                 if (transaction == null)
                 {
                     _logger.LogWarning("Khong tim thay giao dich voi OrderCode: {OrderCode}", data.OrderCode);
-                    throw new NotFoundException("Không tìm thấy giao dịch PayOS tương ứng với orderCode.");
+                    throw new NotFoundException("PayOS transaction corresponding to orderCode not found.");
                 }
 
                 if (transaction.Status != "Pending")
@@ -239,15 +239,15 @@ namespace AutoWashPro.BLL.Services
 
                 if (transaction.Amount != data.Amount)
                 {
-                    throw new BadRequestException("Số tiền webhook không khớp với giao dịch đang chờ.");
+                    throw new BadRequestException("Webhook amount does not match the pending transaction.");
                 }
 
                 transaction.Status = "Completed";
                 transaction.Description = transaction.TransactionType switch
                 {
-                    "Topup" => $"Nạp tiền thành công (Mã: {data.OrderCode})",
-                    "BookingPayment" => $"Thanh toán booking thành công (Mã: {data.OrderCode})",
-                    "WalkInPayment" => $"Thanh toán walk-in thành công (Mã: {data.OrderCode})",
+                    "Topup" => $"Deposit successful (Code: {data.OrderCode})",
+                    "BookingPayment" => $"Booking payment successful (Code: {data.OrderCode})",
+                    "WalkInPayment" => $"Walk-in payment successful (Code: {data.OrderCode})",
                     _ => transaction.Description
                 };
 
@@ -263,14 +263,14 @@ namespace AutoWashPro.BLL.Services
                 else if (transaction.TransactionType == "BookingPayment" || transaction.TransactionType == "WalkInPayment")
                 {
                     if (!transaction.ReferenceBookingId.HasValue)
-                        throw new BadRequestException("Giao dịch thanh toán booking thiếu mã booking.");
+                        throw new BadRequestException("Booking payment transaction is missing booking ID.");
 
                     transaction.Status = "Completed";
                     transaction.Description = $"Thanh toan booking thanh cong (Ma: {data.OrderCode})";
 
                     var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == transaction.ReferenceBookingId.Value);
                     if (booking == null)
-                        throw new NotFoundException("Không tìm thấy booking cần xác nhận thanh toán.");
+                        throw new NotFoundException("Booking requiring payment confirmation not found.");
 
                     booking.UpdatedAt = DateTime.UtcNow;
                     paidBookingId = booking.BookingId;
@@ -315,7 +315,7 @@ namespace AutoWashPro.BLL.Services
                 }
                 else
                 {
-                    throw new BadRequestException("Loại giao dịch webhook không được hỗ trợ.");
+                    throw new BadRequestException("Webhook transaction type not supported.");
                 }
 
                 await _context.SaveChangesAsync();
@@ -405,15 +405,15 @@ namespace AutoWashPro.BLL.Services
 
         public async Task DeductSpendablePointsAsync(int userId, int pointsToDeduct, string reason)
         {
-            if (pointsToDeduct <= 0) throw new BadRequestException("Điểm trừ phải lớn hơn 0.");
+            if (pointsToDeduct <= 0) throw new BadRequestException("Deducted points must be greater than 0.");
 
             try
             {
                 var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(cp => cp.UserId == userId);
-                if (profile == null) throw new NotFoundException("Không tìm thấy hồ sơ khách hàng.");
+                if (profile == null) throw new NotFoundException("Customer profile not found.");
 
                 if (profile.TotalPoint < pointsToDeduct)
-                    throw new BadRequestException($"Không đủ điểm khả dụng. Bạn có {profile.TotalPoint} điểm.");
+                    throw new BadRequestException($"Insufficient available points. You have {profile.TotalPoint} points.");
 
                 profile.TotalPoint -= pointsToDeduct;
 
@@ -429,18 +429,18 @@ namespace AutoWashPro.BLL.Services
             }
             catch (DbUpdateConcurrencyException)
             {
-                throw new BadRequestException("Dữ liệu đã bị thay đổi bởi giao dịch khác. Vui lòng thử lại.");
+                throw new BadRequestException("Data was modified by another transaction. Please try again.");
             }
         }
 
         public async Task RefundSpendablePointsAsync(int userId, int pointsToRefund, string reason, int? referenceBookingId = null)
         {
-            if (pointsToRefund <= 0) throw new BadRequestException("Điểm hoàn phải lớn hơn 0.");
+            if (pointsToRefund <= 0) throw new BadRequestException("Refunded points must be greater than 0.");
 
             try
             {
                 var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(cp => cp.UserId == userId);
-                if (profile == null) throw new NotFoundException("Không tìm thấy hồ sơ khách hàng.");
+                if (profile == null) throw new NotFoundException("Customer profile not found.");
 
                 profile.TotalPoint += pointsToRefund;
 
@@ -457,13 +457,13 @@ namespace AutoWashPro.BLL.Services
             }
             catch (DbUpdateConcurrencyException)
             {
-                throw new BadRequestException("Dữ liệu đã bị thay đổi bởi giao dịch khác. Vui lòng thử lại.");
+                throw new BadRequestException("Data was modified by another transaction. Please try again.");
             }
         }
 
         public async Task<int> AwardCompletionPointsAsync(int userId, int pointsEarned, int bookingId)
         {
-            if (pointsEarned <= 0) throw new BadRequestException("Điểm thưởng phải lớn hơn 0.");
+            if (pointsEarned <= 0) throw new BadRequestException("Bonus points must be greater than 0.");
 
             try
             {
@@ -471,7 +471,7 @@ namespace AutoWashPro.BLL.Services
                     .Include(cp => cp.Tier)
                     .FirstOrDefaultAsync(cp => cp.UserId == userId);
 
-                if (profile == null) throw new NotFoundException("Không tìm thấy hồ sơ khách hàng.");
+                if (profile == null) throw new NotFoundException("Customer profile not found.");
 
                 profile.TotalPoint += pointsEarned;
                 // LUỒNG 1: Tiền tệ (Đưa vào ví và sổ cái, hạn 1 năm)
@@ -497,15 +497,15 @@ namespace AutoWashPro.BLL.Services
             }
             catch (DbUpdateConcurrencyException)
             {
-                throw new BadRequestException("Dữ liệu đã bị thay đổi bởi giao dịch khác. Vui lòng thử lại.");
+                throw new BadRequestException("Data was modified by another transaction. Please try again.");
             }
         }
         public async Task RefundBalanceAsync(int userId, decimal amount, string reason)
         {
-            if (amount <= 0) throw new BadRequestException("Số tiền hoàn phải lớn hơn 0.");
+            if (amount <= 0) throw new BadRequestException("Refund amount must be greater than 0.");
 
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
-            if (wallet == null) throw new NotFoundException("Không tìm thấy ví của người dùng.");
+            if (wallet == null) throw new NotFoundException("User wallet not found.");
 
             wallet.Balance += amount;
 
@@ -554,7 +554,7 @@ namespace AutoWashPro.BLL.Services
                 || string.Equals(paymentType, "Booking", StringComparison.OrdinalIgnoreCase))
                 return "BookingPayment";
 
-            throw new BadRequestException("PaymentType chỉ hỗ trợ Topup hoặc BookingPayment.");
+            throw new BadRequestException("PaymentType only supports Topup or BookingPayment.");
         }
 
         private Task<bool> HasCompletedBookingPaymentAsync(int bookingId)

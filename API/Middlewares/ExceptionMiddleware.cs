@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using System;
 using AutoWashPro.BLL.Exceptions;
 using System.Text.Json;
@@ -27,7 +27,7 @@ namespace AutoWashPro.API.Middlewares
                 context.Response.ContentType = "application/json";
 
                 int statusCode = 500;
-                string message = "Lỗi hệ thống nội bộ. Vui lòng thử lại sau.";
+                string message = "Internal server error. Please try again later.";
                 string? details = null;
 
                 switch (ex)
@@ -50,7 +50,7 @@ namespace AutoWashPro.API.Middlewares
                         break;
                     case DbUpdateConcurrencyException concurrencyEx:
                         statusCode = 409;
-                        message = "Dữ liệu đã bị thay đổi bởi một giao dịch khác. Vui lòng tải lại và thử lại.";
+                        message = "Data was modified by another transaction. Please reload and try again.";
                         break;
                     default:
                         // Fallback cho các ngoại lệ chưa định nghĩa rõ

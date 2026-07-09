@@ -83,7 +83,7 @@ namespace AutoWashPro.BLL.Services
 
             if (!hasScheduledShift)
             {
-                throw new BadRequestException("Nhân viên không có lịch làm việc trong ca này vào ngày được chọn.");
+                throw new BadRequestException("Employee does not have a work schedule in this shift on the selected date.");
             }
 
             // Verify staff is not already assigned to ANY lane for the exact same WorkShiftId on the exact same Date
@@ -92,7 +92,7 @@ namespace AutoWashPro.BLL.Services
 
             if (existingAssignment)
             {
-                throw new BadRequestException("Nhân viên này đã được phân công vào một làn khác trong ca làm việc này.");
+                throw new BadRequestException("This employee is already assigned to another lane in this shift.");
             }
 
             var assignment = new StaffLaneAssignment
@@ -228,7 +228,7 @@ namespace AutoWashPro.BLL.Services
 
             if (request.StartTime >= request.EndTime)
             {
-                throw new BadRequestException("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
+                throw new BadRequestException("Start time must be earlier than end time.");
             }
 
             // Kiểm tra trùng lặp thời gian trong chi nhánh của manager
@@ -240,7 +240,7 @@ namespace AutoWashPro.BLL.Services
 
             if (isOverlap)
             {
-                throw new BadRequestException("Khung giờ bị trùng lặp với một khung giờ đã tồn tại.");
+                throw new BadRequestException("Time slot overlaps with an existing time slot.");
             }
 
             var timeSlot = new TimeSlot
@@ -358,7 +358,7 @@ namespace AutoWashPro.BLL.Services
 
             if (!validLane)
             {
-                throw new BadRequestException("Làn (Lane) không hợp lệ hoặc không thuộc chi nhánh của bạn.");
+                throw new BadRequestException("Lane is invalid or does not belong to your branch.");
             }
 
             booking.ProcessingLaneId = assignment.LaneId;
@@ -417,14 +417,14 @@ namespace AutoWashPro.BLL.Services
             var timeSlot = await _context.TimeSlots.FindAsync(slotId);
             if (timeSlot == null || timeSlot.BranchId != managerProfile.BranchId)
             {
-                throw new NotFoundException("Không tìm thấy khung giờ trong chi nhánh của bạn.");
+                throw new NotFoundException("Time slot not found in your branch.");
             }
 
             request.BranchId = managerProfile.BranchId.Value;
 
             if (request.StartTime >= request.EndTime)
             {
-                throw new BadRequestException("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
+                throw new BadRequestException("Start time must be earlier than end time.");
             }
 
             var isOverlap = await _context.TimeSlots.AnyAsync(ts =>
@@ -436,7 +436,7 @@ namespace AutoWashPro.BLL.Services
 
             if (isOverlap)
             {
-                throw new BadRequestException("Khung giờ bị trùng lặp với một khung giờ đã tồn tại.");
+                throw new BadRequestException("Time slot overlaps with an existing time slot.");
             }
 
             timeSlot.StartTime = request.StartTime;
@@ -464,13 +464,13 @@ namespace AutoWashPro.BLL.Services
             var timeSlot = await _context.TimeSlots.FindAsync(slotId);
             if (timeSlot == null || timeSlot.BranchId != managerProfile.BranchId)
             {
-                throw new NotFoundException("Không tìm thấy khung giờ trong chi nhánh của bạn.");
+                throw new NotFoundException("Time slot not found in your branch.");
             }
 
             var isBooked = await _context.DailySlotCapacities.AnyAsync(dsc => dsc.SlotId == slotId && dsc.BookedWeight > 0);
             if (isBooked)
             {
-                throw new BadRequestException("Không thể xoá khung giờ này vì đã có người đặt lịch. Vui lòng kiểm tra lại.");
+                throw new BadRequestException("Cannot delete this time slot because there are existing bookings. Please check again.");
             }
 
             _context.TimeSlots.Remove(timeSlot);

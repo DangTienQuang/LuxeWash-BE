@@ -33,7 +33,7 @@ namespace AutoWashPro.BLL.Services
                     .ThenInclude(v => v.VehicleType)
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
-            if (user == null) throw new NotFoundException("Không tìm thấy người dùng.");
+            if (user == null) throw new NotFoundException("User not found.");
 
             var fullName = user.CustomerProfile?.FullName
                         ?? user.StaffProfile?.FullName
@@ -72,7 +72,7 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
             if (user == null)
-                throw new NotFoundException("Không tìm thấy dữ liệu người dùng.");
+                throw new NotFoundException("User data not found.");
 
             bool isUpdated = false;
             if (!string.IsNullOrWhiteSpace(request.FullName))
@@ -108,7 +108,7 @@ namespace AutoWashPro.BLL.Services
             {
                 if (user.CustomerProfile.DateOfBirth.HasValue && user.CustomerProfile.DateOfBirth.Value.Date != request.DateOfBirth.Value.Date)
                 {
-                    throw new BadRequestException("Bạn không thể tự thay đổi ngày sinh sau khi đã cập nhật. Vui lòng liên hệ Admin nếu cần hỗ trợ.");
+                    throw new BadRequestException("You cannot change your birth date after it has been set. Please contact Admin if you need assistance.");
                 }
 
                 if (!user.CustomerProfile.DateOfBirth.HasValue)
@@ -122,7 +122,7 @@ namespace AutoWashPro.BLL.Services
                 string newPhone = request.PhoneNumber.Trim();
                 bool phoneExists = await _context.Users.AnyAsync(u => u.PhoneNumber == newPhone && u.UserId != userId);
                 if (phoneExists)
-                    throw new BadRequestException("Số điện thoại này đã được sử dụng bởi tài khoản khác.");
+                    throw new BadRequestException("This phone number is already used by another account.");
 
                 user.PhoneNumber = newPhone;
                 isUpdated = true;
@@ -134,7 +134,7 @@ namespace AutoWashPro.BLL.Services
 
                 bool emailExists = await _context.Users.AnyAsync(u => u.Email == newEmail && u.UserId != userId);
                 if (emailExists)
-                    throw new BadRequestException("Email này đã được sử dụng bởi tài khoản khác.");
+                    throw new BadRequestException("This email is already used by another account.");
 
                 user.Email = newEmail;
                 isUpdated = true;
@@ -198,7 +198,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<UserProfileDTO> GetCustomerDetailByAdminAsync(int customerId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == customerId);
-            if (user == null || user.Role != UserRoles.Customer) throw new NotFoundException("Không tìm thấy khách hàng này.");
+            if (user == null || user.Role != UserRoles.Customer) throw new NotFoundException("Customer not found.");
 
             return await GetProfileAsync(customerId);
         }
@@ -206,9 +206,9 @@ namespace AutoWashPro.BLL.Services
         public async Task<bool> UpdateCustomerStatusAsync(int customerId, string newStatus)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == customerId);
-            if (user == null || user.Role != UserRoles.Customer) throw new NotFoundException("Không tìm thấy khách hàng này.");
+            if (user == null || user.Role != UserRoles.Customer) throw new NotFoundException("Customer not found.");
 
-            if (user.Status == newStatus) throw new BadRequestException($"Tài khoản đã ở trạng thái {newStatus} từ trước.");
+            if (user.Status == newStatus) throw new BadRequestException($"Account is already in status {newStatus}.");
 
             user.Status = newStatus;
             await _context.SaveChangesAsync();
@@ -217,7 +217,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task SyncCustomerProfilePointsAsync()
         {
-            const string completionPrefix = "Hoàn thành dịch vụ";
+            const string completionPrefix = "Service completion";
             var now = DateTime.UtcNow;
 
             // Get users with 0 TotalPoint & 0 PromotionPoint

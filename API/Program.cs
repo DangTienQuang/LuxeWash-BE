@@ -37,7 +37,7 @@ builder.Services.AddControllers()
                 .SelectMany(entry => entry.Value?.Errors.Select(error => (
                     Field: entry.Key,
                     Message: string.IsNullOrWhiteSpace(error.ErrorMessage)
-                        ? "Dữ liệu đầu vào không hợp lệ."
+                        ? "Invalid input data."
                         : error.ErrorMessage
                 )) ?? Enumerable.Empty<(string Field, string Message)>())
                 .ToList();
@@ -51,7 +51,7 @@ builder.Services.AddControllers()
             return new BadRequestObjectResult(new
             {
                 statusCode = 400,
-                message = errorMessage ?? "Dữ liệu đầu vào không hợp lệ.",
+                message = errorMessage ?? "Invalid input data.",
                 details = errors.Select(error => new { field = error.Field, message = error.Message }).ToList()
             });
         };

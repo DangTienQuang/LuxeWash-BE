@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -36,7 +36,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<TierResponseDTO> CreateTierAsync(CreateTierDTO request)
         {
             var isDuplicate = await _context.Tiers.AnyAsync(t => t.TierName == request.TierName || t.MinAccumulatedPoints == request.MinAccumulatedPoints);
-            if (isDuplicate) throw new BadRequestException("Tên hạng hoặc số điểm tối thiểu đã tồn tại.");
+            if (isDuplicate) throw new BadRequestException("Tier name or minimum points requirement already exists.");
 
             var tier = new Tier
             {
@@ -55,10 +55,10 @@ namespace AutoWashPro.BLL.Services
         public async Task<TierResponseDTO> UpdateTierAsync(int id, UpdateTierDTO request)
         {
             var tier = await _context.Tiers.FindAsync(id);
-            if (tier == null) throw new NotFoundException("Không tìm thấy hạng thành viên.");
+            if (tier == null) throw new NotFoundException("Membership tier not found.");
 
             var isDuplicate = await _context.Tiers.AnyAsync(t => (t.TierName == request.TierName || t.MinAccumulatedPoints == request.MinAccumulatedPoints) && t.TierId != id);
-            if (isDuplicate) throw new BadRequestException("Tên hạng hoặc số điểm tối thiểu đã tồn tại.");
+            if (isDuplicate) throw new BadRequestException("Tier name or minimum points requirement already exists.");
 
             tier.TierName = request.TierName;
             tier.PointMultiplier = request.PointMultiplier;
@@ -75,7 +75,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(cp => cp.Tier)
                 .FirstOrDefaultAsync(cp => cp.UserId == userId);
 
-            if (profile == null) throw new NotFoundException("Không tìm thấy hồ sơ khách hàng.");
+            if (profile == null) throw new NotFoundException("Customer profile not found.");
 
             var result = await EvaluateTierForProfileAsync(profile.UserId);
             if (result != null)
@@ -89,7 +89,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<TierUpgradeResultDTO?> EvaluateTierForProfileAsync(int userId)
         {
             var profile = await _context.CustomerProfiles.Include(p => p.Tier).FirstOrDefaultAsync(p => p.UserId == userId);
-            if (profile == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Không tìm thấy profile.");
+            if (profile == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Profile not found.");
             if (profile.Tier == null && profile.TierId > 0)
             {
                 profile.Tier = await _context.Tiers.FindAsync(profile.TierId);

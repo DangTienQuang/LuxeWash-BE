@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.Exceptions;
+using AutoWashPro.BLL.Exceptions;
 using AutoWashPro.DAL.Data;
 using BLL.DTOs.Business;
 using BLL.DTOs.Fleet;
@@ -84,7 +84,7 @@ namespace BLL.Services
         public async Task<LaneScheduleResult> ScheduleFleetAsync(int branchId, DateTime slotStart, TimeSpan slotDuration, List<VehicleScheduleRequest> vehicles)
         {
             if (!vehicles.Any())
-                return LaneScheduleResult.Fail("Danh sách phương tiện không được để trống.");
+                return LaneScheduleResult.Fail("Vehicle list cannot be empty.");
 
             var lanes = await _context.Lanes
                 .Where(x =>
@@ -94,7 +94,7 @@ namespace BLL.Services
                 .ToListAsync();
 
             if (!lanes.Any())
-                return LaneScheduleResult.Fail("Không có làn xe khả dụng tại chi nhánh này.");
+                return LaneScheduleResult.Fail("No available lane in this branch.");
 
             // ------------------------------------------------------------------
             // STEP 1: Current active occupancy from CheckedIn/Assigned/Processing
@@ -203,9 +203,9 @@ namespace BLL.Services
                 if (estimatedEnd > deadline)
                 {
                     return LaneScheduleResult.Fail(
-                        $"Không đủ thời gian trong khung giờ cho {vehicles.Count} phương tiện. " +
-                        $"Phương tiện thứ {assignments.Count + 1} ước tính hoàn thành lúc " +
-                        $"{estimatedEnd:HH:mm}, vượt quá giới hạn cho phép ({deadline:HH:mm}).");
+                        $"Not enough time in the time slot for {vehicles.Count} vehicles. " +
+                        $"Vehicle #{assignments.Count + 1} estimated completion time at " +
+                        $"{estimatedEnd:HH:mm}, exceeding allowed limit ({deadline:HH:mm}).");
                 }
 
                 assignments.Add(new VehicleAssignment

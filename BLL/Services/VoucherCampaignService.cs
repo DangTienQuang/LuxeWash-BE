@@ -27,7 +27,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<CampaignVoucherResponseDTO> CreateAgeVouchersAsync(CreateAgeVouchersDTO request)
         {
-            if (request.TargetAge <= 0) throw new BadRequestException("Tuổi mục tiêu không hợp lệ.");
+            if (request.TargetAge <= 0) throw new BadRequestException("Invalid target age.");
             var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Age, v => v.TargetAge = request.TargetAge);
             return MapCampaignDto(voucher);
         }
@@ -35,7 +35,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<CampaignVoucherResponseDTO> CreateWinbackVouchersAsync(CreateWinbackVouchersDTO request)
         {
             if (request.ResendAfterDays > request.InactiveDays)
-                throw new BadRequestException("Số ngày gửi lại không nên lớn hơn số ngày khách không sử dụng.");
+                throw new BadRequestException("Resend days should not be greater than the days of inactivity.");
 
             var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Winback, v =>
             {
@@ -47,7 +47,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<CampaignVoucherResponseDTO> CreateVipVouchersAsync(CreateVipVouchersDTO request)
         {
-            if (!request.RequiredTierId.HasValue) throw new BadRequestException("Vui lòng chọn hạng VIP áp dụng.");
+            if (!request.RequiredTierId.HasValue) throw new BadRequestException("Please select the applicable VIP tier.");
             var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Vip, v => v.RequiredTierId = request.RequiredTierId);
             var response = MapCampaignDto(voucher);
 
@@ -64,7 +64,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<CampaignVoucherResponseDTO> CreateMilestoneVouchersAsync(CreateMilestoneVouchersDTO request)
         {
-            if (request.MilestoneUsageCount <= 0) throw new BadRequestException("Mốc số lần sử dụng không hợp lệ.");
+            if (request.MilestoneUsageCount <= 0) throw new BadRequestException("Invalid usage milestone.");
             var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Milestone, v => v.MilestoneUsageCount = request.MilestoneUsageCount);
             return MapCampaignDto(voucher);
         }
@@ -198,9 +198,9 @@ namespace AutoWashPro.BLL.Services
 
             try
             {
-                var customerName = user.CustomerProfile?.FullName ?? "Quý khách";
+                var customerName = user.CustomerProfile?.FullName ?? "Valued Customer";
                 var html = EmailTemplateBuilder.BuildVoucherCampaignEmail(voucher, customerName, userExpiryDate);
-                await _emailService.SendEmailAsync(user.Email, $"[SmartWash] Voucher mới: {voucher.Code}", html);
+                await _emailService.SendEmailAsync(user.Email, $"[SmartWash] New Voucher: {voucher.Code}", html);
             }
             catch (Exception ex)
             {
@@ -278,18 +278,18 @@ namespace AutoWashPro.BLL.Services
         {
             var code = request.Code.Trim().ToUpperInvariant();
             if (await _context.Vouchers.AnyAsync(v => v.Code == code))
-                throw new BadRequestException("Mã voucher đã tồn tại.");
+                throw new BadRequestException("Voucher code already exists.");
 
             if (request.RequiredTierId.HasValue)
             {
                 var tierExists = await _context.Tiers.AnyAsync(t => t.TierId == request.RequiredTierId.Value);
-                if (!tierExists) throw new BadRequestException("Hạng yêu cầu không tồn tại.");
+                if (!tierExists) throw new BadRequestException("Required tier does not exist.");
             }
 
             var now = DateTime.UtcNow;
             var startDate = request.StartDate?.ToUniversalTime() ?? now;
             var endDate = request.EndDate?.ToUniversalTime() ?? startDate.AddDays(request.ExpiryDays);
-            if (endDate <= now) throw new BadRequestException("Ngày hết hạn phải lớn hơn hiện tại.");
+            if (endDate <= now) throw new BadRequestException("Expiration date must be in the future.");
 
             var voucher = new Voucher
             {

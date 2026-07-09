@@ -44,7 +44,7 @@ namespace AutoWashPro.BLL.Services
         {
             if (request.StartTime >= request.EndTime)
             {
-                throw new BadRequestException("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
+                throw new BadRequestException("Start time must be earlier than end time.");
             }
 
             // Kiểm tra trùng lặp thời gian
@@ -56,7 +56,7 @@ namespace AutoWashPro.BLL.Services
 
             if (isOverlap)
             {
-                throw new BadRequestException("Khung giờ bị trùng lặp với một khung giờ đã tồn tại.");
+                throw new BadRequestException("Time slot overlaps with an existing time slot.");
             }
 
             var timeSlot = new TimeSlot
@@ -86,13 +86,13 @@ namespace AutoWashPro.BLL.Services
         {
             if (request.StartTime >= request.EndTime)
             {
-                throw new BadRequestException("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
+                throw new BadRequestException("Start time must be earlier than end time.");
             }
 
             var timeSlot = await _context.TimeSlots.FindAsync(slotId);
             if (timeSlot == null)
             {
-                throw new NotFoundException("Không tìm thấy khung giờ.");
+                throw new NotFoundException("Time slot not found.");
             }
 
             var isOverlap = await _context.TimeSlots.AnyAsync(ts =>
@@ -104,7 +104,7 @@ namespace AutoWashPro.BLL.Services
 
             if (isOverlap)
             {
-                throw new BadRequestException("Khung giờ bị trùng lặp với một khung giờ đã tồn tại.");
+                throw new BadRequestException("Time slot overlaps with an existing time slot.");
             }
 
             timeSlot.BranchId = request.BranchId;
@@ -131,13 +131,13 @@ namespace AutoWashPro.BLL.Services
             var timeSlot = await _context.TimeSlots.FindAsync(slotId);
             if (timeSlot == null)
             {
-                throw new NotFoundException("Không tìm thấy khung giờ.");
+                throw new NotFoundException("Time slot not found.");
             }
 
             var isBooked = await _context.DailySlotCapacities.AnyAsync(dsc => dsc.SlotId == slotId && dsc.BookedWeight > 0);
             if (isBooked)
             {
-                throw new BadRequestException("Không thể xoá khung giờ này vì đã có người đặt lịch. Vui lòng kiểm tra lại.");
+                throw new BadRequestException("Cannot delete this time slot because there are existing bookings. Please check again.");
             }
 
             _context.TimeSlots.Remove(timeSlot);

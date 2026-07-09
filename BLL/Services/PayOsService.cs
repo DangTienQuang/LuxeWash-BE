@@ -21,7 +21,7 @@ namespace AutoWashPro.BLL.Services
             string? returnUrl = null, string? cancelUrl = null)
         {
             if (amount <= 0)
-                throw new ArgumentException("Số tiền thanh toán PayOS phải lớn hơn 0.", nameof(amount));
+                throw new ArgumentException("PayOS payment amount must be greater than 0.", nameof(amount));
 
             var request = new CreatePaymentLinkRequest
             {
