@@ -43,5 +43,17 @@ namespace API.Controllers.User
 
             return Ok(new { statusCode = 200, message = "Personal information updated successfully." });
         }
+
+        [HttpDelete("me")]
+        public async Task<IActionResult> DeleteMyAccount()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdClaim == null) return Unauthorized(new { statusCode = 401, message = "Unauthorized" });
+
+            int userId = int.Parse(userIdClaim);
+            await _userService.DeleteAccountAsync(userId);
+
+            return Ok(new { statusCode = 200, message = "Account deleted successfully." });
+        }
     }
 }

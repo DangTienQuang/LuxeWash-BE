@@ -147,6 +147,48 @@ namespace AutoWashPro.BLL.Services
 
             return true;
         }
+
+        public async Task<bool> DeleteAccountAsync(int userId)
+        {
+            var user = await _context.Users
+                .Include(u => u.Vehicles)
+                .FirstOrDefaultAsync(u => u.UserId == userId);
+
+            if (user == null)
+                throw new NotFoundException("User not found.");
+
+            if (user.Status == UserStatuses.Deleted)
+                throw new BadRequestException("Account is already deleted.");
+
+            bool hasActiveBookings = await _context.Bookings.AnyAsync(b =>
+                b.UserId == userId &&
+                (b.Status == "Pending" || b.Status == "CheckedIn" || b.Status == "Delayed" ||
+                 b.Status == "Assigned" || b.Status == "Processing" || b.Status == "Confirmed"));
+
+            if (hasActiveBookings)
+            {
+                throw new BadRequestException("You currently have active bookings. Please complete or cancel them before deleting your account.");
+            }
+
+            user.Status = UserStatuses.Deleted;
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = null;
+
+            foreach (var vehicle in user.Vehicles.Where(v => !v.IsDeleted))
+            {
+                vehicle.IsDeleted = true;
+            }
+
+            var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
+            if (wallet != null)
+            {
+                wallet.Status = "Blocked";
+            }
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
         public async Task<PagedResultDTO<UserAdminSummaryDTO>> GetAllCustomersAsync(int page, int pageSize, string? searchKeyword, string? statusFilter)
         {
             var query = _context.Users

@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using AutoWashPro.BLL.DTOs;
 
 namespace AutoWashPro.BLL.Services
@@ -8,6 +8,7 @@ namespace AutoWashPro.BLL.Services
 
         Task<UserProfileDTO> GetProfileAsync(int userId);
         Task<bool> UpdateProfileAsync(int userId, UpdateUserProfileDTO request);
+        Task<bool> DeleteAccountAsync(int userId);
 
 
         Task<PagedResultDTO<UserAdminSummaryDTO>> GetAllCustomersAsync(int page, int pageSize, string? searchKeyword, string? statusFilter);
