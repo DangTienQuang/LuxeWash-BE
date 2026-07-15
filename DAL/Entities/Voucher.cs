@@ -56,5 +56,11 @@ namespace AutoWashPro.DAL.Entities
         public int? BranchId { get; set; }
         [ForeignKey("BranchId")]
         public Branch? Branch { get; set; }
+
+        [MaxLength(20)]
+        public string ApprovalStatus { get; set; } = "Approved"; // "Approved", "Proposed", "Rejected"
+
+        [MaxLength(500)]
+        public string? ProposalNote { get; set; }
     }
 }

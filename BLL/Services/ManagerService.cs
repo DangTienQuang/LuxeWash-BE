@@ -511,5 +511,35 @@ namespace AutoWashPro.BLL.Services
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.CheckAndTriggerMonthlyRevenueCampaignAsync(managerProfile.BranchId!.Value, month, year);
         }
+
+        public async Task<List<VoucherProposalDTO>> GetPendingProposalsAsync(int managerUserId)
+        {
+            var managerProfile = await GetManagerProfileAsync(managerUserId);
+            return await _branchRevenueAnalyticsService.GetPendingProposalsAsync(managerProfile.BranchId!.Value);
+        }
+
+        public async Task<VoucherProposalDTO> ModifyProposalAsync(int managerUserId, int voucherId, ModifyVoucherProposalDTO dto)
+        {
+            var managerProfile = await GetManagerProfileAsync(managerUserId);
+            return await _branchRevenueAnalyticsService.ModifyProposalAsync(managerProfile.BranchId!.Value, voucherId, dto);
+        }
+
+        public async Task<MonthlyRevenueCampaignResultDTO> ApproveProposalAsync(int managerUserId, int voucherId)
+        {
+            var managerProfile = await GetManagerProfileAsync(managerUserId);
+            return await _branchRevenueAnalyticsService.ApproveProposalAsync(managerProfile.BranchId!.Value, voucherId);
+        }
+
+        public async Task<bool> RejectProposalAsync(int managerUserId, int voucherId, string? rejectReason)
+        {
+            var managerProfile = await GetManagerProfileAsync(managerUserId);
+            return await _branchRevenueAnalyticsService.RejectProposalAsync(managerProfile.BranchId!.Value, voucherId, rejectReason);
+        }
+
+        public async Task<BranchComprehensiveStimulusDTO> GenerateComprehensiveStimulusAnalysisAsync(int managerUserId, int? month = null, int? year = null)
+        {
+            var managerProfile = await GetManagerProfileAsync(managerUserId);
+            return await _branchRevenueAnalyticsService.GenerateComprehensiveStimulusAnalysisAsync(managerProfile.BranchId!.Value, month, year);
+        }
     }
 }

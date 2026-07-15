@@ -162,3 +162,42 @@ Khi khách đến trễ 25 phút vì kẹt xe, Lễ tân/Staff tuyệt đối kh
   }
   ```
 - **Cơ chế vận hành:** Khi Khách Đặt Trước đi trễ quá 15 phút mà đơn vẫn đang giữ suất `Pending` (chưa hủy), Lễ tân/Quản lý chỉ cần bật cờ `ForceOverrideCapacity: true` khi tạo đơn Walk-in. Hệ thống bỏ qua bước chặn tải, lập tức đưa xe vãng lai vào khoang rửa (`Processing`), đảm bảo xưởng luôn lấp đầy công suất theo đúng chỉ đạo của Hội Đồng Quản Trị!
+
+---
+
+## 6. KIẾN TRÚC HỆ SINH THÁI AI NHÚNG TỰ ĐỘNG HÓA (`EMBEDDED AUTOMATED AI ENGINE`) & CƠ CHẾ KÍCH CẦU DOANH THU
+
+Hệ thống SmartWash Pro tích hợp một **Hệ sinh thái AI lai (Hybrid AI Ecosystem)** vận hành hoàn toàn ngầm bên dưới luồng nghiệp vụ (Embedded Pipeline), thay cho việc con người phải xuất file hoặc paste số liệu thủ công vào các AI Chatbot bên ngoài.
+
+### 6.1 Sơ đồ 3 Trụ cột AI trong Hệ thống
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   SMARTWASH PRO HYBRID AI ENGINE                                │
+├────────────────────────────────┬────────────────────────────────┬───────────────────────────────┤
+│    TRỤ CỘT 1: COMPUTER VISION  │     TRỤ CỘT 2: KNOWLEDGE AI    │     TRỤ CỘT 3: REVENUE AI     │
+│   (Nhận diện Barie Camera AI)  │  (Hệ chuyên gia Khách hàng)    │   (Kích cầu & Tối ưu Trạm)    │
+├────────────────────────────────┼────────────────────────────────┼───────────────────────────────┤
+│ • YOLOv8 Detection & ONNX      │ • Khai phá 7 nhóm đặc trưng    │ • Tự động đối chiếu Doanh thu │
+│ • Quét biển số & Hãng/Dòng xe  │   hành vi (`FeatureProfiles`)  │ • Tìm ngày trong tuần vắng xe │
+│ • Tự động Check-in / Check-out │ • Khớp Kịch bản cá nhân hóa    │ • Phát hiện khách quen rời bỏ │
+│ • Tự động tính giá theo phân   │ • Gợi ý giữ chân & CSKH thông  │ • Tự động "Vẽ ra" 2 kịch bản  │
+│   khúc (Sedan, SUV, Luxury...) │   minh theo thời gian thực     │   Voucher chờ Manager duyệt   │
+└────────────────────────────────┴────────────────────────────────┴───────────────────────────────┘
+```
+
+### 6.2 So sánh AI Thủ công vs AI Nhúng Tự Động Hóa trong SmartWash Pro
+- **Nếu dùng AI Chatbot thủ công:** Quản lý phải tự xuất báo cáo Excel $\rightarrow$ Copy & Paste số liệu vào ChatGPT/Claude $\rightarrow$ Gõ câu lệnh hỏi $\rightarrow$ Đọc kết quả văn bản $\rightarrow$ Lại tự đăng nhập vào hệ thống gõ tay tạo từng mã Voucher, tự chọn ngày hết hạn, % giảm giá $\rightarrow$ Rất tốn thời gian và dễ sai lệch.
+- **Trong SmartWash Pro (Tự động hóa 100%):**
+  1. **Tự chọc thẳng vào Database:** Khi Quản lý bấm nút *Phân tích Kích cầu* (`POST /api/v1/manager/revenue-stimulus/comprehensive-proposals`), Backend (`BranchRevenueAnalyticsService`) tự động đọc trực tiếp dữ liệu từ các bảng `Bookings`, `Vouchers`, `CustomerFeatureProfiles` trong tích tắc.
+  2. **Tự chạy suy luận & tính toán hành vi:** 
+     - Tự tính toán tỷ lệ sụt giảm doanh thu tháng này so với tháng trước (`CurrentMonthRevenue` vs `PreviousMonthRevenue`).
+     - Tự gom nhóm lịch sử `Bookings` theo ngày trong tuần để phát hiện 2 ngày có lưu lượng xe thấp nhất (`SlowestDaysOfWeek`, ví dụ: *Thứ 3, Thứ 4*).
+     - Tự lọc tập khách hàng thân thiết ($\ge 2$ lần ghé) đã **trên 45 ngày chưa ghé xưởng** (`AtRiskLoyalCustomersCount`).
+  3. **Tự khởi tạo bản ghi Voucher vào hệ thống:** AI trực tiếp khởi tạo sẵn 2 bản ghi `Voucher` vào Database với trạng thái `ApprovalStatus = "Proposed"` (Đang chờ duyệt):
+     - **Voucher 1 (`OFFPEAK_WEEKDAY`)**: Giảm $10\% - 20\%$ cho các ngày trong tuần vắng xe để lấp đầy công suất Làn rửa.
+     - **Voucher 2 (`LOYAL_WINBACK`)**: Giảm $15\% - 25\%$ tri ân nhóm khách VIP >45 ngày chưa tới để kéo họ quay lại ngay.
+     - Kèm theo **Ghi chú giải thích AI (`ProposalNote`)** tường tận cho Quản lý hiểu rõ lý do đề xuất.
+  4. **👉 Trải nghiệm tối thượng cho Quản lý:** Quản lý chỉ việc mở màn hình Dashboard là đã thấy AI phân tích xong, vẽ sẵn Voucher và giải thích lý do. Quản lý chỉ cần bấm **1 nút duy nhất [✔ Phê duyệt (`Approve`)]** là Voucher chính thức phát hành thẳng vào ví của khách hàng!
+
+---
+*Tài liệu tổng hợp bởi đội ngũ Kiến trúc sư Hệ thống SmartWash Pro.*

@@ -1,5 +1,6 @@
 using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
+using BLL.DTOs.Business;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
@@ -135,6 +136,41 @@ namespace API.Controllers.Manager
         {
             var result = await _managerService.CheckRevenueStimulusCampaignAsync(GetUserId(), month, year);
             return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
+        [HttpGet("revenue-stimulus/proposals")]
+        public async Task<IActionResult> GetPendingProposals()
+        {
+            var result = await _managerService.GetPendingProposalsAsync(GetUserId());
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
+        [HttpPut("revenue-stimulus/proposals/{voucherId}")]
+        public async Task<IActionResult> ModifyProposal(int voucherId, [FromBody] ModifyVoucherProposalDTO request)
+        {
+            var result = await _managerService.ModifyProposalAsync(GetUserId(), voucherId, request);
+            return Ok(new { statusCode = 200, message = "Proposal modified successfully.", data = result });
+        }
+
+        [HttpPost("revenue-stimulus/proposals/{voucherId}/approve")]
+        public async Task<IActionResult> ApproveProposal(int voucherId)
+        {
+            var result = await _managerService.ApproveProposalAsync(GetUserId(), voucherId);
+            return Ok(new { statusCode = 200, message = "Proposal approved and distributed successfully.", data = result });
+        }
+
+        [HttpPost("revenue-stimulus/proposals/{voucherId}/reject")]
+        public async Task<IActionResult> RejectProposal(int voucherId, [FromBody] RejectVoucherProposalDTO? request)
+        {
+            var result = await _managerService.RejectProposalAsync(GetUserId(), voucherId, request?.RejectReason);
+            return Ok(new { statusCode = 200, message = "Proposal rejected successfully.", data = result });
+        }
+
+        [HttpPost("revenue-stimulus/comprehensive-proposals")]
+        public async Task<IActionResult> GenerateComprehensiveProposals([FromQuery] int? month = null, [FromQuery] int? year = null)
+        {
+            var result = await _managerService.GenerateComprehensiveStimulusAnalysisAsync(GetUserId(), month, year);
+            return Ok(new { statusCode = 200, message = "Comprehensive analysis and proposals generated successfully.", data = result });
         }
     }
 }

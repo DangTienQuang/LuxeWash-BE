@@ -23,5 +23,10 @@ namespace AutoWashPro.BLL.Services
         Task<bool> DeleteTimeSlotAsync(int managerUserId, int slotId);
         Task<bool> DeactivateStaffAsync(int managerUserId, int staffUserId);
         Task<MonthlyRevenueCampaignResultDTO> CheckRevenueStimulusCampaignAsync(int managerUserId, int? month = null, int? year = null);
+        Task<List<VoucherProposalDTO>> GetPendingProposalsAsync(int managerUserId);
+        Task<VoucherProposalDTO> ModifyProposalAsync(int managerUserId, int voucherId, ModifyVoucherProposalDTO dto);
+        Task<MonthlyRevenueCampaignResultDTO> ApproveProposalAsync(int managerUserId, int voucherId);
+        Task<bool> RejectProposalAsync(int managerUserId, int voucherId, string? rejectReason);
+        Task<BranchComprehensiveStimulusDTO> GenerateComprehensiveStimulusAnalysisAsync(int managerUserId, int? month = null, int? year = null);
     }
 }

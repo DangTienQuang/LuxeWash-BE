@@ -10,6 +10,35 @@ Dưới đây là đặc tả chi tiết từng API endpoints và hướng dẫn
 
 ---
 
+## 🤖 MỤC 0: TỔNG QUAN HỆ SINH THÁI AI NHÚNG TỰ ĐỘNG HÓA (`EMBEDDED AUTOMATED AI ENGINE`) - GIẢI THÍCH CƠ CHẾ HOẠT ĐỘNG CHO FRONTEND
+
+Trước khi tích hợp các API bên dưới, đội ngũ Frontend và Quản trị hệ thống cần nắm rõ bản chất kiến trúc AI của SmartWash Pro. Hệ thống không sử dụng AI theo kiểu "nhập liệu thủ công vào chatbox" mà vận hành theo mô hình **AI Nhúng Tự Động Hóa Toàn Phần (Automated Embedded AI Pipeline)** gồm **3 trụ cột chính**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   SMARTWASH PRO HYBRID AI ENGINE                                │
+├────────────────────────────────┬────────────────────────────────┬───────────────────────────────┤
+│    TRỤ CỘT 1: COMPUTER VISION  │     TRỤ CỘT 2: KNOWLEDGE AI    │     TRỤ CỘT 3: REVENUE AI     │
+│   (Nhận diện Barie Camera AI)  │  (Hệ chuyên gia Khách hàng)    │   (Kích cầu & Tối ưu Trạm)    │
+├────────────────────────────────┼────────────────────────────────┼───────────────────────────────┤
+│ • YOLOv8 Detection & ONNX      │ • Khai phá 7 nhóm đặc trưng    │ • Tự động đối chiếu Doanh thu │
+│ • Quét biển số & Hãng/Dòng xe  │   hành vi (`FeatureProfiles`)  │ • Tìm ngày trong tuần vắng xe │
+│ • Tự động Check-in / Check-out │ • Khớp Kịch bản cá nhân hóa    │ • Phát hiện khách quen rời bỏ │
+│ • Tự động tính giá theo phân   │ • Gợi ý giữ chân & CSKH thông  │ • Tự động "Vẽ ra" 2 kịch bản  │
+│   khúc (Sedan, SUV, Luxury...) │   minh theo thời gian thực     │   Voucher chờ Manager duyệt   │
+└────────────────────────────────┴────────────────────────────────┴───────────────────────────────┘
+```
+
+### 🎯 Sự khác biệt giữa AI Thông Thường vs AI Nhúng Tự Động Hóa (Giải thích cho FE & Dev Team)
+- **❌ Nếu dùng AI thông thường (Thủ công):** Manager phải xuất file Excel từ DB $\rightarrow$ Copy & Paste số liệu vào ChatGPT $\rightarrow$ Gõ câu hỏi *"Hãy phân tích doanh thu và đề xuất voucher cho tôi"* $\rightarrow$ Đọc câu trả lời văn bản $\rightarrow$ Lại tự đăng nhập vào hệ thống gõ tay tạo từng mã Voucher, tự nhập ngày hết hạn, % giảm giá... rất chậm và dễ sai lệch.
+- **✔ Trong SmartWash Pro (Tự động hóa 100%):**
+  1. **AI tự đọc Database:** Khi Manager bấm nút *Phân tích Kích cầu* trên Dashboard (hoặc cron job chạy ngầm), Backend AI (`BranchRevenueAnalyticsService`) tự chọc thẳng vào DB (`Bookings`, `Vouchers`, `CustomerFeatureProfiles`) chỉ trong vài mili giây.
+  2. **AI tự tính toán toán học & hành vi:** Tự tính % sụt giảm doanh thu tháng này vs tháng trước $\rightarrow$ Tự quét nhịp sinh học xưởng tìm ra 2 ngày vắng xe nhất trong tuần (ví dụ: *Thứ 3, Thứ 4*) $\rightarrow$ Tự đếm số khách hàng VIP đã trên 45 ngày chưa ghé.
+  3. **AI tự khởi tạo bản ghi Voucher vào hệ thống:** Code AI tự khởi tạo sẵn các bản ghi `Voucher` trong Database với trạng thái `ApprovalStatus = "Proposed"` (Đang chờ duyệt), điền sẵn mã `OFFPEAK_WEEKDAY...`, `LOYAL_WINBACK...`, mức giảm $15\% - 20\%$ kèm **Lời giải thích AI (`ProposalNote`)** tường tận.
+  4. **👉 Nhiệm vụ của Frontend:** FE chỉ việc gọi API lấy danh sách đề xuất (`GET /proposals` & `POST /comprehensive-proposals`) và hiển thị lên UI Dashboard cho Manager xem. Manager chỉ việc bấm **1 nút duy nhất [✔ Phê duyệt (`Approve`)]** là Voucher lập tức chính thức phát hành vào ví khách hàng!
+
+---
+
 ## PHẦN 1: DÀNH CHO KHÁCH HÀNG (CUSTOMER APP - WEB & MOBILE)
 
 ### 1. API Kiểm tra Khung giờ trống & Gợi ý Chi nhánh Thông minh
@@ -154,10 +183,13 @@ Hệ thống Backend đã bổ sung bảo mật và ràng buộc nghiệp vụ c
 ### 1. API Kiểm tra Sức khỏe Doanh thu & Kích hoạt Chiến dịch Kích cầu (Tháng)
 Dành cho trang Dashboard của Quản lý chi nhánh (`Manager Role`). Quản lý có thể chủ động kiểm tra xem doanh thu tháng này so với tháng trước tăng hay giảm. Nếu sụt giảm, hệ thống tự động tạo mã giảm giá kích cầu và gửi cho khách hàng quen thuộc của chi nhánh.
 
+### 1. API Kiểm tra Sức khỏe Doanh thu & Khởi tạo Đề xuất Kích cầu (Tháng)
+Dành cho trang Dashboard của Quản lý chi nhánh (`Manager Role`). Quản lý có thể chủ động kiểm tra xem doanh thu tháng này so với tháng trước tăng hay giảm. Nếu sụt giảm, hệ thống **KHÔNG PHÁT VOUCHER TỰ ĐỘNG** mà sẽ tạo một **Đề xuất Voucher ở trạng thái chờ duyệt (`ApprovalStatus = "Proposed"`)** để Manager quyết định có chấp nhận, chỉnh sửa hay từ chối.
+
 * **Endpoint:** `POST /api/v1/manager/check-revenue-stimulus`
 * **Query Parameters (Tùy chọn):** `?month=7&year=2026` *(Nếu bỏ trống, hệ thống tự động lấy tháng/năm hiện tại theo UTC)*
 * **Headers:** `Authorization: Bearer {JWT_TOKEN_CUA_MANAGER}`
-* **Quyền hạn:** `Manager` *(Hệ thống tự động nhận diện `BranchId` từ profile của Manager đang đăng nhập)*
+* **Quyền hạn:** `Manager` *(Hệ thống tự động nhận diện `BranchId` từ profile của Manager)*
 
 #### 📤 Response 1: Doanh thu Tăng trưởng hoặc Ổn định (Không cần kích cầu)
 ```json
@@ -167,21 +199,22 @@ Dành cho trang Dashboard của Quản lý chi nhánh (`Manager Role`). Quản l
   "data": {
     "branchId": 1,
     "branchName": "Chi nhánh Trung tâm Quận 1",
-    "month": 7,
-    "year": 2026,
+    "targetMonth": 7,
+    "targetYear": 2026,
     "currentMonthRevenue": 150000000,
     "previousMonthRevenue": 120000000,
-    "growthRatePercentage": 25.0,
-    "requiresStimulusCampaign": false,
-    "statusMessage": "Doanh thu đang tăng trưởng tốt (+25%). Không cần kích cầu.",
+    "revenueDropPercentage": 0,
+    "isCampaignTriggered": false,
+    "approvalStatus": "N/A",
+    "message": "Doanh thu tháng 07/2026 của Chi nhánh Trung tâm Quận 1 đạt 150,000,000đ (ổn định hoặc tăng trưởng so với tháng trước 120,000,000đ). Không cần đề xuất phiếu giảm giá.",
     "generatedVoucherCode": null,
     "discountPercentage": 0,
-    "targetCustomersCount": 0
+    "grantedUsersCount": 0
   }
 }
 ```
 
-#### 📤 Response 2: Doanh thu Sụt giảm -> TỰ ĐỘNG PHÁT VOUCHER WIN-BACK CHO KHÁCH QUEN
+#### 📤 Response 2: Doanh thu Sụt giảm -> TẠO ĐỀ XUẤT VOUCHER CHỜ DUYỆT (`Proposed`)
 ```json
 {
   "statusCode": 200,
@@ -189,24 +222,199 @@ Dành cho trang Dashboard của Quản lý chi nhánh (`Manager Role`). Quản l
   "data": {
     "branchId": 1,
     "branchName": "Chi nhánh Trung tâm Quận 1",
-    "month": 7,
-    "year": 2026,
+    "targetMonth": 7,
+    "targetYear": 2026,
     "currentMonthRevenue": 80000000,
     "previousMonthRevenue": 120000000,
-    "growthRatePercentage": -33.33,
-    "requiresStimulusCampaign": true,
-    "statusMessage": "Doanh thu giảm -33.33% so với tháng trước. Đã tự động kích hoạt chiến dịch phát phiếu giảm giá 16.66% cho 45 khách hàng quen thuộc của chi nhánh.",
-    "generatedVoucherCode": "WINBACK_BR1_7_2026",
-    "discountPercentage": 16.66,
-    "targetCustomersCount": 45
+    "revenueDropPercentage": 33.33,
+    "isCampaignTriggered": false,
+    "approvalStatus": "Proposed",
+    "message": "Doanh thu giảm 33.33%. Hệ thống đã tạo ĐỀ XUẤT Voucher (WINBACK_BR1_M07Y2026_15%) chờ Manager xét duyệt (Số khách quen mục tiêu: ~45 người).",
+    "generatedVoucherCode": "WINBACK_BR1_M07Y2026_15%",
+    "discountPercentage": 15,
+    "grantedUsersCount": 0
   }
 }
 ```
 
-#### 💻 Hướng dẫn triển khai UI Dashboard cho Manager:
-- Thêm widget/card: **"Sức khỏe Doanh thu Tháng {month}/{year}"** kèm nút bấm **[📊 Đánh giá & Kích cầu Doanh thu]**.
-- Hiển thị bảng so sánh: Doanh thu tháng hiện tại (`currentMonthRevenue`) vs Doanh thu tháng trước (`previousMonthRevenue`), hiển thị % tăng trưởng (`growthRatePercentage`) với màu Xanh (nếu >= 0) hoặc màu Đỏ (nếu < 0).
-- Nếu `requiresStimulusCampaign == true`, hiển thị thông báo thành công: *"🎯 Đã tự động phát hành mã **{generatedVoucherCode}** (Giảm **{discountPercentage}%**) vào ví của **{targetCustomersCount}** khách hàng quen thuộc trong 60 ngày qua để kéo họ quay lại rửa xe!"*
+---
+
+### 2. API Lấy Danh sách Đề xuất Voucher đang chờ duyệt (`GET /api/v1/manager/revenue-stimulus/proposals`)
+FE hiển thị danh sách các đề xuất voucher kích cầu đang chờ xét duyệt (`ApprovalStatus == "Proposed"`) trên Dashboard của Manager.
+
+* **Endpoint:** `GET /api/v1/manager/revenue-stimulus/proposals`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUA_MANAGER}`
+
+#### 📤 Response:
+```json
+{
+  "statusCode": 200,
+  "message": "Success",
+  "data": [
+    {
+      "voucherId": 88,
+      "code": "WINBACK_BR1_M07Y2026_15%",
+      "discountAmount": 15,
+      "maxUsages": 999999,
+      "expiryDays": 30,
+      "approvalStatus": "Proposed",
+      "proposalNote": "Doanh thu tháng 07/2026 của Chi nhánh Trung tâm Quận 1 giảm 33.33% (còn 80,000,000đ so với 120,000,000đ). Đề xuất Voucher giảm 15% để kéo khách hàng trở lại.",
+      "branchId": 1,
+      "branchName": "Chi nhánh Trung tâm Quận 1",
+      "targetMonth": 7,
+      "targetYear": 2026,
+      "estimatedTargetCustomers": 45,
+      "createdAt": "2026-07-15T08:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### 3. API Sửa đổi Đề xuất Voucher (`PUT /api/v1/manager/revenue-stimulus/proposals/{voucherId}`)
+Cho phép Manager điều chỉnh lại mã code, mức giảm discount (% hoặc tiền mặt), số lượng tối đa và thời gian hết hạn của voucher trước khi duyệt phát hành.
+
+* **Endpoint:** `PUT /api/v1/manager/revenue-stimulus/proposals/{voucherId}`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUA_MANAGER}`
+* **Request Body:** *(Gửi các trường muốn cập nhật, trường nào giữ nguyên có thể bỏ qua)*
+```json
+{
+  "code": "WINBACK_BR1_VIP_20%",
+  "discountAmount": 20,
+  "maxUsages": 100,
+  "expiryDays": 15,
+  "proposalNote": "Quản lý nâng mức giảm lên 20% và giới hạn 100 lượt dùng đầu tiên trong 15 ngày."
+}
+```
+
+---
+
+### 4. API Phê duyệt Đề xuất Voucher (`POST /api/v1/manager/revenue-stimulus/proposals/{voucherId}/approve`)
+Khi Manager bấm **[✔ Chấp nhận & Phát hành Voucher]**, hệ thống chuyển `ApprovalStatus = "Approved"`, kích hoạt `IsActive = true` và **chính thức phát hành Voucher vào ví (`UserVouchers`) của tập khách hàng mục tiêu**.
+
+* **Endpoint:** `POST /api/v1/manager/revenue-stimulus/proposals/{voucherId}/approve`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUA_MANAGER}`
+
+#### 📤 Response:
+```json
+{
+  "statusCode": 200,
+  "message": "Proposal approved and distributed successfully.",
+  "data": {
+    "branchId": 1,
+    "branchName": "Chi nhánh Trung tâm Quận 1",
+    "targetMonth": 7,
+    "targetYear": 2026,
+    "isCampaignTriggered": true,
+    "approvalStatus": "Approved",
+    "message": "Đã PHÊ DUYỆT thành công đề xuất Voucher 'WINBACK_BR1_VIP_20%'. Đã phát hành và gửi vào ví của 45 khách hàng quen thuộc!",
+    "generatedVoucherCode": "WINBACK_BR1_VIP_20%",
+    "discountPercentage": 20,
+    "grantedUsersCount": 45
+  }
+}
+```
+
+---
+
+### 5. API Từ chối Đề xuất Voucher (`POST /api/v1/manager/revenue-stimulus/proposals/{voucherId}/reject`)
+Khi Manager bấm **[✖ Từ chối Đề xuất]**, hệ thống đóng đề xuất (`ApprovalStatus = "Rejected"`, `IsActive = false`) và không gửi phiếu giảm giá nào cho khách.
+
+* **Endpoint:** `POST /api/v1/manager/revenue-stimulus/proposals/{voucherId}/reject`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUA_MANAGER}`
+* **Request Body (Tùy chọn):**
+```json
+{
+  "rejectReason": "Doanh thu giảm do xưởng sửa chữa nâng cấp hệ thống 5 ngày, không cần kích cầu."
+}
+```
+
+---
+
+### 6. API Phân Tích Tổng Hợp Doanh Thu, Lưu Lượng & Đề Xuất 2 Kịch Bản Voucher (`POST /api/v1/manager/revenue-stimulus/comprehensive-proposals`)
+Đây là API thông minh và toàn diện nhất dành cho Manager khi muốn AI kiểm tra và đối chiếu đồng thời: **(1) Mức doanh thu hiện tại vs tháng trước**, **(2) Thống kê lưu lượng khách ra vào trong tháng và ngày vắng khách**, và **(3) Số lượng khách hàng thân thiết có dấu hiệu rời bỏ (>45 ngày chưa quay lại)**. Dựa trên dữ liệu doanh thu, hệ thống tự động tính toán tỷ lệ giảm giá phù hợp nhất và "vẽ ra" 2 kịch bản đề xuất (`OFFPEAK_WEEKDAY` và `LOYAL_WINBACK`) trong danh sách chờ duyệt.
+
+* **Endpoint:** `POST /api/v1/manager/revenue-stimulus/comprehensive-proposals?month=7&year=2026` *(month, year tùy chọn, mặc định lấy tháng/năm hiện tại)*
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUA_MANAGER}`
+
+#### 📤 Response:
+```json
+{
+  "statusCode": 200,
+  "message": "Comprehensive analysis and proposals generated successfully.",
+  "data": {
+    "branchId": 1,
+    "branchName": "Chi nhánh Trung tâm Quận 1",
+    "targetMonth": 7,
+    "targetYear": 2026,
+    "previousMonthRevenue": 150000000,
+    "currentMonthRevenue": 125000000,
+    "revenueDropPercentage": 16.67,
+    "isRevenueHealthy": false,
+    "trafficAndCustomerStats": {
+      "totalCheckInsThisMonth": 240,
+      "averageDailyCheckIns": 16.0,
+      "slowestDaysOfWeek": "Thứ 3, Thứ 4",
+      "atRiskLoyalCustomersCount": 38,
+      "activeCustomersCount": 185
+    },
+    "proposedVouchers": [
+      {
+        "voucherId": 12,
+        "code": "OFFPEAK_B1_M07Y2026_15",
+        "discountAmount": 15,
+        "maxUsages": 100,
+        "expiryDays": 30,
+        "approvalStatus": "Proposed",
+        "proposalNote": "[Phân tích AI] Đối chiếu doanh thu tháng 07/2026 sụt giảm 16.67%, phát hiện lưu lượng vào Thứ 3, Thứ 4 rất thấp (trung bình ~16 xe/ngày). Đề xuất giảm 15% cho các ngày vắng khách nhằm tối ưu công suất xưởng.",
+        "branchId": 1,
+        "branchName": "Chi nhánh Trung tâm Quận 1",
+        "targetMonth": 7,
+        "targetYear": 2026,
+        "previousMonthRevenue": 150000000,
+        "currentMonthRevenue": 125000000,
+        "revenueDropPercentage": 16.67,
+        "estimatedTargetCustomers": 480,
+        "createdAt": "2026-07-15T08:15:00Z"
+      },
+      {
+        "voucherId": 13,
+        "code": "LOYAL_B1_M07Y2026_20",
+        "discountAmount": 20,
+        "maxUsages": 76,
+        "expiryDays": 20,
+        "approvalStatus": "Proposed",
+        "proposalNote": "[Phân tích AI] Đối chiếu doanh thu giảm 16.67%, hệ thống phát hiện có 38 khách hàng thân thiết (>2 lượt) đã hơn 45 ngày chưa quay lại. Đề xuất ưu đãi 20% để tri ân và kéo nhóm VIP quay lại ngay.",
+        "branchId": 1,
+        "branchName": "Chi nhánh Trung tâm Quận 1",
+        "targetMonth": 7,
+        "targetYear": 2026,
+        "previousMonthRevenue": 150000000,
+        "currentMonthRevenue": 125000000,
+        "revenueDropPercentage": 16.67,
+        "estimatedTargetCustomers": 38,
+        "createdAt": "2026-07-15T08:15:00Z"
+      }
+    ],
+    "comprehensiveAnalysisSummary": "Doanh thu tháng 07/2026 đạt 125,000,000đ (giảm 16.67% so với tháng trước 150,000,000đ). Lưu lượng khách trung bình 16 xe/ngày, vắng nhất vào Thứ 3, Thứ 4. Phát hiện 38 khách hàng thân thiết (>45 ngày chưa quay lại). Hệ thống đã tạo 2 đề xuất mã ưu đãi tối ưu hóa theo tỷ lệ doanh thu hiện tại."
+  }
+}
+```
+
+---
+
+#### 💻 Hướng dẫn triển khai UI Dashboard cho Manager (FE):
+- Nút bấm chính trên Dashboard: **[🤖 Phân Tích Kích Cầu & Đề Xuất Khuyến Mãi AI]** $\rightarrow$ Khi gọi `POST /api/v1/manager/revenue-stimulus/comprehensive-proposals`.
+- **Phần 1 - Bảng Thống Kê Tổng Hợp (Summary Header):** Hiển thị đoạn `comprehensiveAnalysisSummary` cùng các thẻ KPI:
+  - Doanh thu: `currentMonthRevenue` (Đang giảm/tăng `revenueDropPercentage`%)
+  - Lưu lượng trung bình/ngày: `averageDailyCheckIns` xe/ngày (Vắng nhất: `slowestDaysOfWeek`)
+  - Khách quen sắp rời bỏ: `atRiskLoyalCustomersCount` khách (>45 ngày chưa đến)
+- **Phần 2 - Danh Sách Các Đề Xuất (`proposedVouchers`):** Hiển thị từng thẻ `VoucherProposalDTO` đang ở trạng thái `Proposed`.
+- Cung cấp bộ 3 nút bấm thao tác cho Manager trên từng thẻ:
+  1. **[✏️ Sửa đổi thông số (`Modify`)]** $\rightarrow$ Mở modal nhập `% giảm giá`, `Số ngày hết hạn` $\rightarrow$ Gọi `PUT /proposals/{id}`.
+  2. **[✔ Phê duyệt & Phát hành ngay (`Approve`)]** $\rightarrow$ Gọi `POST /proposals/{id}/approve` $\rightarrow$ Phát hành thẳng vào ví khách hàng.
+  3. **[✖ Từ chối (`Reject`)]** $\rightarrow$ Gọi `POST /proposals/{id}/reject`.
 
 ---
 ---
