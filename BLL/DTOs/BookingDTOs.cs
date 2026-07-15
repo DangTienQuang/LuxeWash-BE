@@ -151,6 +151,8 @@ namespace AutoWashPro.BLL.DTOs
         public string? ReturnUrl { get; set; }
 
         public string? CancelUrl { get; set; }
+
+        public bool ForceOverrideCapacity { get; set; } = false;
     }
 
     public class WalkInBookingResponseDTO : BookingResponseDTO

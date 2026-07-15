@@ -17,5 +17,7 @@ namespace AutoWashPro.BLL.DTOs
         public DateTime? ProcessingStartTime { get; set; }
         public DateTime? CompletedTime { get; set; }
         public int? ActualDurationMinutes { get; set; }
+        public string? CustomerTierName { get; set; }
+        public int? CustomerTierPoints { get; set; }
     }
 }

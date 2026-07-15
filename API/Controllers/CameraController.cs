@@ -30,5 +30,19 @@ namespace API.Controllers.AI
                 return BadRequest(new { statusCode = 400, message = ex.Message });
             }
         }
+
+        [HttpPost("check-out")]
+        public async Task<IActionResult> AutoCheckOutByCamera([FromQuery] string plate)
+        {
+            try
+            {
+                var result = await _bookingService.AutoCheckOutByLicensePlateAsync(plate);
+                return Ok(new { statusCode = 200, message = "Vehicle check-out completed, barrier opening!", data = result });
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(new { statusCode = 400, message = ex.Message });
+            }
+        }
     }
 }

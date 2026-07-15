@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -52,5 +52,9 @@ namespace AutoWashPro.DAL.Entities
         public int? InactiveDays { get; set; }
         public int? ResendAfterDays { get; set; }
         public int? MilestoneUsageCount { get; set; }
+
+        public int? BranchId { get; set; }
+        [ForeignKey("BranchId")]
+        public Branch? Branch { get; set; }
     }
 }

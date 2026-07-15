@@ -189,6 +189,7 @@ builder.Services.AddScoped<IStaffManagementService, StaffManagementService>();
 builder.Services.AddScoped<ICRMCampaignService, CRMCampaignService>();
 builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 builder.Services.AddScoped<IOccupancyService, OccupancyService>();
+builder.Services.AddScoped<IBranchRevenueAnalyticsService, BranchRevenueAnalyticsService>();
 builder.Services.AddScoped<IAnnualTierService, AnnualTierService>();
 builder.Services.AddScoped<IFeatureGenerationService, FeatureGenerationService>();
 builder.Services.AddScoped<IScenarioEvaluationService, ScenarioEvaluationService>();

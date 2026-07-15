@@ -129,5 +129,12 @@ namespace API.Controllers.Manager
             await _managerService.DeactivateStaffAsync(GetUserId(), userId);
             return Ok(new { Message = "Staff deactivated successfully." });
         }
+
+        [HttpPost("check-revenue-stimulus")]
+        public async Task<IActionResult> CheckRevenueStimulus([FromQuery] int? month = null, [FromQuery] int? year = null)
+        {
+            var result = await _managerService.CheckRevenueStimulusCampaignAsync(GetUserId(), month, year);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
     }
 }

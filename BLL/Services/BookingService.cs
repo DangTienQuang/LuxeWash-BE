@@ -8,6 +8,7 @@ using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using BLL.Helpers;
 using Microsoft.EntityFrameworkCore;
+using AutoWashPro.BLL.Services.Interface;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -21,6 +22,7 @@ namespace AutoWashPro.BLL.Services
         private readonly IVoucherCampaignService _voucherCampaignService;
         private readonly IPayOsService _payOsService;
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
+        private readonly IOccupancyService _occupancyService;
 
         public BookingService(
             AutoWashDbContext context,
@@ -30,7 +32,8 @@ namespace AutoWashPro.BLL.Services
             IVoucherService voucherService,
             IVoucherCampaignService voucherCampaignService,
             IPayOsService payOsService,
-            IBookingMaterialUsageService bookingMaterialUsageService)
+            IBookingMaterialUsageService bookingMaterialUsageService,
+            IOccupancyService occupancyService)
         {
             _context = context;
             _walletService = walletService;
@@ -40,6 +43,7 @@ namespace AutoWashPro.BLL.Services
             _voucherCampaignService = voucherCampaignService;
             _payOsService = payOsService;
             _bookingMaterialUsageService = bookingMaterialUsageService;
+            _occupancyService = occupancyService;
         }
 
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
@@ -90,7 +94,7 @@ namespace AutoWashPro.BLL.Services
                 .Where(dc => dc.BranchId == request.BranchId && dc.Date == request.TargetDate.Date)
                 .ToDictionaryAsync(dc => dc.SlotId, dc => dc.BookedWeight);
 
-            bool isVip = userProfile.Tier.TierName.ToLower() == "gold" || userProfile.Tier.TierName.ToLower() == "platinum";
+            bool isVip = userProfile.Tier != null && (userProfile.Tier.MinAccumulatedPoints >= 5000 || string.Equals(userProfile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase));
 
             // 3. VÒNG LẶP KIỂM TRA TỪNG SLOT
             foreach (var slot in allSlots)
@@ -128,6 +132,151 @@ namespace AutoWashPro.BLL.Services
                 }
 
                 response.Add(slotDto);
+            }
+
+            return response;
+        }
+
+        private double CalculateHaversineDistanceKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371.0; // Earth radius in km
+            var dLat = (lat2 - lat1) * Math.PI / 180.0;
+            var dLon = (lon2 - lon1) * Math.PI / 180.0;
+            var a = Math.Sin(dLat / 2.0) * Math.Sin(dLat / 2.0) +
+                    Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0) *
+                    Math.Sin(dLon / 2.0) * Math.Sin(dLon / 2.0);
+            var c = 2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a));
+            return R * c;
+        }
+
+        public async Task<CheckSlotsWithSuggestionResponseDTO> GetAvailableSlotsWithSuggestionAsync(int userId, CheckAvailableSlotsRequestDTO request)
+        {
+            var slots = await GetAvailableSlotsAsync(userId, request);
+            var currentBranch = await _context.Branches.FirstOrDefaultAsync(b => b.BranchId == request.BranchId);
+            if (currentBranch == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Branch not found.");
+
+            double currentOccupancyRate = await _occupancyService.GetBranchOccupancyRateAsync(request.BranchId, request.TargetDate);
+            bool isOverloaded = currentOccupancyRate >= 0.80 || !slots.Any(s => s.IsAvailable);
+
+            var response = new CheckSlotsWithSuggestionResponseDTO
+            {
+                CurrentBranchId = currentBranch.BranchId,
+                CurrentBranchName = currentBranch.Name,
+                CurrentOccupancyRate = Math.Round(currentOccupancyRate, 2),
+                IsOverloaded = isOverloaded,
+                TimeSlots = slots,
+                HasAlternativeSuggestion = false
+            };
+
+            if (!isOverloaded)
+            {
+                response.StatusMessage = "Chi nhánh đang có sẵn lịch trống và công suất phục vụ tốt.";
+                return response;
+            }
+
+            response.StatusMessage = $"Chi nhánh {currentBranch.Name} hiện đang rất đông ({currentOccupancyRate * 100:F0}% kín lịch). Thời gian chờ có thể kéo dài.";
+
+            if (!currentBranch.Latitude.HasValue || !currentBranch.Longitude.HasValue)
+            {
+                return response;
+            }
+
+            var altBranches = await _context.Branches
+                .Where(b => b.IsActive && b.BranchId != request.BranchId && b.Latitude != null && b.Longitude != null)
+                .ToListAsync();
+
+            var candidates = new List<(Branch Branch, double DistanceKm, double OccupancyRate, int AvailableCount)>();
+
+            foreach (var alt in altBranches)
+            {
+                double dist = CalculateHaversineDistanceKm(currentBranch.Latitude.Value, currentBranch.Longitude.Value, alt.Latitude!.Value, alt.Longitude!.Value);
+                if (dist <= 15.0) // Within 15 km
+                {
+                    double altOcc = await _occupancyService.GetBranchOccupancyRateAsync(alt.BranchId, request.TargetDate);
+                    var altSlots = await _context.TimeSlots.Where(s => s.BranchId == alt.BranchId).ToListAsync();
+                    var dailyCaps = await _context.DailySlotCapacities
+                        .Where(dc => dc.BranchId == alt.BranchId && dc.Date == request.TargetDate.Date)
+                        .ToDictionaryAsync(dc => dc.SlotId, dc => dc.BookedWeight);
+
+                    int availCount = 0;
+                    foreach (var s in altSlots)
+                    {
+                        int booked = dailyCaps.TryGetValue(s.SlotId, out int w) ? w : 0;
+                        if (booked < s.MaxCapacity) availCount++;
+                    }
+
+                    if (availCount > 0 && altOcc < 0.70)
+                    {
+                        candidates.Add((alt, dist, altOcc, availCount));
+                    }
+                }
+            }
+
+            var bestAlt = candidates
+                .OrderBy(c => c.OccupancyRate)
+                .ThenBy(c => c.DistanceKm)
+                .FirstOrDefault();
+
+            if (bestAlt.Branch != null)
+            {
+                string voucherCode = $"SWITCH_BR{bestAlt.Branch.BranchId}_15%";
+                var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == voucherCode);
+                if (voucher == null)
+                {
+                    voucher = new Voucher
+                    {
+                        Code = voucherCode,
+                        DiscountAmount = 15,
+                        VoucherType = AutoWashPro.DAL.Enums.VoucherType.Discount,
+                        CampaignType = AutoWashPro.DAL.Enums.VoucherCampaignType.Winback,
+                        BranchId = bestAlt.Branch.BranchId,
+                        ExpiryDays = 1,
+                        MaxUsagePerUser = 5,
+                        MaxUsages = 999999,
+                        IsActive = true,
+                        StartDate = DateTime.UtcNow,
+                        ExpiryDate = DateTime.UtcNow.AddYears(1)
+                    };
+                    _context.Vouchers.Add(voucher);
+                    await _context.SaveChangesAsync();
+                }
+
+                if (userId > 0)
+                {
+                    bool hasUserVoucher = await _context.UserVouchers.AnyAsync(uv => uv.UserId == userId && uv.VoucherId == voucher.VoucherId && uv.ExpiryDate >= DateTime.UtcNow && !uv.IsUsed);
+                    if (!hasUserVoucher)
+                    {
+                        _context.UserVouchers.Add(new UserVoucher
+                        {
+                            UserId = userId,
+                            VoucherId = voucher.VoucherId,
+                            ReceivedDate = DateTime.UtcNow,
+                            ExpiryDate = DateTime.UtcNow.AddDays(1),
+                            IsUsed = false,
+                            TriggerKey = $"SwitchBranch_BR{bestAlt.Branch.BranchId}"
+                        });
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                response.HasAlternativeSuggestion = true;
+                response.SuggestedAlternative = new SuggestedBranchInfoDTO
+                {
+                    BranchId = bestAlt.Branch.BranchId,
+                    BranchName = bestAlt.Branch.Name,
+                    Address = bestAlt.Branch.Address,
+                    DistanceKm = Math.Round(bestAlt.DistanceKm, 1),
+                    OccupancyRate = Math.Round(bestAlt.OccupancyRate, 2),
+                    AvailableSlotsCount = bestAlt.AvailableCount
+                };
+                response.IncentiveVoucher = new SwitchBranchIncentiveVoucherDTO
+                {
+                    VoucherId = voucher.VoucherId,
+                    VoucherCode = voucher.Code,
+                    DiscountPercentage = 15,
+                    Description = $"🎁 Tặng ngay Mã giảm giá 15% khi bạn đặt lịch sang {bestAlt.Branch.Name} hôm nay!",
+                    ExpiresInHours = 24
+                };
             }
 
             return response;
@@ -573,7 +722,7 @@ namespace AutoWashPro.BLL.Services
 
             bool isStatusValid = false;
             if (newStatus == "CheckedIn" && booking.Status == "Pending") isStatusValid = true;
-            else if (newStatus == "Completed" && booking.Status == "CheckedIn") isStatusValid = true;
+            else if (newStatus == "Completed" && (booking.Status == "CheckedIn" || booking.Status == "Processing")) isStatusValid = true;
             else if ((newStatus == "Cancelled" || newStatus == "Delayed") && (booking.Status == "Pending" || booking.Status == "CheckedIn")) isStatusValid = true;
 
             if (!isStatusValid)
@@ -606,6 +755,103 @@ namespace AutoWashPro.BLL.Services
                 ActualDurationMinutes = booking.ActualDurationMinutes
             };
         }
+
+        public async Task<BookingResponseDTO> AutoCheckOutByLicensePlateAsync(string licensePlate)
+        {
+            var normalizedPlate = NormalizeLicensePlate(licensePlate);
+            if (string.IsNullOrEmpty(normalizedPlate))
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
+
+            // 1. Tìm trong Bookings (bao gồm cả xe cá nhân, xe đặt trước, khách vãng lai tạo qua CreateWalkInBookingAsync)
+            var activeBooking = await _context.Bookings
+                .Include(b => b.BookingDetails)
+                    .ThenInclude(bd => bd.Service)
+                .Where(b => NormalizeLicensePlate(b.LicensePlate) == normalizedPlate
+                         && (b.Status == "CheckedIn" || b.Status == "Processing"))
+                .OrderByDescending(b => b.BookingId)
+                .FirstOrDefaultAsync();
+
+            // 2. Tìm trong FleetWashLogs (xe doanh nghiệp check-in vãng lai / hạm đội)
+            var activeFleetLog = await _context.FleetWashLogs
+                .Include(x => x.FleetVehicle)
+                .Include(x => x.Booking)
+                    .ThenInclude(b => b!.BookingDetails)
+                        .ThenInclude(bd => bd.Service)
+                .Where(x => NormalizeLicensePlate(x.FleetVehicle.LicensePlate) == normalizedPlate
+                         && (x.Status == "CheckedIn" || x.Status == "Processing" || x.Status == "Assigned"))
+                .OrderByDescending(x => x.FleetWashLogId)
+                .FirstOrDefaultAsync();
+
+            if (activeBooking == null && activeFleetLog == null)
+            {
+                throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No active wash session (CheckedIn/Processing) found for vehicle {licensePlate} to complete check-out.");
+            }
+
+            // Ưu tiên Booking nếu có
+            Booking? targetBooking = activeBooking ?? activeFleetLog?.Booking;
+
+            if (targetBooking != null)
+            {
+                if (targetBooking.FinalAmount > 0 && !await HasCompletedBookingPaymentAsync(targetBooking.BookingId))
+                {
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking is unpaid; cannot check out barrier.");
+                }
+
+                await UpdateBookingStatusAsync(targetBooking.BookingId, "Completed");
+
+                if (activeFleetLog != null && activeFleetLog.Status != "Completed")
+                {
+                    activeFleetLog.Status = "Completed";
+                    activeFleetLog.CompletedTime = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                }
+
+                var updatedBooking = await _context.Bookings
+                    .Include(b => b.BookingDetails)
+                        .ThenInclude(bd => bd.Service)
+                    .FirstOrDefaultAsync(b => b.BookingId == targetBooking.BookingId) ?? targetBooking;
+
+                return new BookingResponseDTO
+                {
+                    BookingId = updatedBooking.BookingId,
+                    LicensePlate = normalizedPlate,
+                    ServiceNames = updatedBooking.BookingDetails.Select(d => d.Service.ServiceName).ToList(),
+                    ScheduledTime = updatedBooking.ScheduledTime,
+                    Status = "Completed",
+                    OriginalPrice = updatedBooking.OriginalPrice,
+                    PointDiscountAmount = updatedBooking.PointDiscountAmount,
+                    VoucherDiscountAmount = updatedBooking.VoucherDiscountAmount,
+                    FinalAmount = updatedBooking.FinalAmount,
+                    ProcessingStartTime = updatedBooking.ProcessingStartTime.HasValue ? updatedBooking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
+                    CompletedTime = updatedBooking.CompletedTime.HasValue ? updatedBooking.CompletedTime.Value.ToVnTime() : DateTime.UtcNow.ToVnTime(),
+                    ActualDurationMinutes = updatedBooking.ActualDurationMinutes
+                };
+            }
+            else if (activeFleetLog != null)
+            {
+                activeFleetLog.Status = "Completed";
+                activeFleetLog.CompletedTime = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                return new BookingResponseDTO
+                {
+                    BookingId = activeFleetLog.FleetWashLogId,
+                    LicensePlate = normalizedPlate,
+                    ServiceNames = new List<string> { "Fleet Wash Service" },
+                    ScheduledTime = activeFleetLog.CheckInTime,
+                    Status = "Completed",
+                    OriginalPrice = activeFleetLog.WashCost,
+                    PointDiscountAmount = 0,
+                    VoucherDiscountAmount = 0,
+                    FinalAmount = activeFleetLog.WashCost,
+                    ProcessingStartTime = activeFleetLog.CheckInTime.ToVnTime(),
+                    CompletedTime = activeFleetLog.CompletedTime.Value.ToVnTime(),
+                    ActualDurationMinutes = (int)Math.Max(1, Math.Round((activeFleetLog.CompletedTime.Value - activeFleetLog.CheckInTime).TotalMinutes))
+                };
+            }
+
+            throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No active wash session found for vehicle {licensePlate}.");
+        }
         public async Task<bool> UpdateBookingStatusAsync(int bookingId, string newStatus)
         {
             var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == bookingId);
@@ -631,6 +877,13 @@ namespace AutoWashPro.BLL.Services
 
             if (isCompletingNow)
             {
+                booking.CompletedTime = DateTime.UtcNow;
+                if (booking.ProcessingStartTime.HasValue)
+                {
+                    var duration = (int)Math.Round((booking.CompletedTime.Value - booking.ProcessingStartTime.Value).TotalMinutes);
+                    booking.ActualDurationMinutes = duration < 1 ? 1 : duration;
+                }
+
                 if (booking.UserId > 0)
                 {
                     var userProfile = await _context.CustomerProfiles
@@ -681,10 +934,10 @@ namespace AutoWashPro.BLL.Services
                 if (profile == null || profile.Tier == null)
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Membership tier information not found.");
 
-                string tierName = profile.Tier.TierName.ToLower();
-                if (tierName != "gold" && tierName != "platinum")
+                bool isVipTier = profile.Tier.MinAccumulatedPoints >= 5000 || string.Equals(profile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(profile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(profile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase);
+                if (!isVipTier)
                 {
-                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("This time slot is exclusive to Gold and Platinum members.");
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("This time slot is exclusive to VIP members (Gold tier or above).");
                 }
             }
 
@@ -879,7 +1132,7 @@ namespace AutoWashPro.BLL.Services
 
             // PHASE 4: Financial Math
             var (voucherDiscount, pointDiscount, pointsUsed, finalAmount, userVoucher) =
-                await CalculateBookingPricingAsync(userId, totalOriginalPrice, request.VoucherId, request.PointsToUse, targetDateTime, vehicleTypeQuery.VehicleTypeId);
+                await CalculateBookingPricingAsync(userId, totalOriginalPrice, request.VoucherId, request.PointsToUse, targetDateTime, vehicleTypeQuery.VehicleTypeId, request.BranchId);
 
             // PHASE 5: Transaction
             var paymentMethod = request.PaymentMethod?.Trim() ?? "Wallet";
@@ -1177,7 +1430,7 @@ namespace AutoWashPro.BLL.Services
         }
 
         private async Task<(decimal voucherDiscount, decimal pointDiscount, int pointsUsed, decimal finalAmount, UserVoucher? userVoucher)>
-            CalculateBookingPricingAsync(int userId, decimal originalPrice, int? voucherId, int pointsToUseRequest, DateTime scheduledTime, int vehicleTypeId)
+            CalculateBookingPricingAsync(int userId, decimal originalPrice, int? voucherId, int pointsToUseRequest, DateTime scheduledTime, int vehicleTypeId, int branchId)
         {
             decimal voucherDiscount = 0;
             UserVoucher? userVoucher = null;
@@ -1186,9 +1439,14 @@ namespace AutoWashPro.BLL.Services
             {
                 userVoucher = await _context.UserVouchers
                     .Include(uv => uv.Voucher)
+                        .ThenInclude(v => v.Branch)
                     .FirstOrDefaultAsync(uv => uv.VoucherId == voucherId.Value && uv.UserId == userId);
 
                 if (userVoucher == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("You do not own this voucher.");
+                if (userVoucher.Voucher.BranchId.HasValue && userVoucher.Voucher.BranchId.Value != branchId)
+                {
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException($"This voucher is only valid for use at branch #{userVoucher.Voucher.BranchId.Value} ({userVoucher.Voucher.Branch?.Name ?? "Designated Branch"}).");
+                }
                 if (userVoucher.Voucher.VehicleTypeId.HasValue && userVoucher.Voucher.VehicleTypeId.Value != vehicleTypeId)
                 {
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("This voucher does not apply to your vehicle type.");
@@ -1619,7 +1877,7 @@ namespace AutoWashPro.BLL.Services
                     }
                 }
 
-                if (dailyCapacity.BookedWeight + maxCapacityWeight > slot.MaxCapacity)
+                if (!request.ForceOverrideCapacity && dailyCapacity.BookedWeight + maxCapacityWeight > slot.MaxCapacity)
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Insufficient shop capacity for this vehicle right now. Please try again later.");
 
                 dailyCapacity.BookedWeight += maxCapacityWeight;
@@ -1726,7 +1984,7 @@ namespace AutoWashPro.BLL.Services
                     if (isWalletPayment)
                     {
                         var (voucherDiscount, pointDiscount, pointsUsed, finalAmount, userVoucher) =
-                            await CalculateBookingPricingAsync(customerUserId.Value, totalOriginalPrice, request.VoucherId, request.PointsToUse, targetDateTime, vehicleTypeQuery.VehicleTypeId);
+                            await CalculateBookingPricingAsync(customerUserId.Value, totalOriginalPrice, request.VoucherId, request.PointsToUse, targetDateTime, vehicleTypeQuery.VehicleTypeId, request.BranchId);
 
                         var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == customerUserId);
                         if (wallet == null || wallet.Balance < finalAmount)

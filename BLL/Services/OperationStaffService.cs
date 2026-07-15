@@ -35,7 +35,15 @@ namespace AutoWashPro.BLL.Services
                 .OrderByDescending(a => a.AssignmentId)
                 .FirstOrDefaultAsync();
 
-            if (assignment == null) return null;
+            if (assignment == null)
+            {
+                return new StaffLaneTaskDTO
+                {
+                    LaneId = 0,
+                    LaneName = "Mọi làn rửa xe (All Lanes)",
+                    AssignedDate = targetDate
+                };
+            }
 
             return new StaffLaneTaskDTO
             {
@@ -53,11 +61,6 @@ namespace AutoWashPro.BLL.Services
                 .OrderByDescending(a => a.AssignmentId)
                 .FirstOrDefaultAsync();
 
-            if (assignment == null)
-            {
-                throw new BadRequestException("You are not assigned to any lane today. Cannot check in.");
-            }
-
             var booking = await _context.Bookings
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
 
@@ -71,7 +74,13 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Can only check in vehicles in Pending status.");
             }
 
-            booking.ProcessingLaneId = assignment.LaneId;
+            int laneIdToAssign = assignment?.LaneId ?? booking.ProcessingLaneId ?? await _context.Lanes.Where(l => l.BranchId == booking.BranchId && l.IsActive).Select(l => l.LaneId).FirstOrDefaultAsync();
+            if (laneIdToAssign == 0)
+            {
+                laneIdToAssign = await _context.Lanes.Select(l => l.LaneId).FirstOrDefaultAsync();
+            }
+
+            booking.ProcessingLaneId = laneIdToAssign;
             booking.ProcessingStaffId = staffUserId;
             booking.Status = "CheckedIn";
 
@@ -83,22 +92,19 @@ namespace AutoWashPro.BLL.Services
         {
             var targetDate = date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
 
-            var assignment = await _context.StaffLaneAssignments
-                .Where(a => a.StaffId == staffUserId && a.AssignedDate.Date == targetDate)
-                .FirstOrDefaultAsync();
-
-            if (assignment == null)
-            {
-                return new List<StaffBookingDTO>();
-            }
-
             var bookings = await _context.Bookings
                 .Include(b => b.BookingDetails)
                 .ThenInclude(d => d.Service)
                 .Include(b => b.ActualVehicleType)
-                .Where(b => b.ProcessingLaneId == assignment.LaneId
-                         && (b.ProcessingStaffId == staffUserId || b.ProcessingStaffId == null)
-                         && (b.Status == "CheckedIn" || b.Status == "Processing"))
+                .Include(b => b.User)
+                .ThenInclude(u => u!.CustomerProfile)
+                .ThenInclude(p => p!.Tier)
+                .Where(b => (b.Status == "CheckedIn" || b.Status == "Processing")
+                         && (b.ScheduledTime.Date == targetDate || b.ProcessingStartTime.HasValue))
+                .OrderByDescending(b => b.User != null && b.User.CustomerProfile != null && b.User.CustomerProfile.Tier != null
+                                         ? b.User.CustomerProfile.Tier.MinAccumulatedPoints
+                                         : -1)
+                .ThenBy(b => b.ScheduledTime)
                 .ToListAsync();
 
             if (bookings.Count == 0)
@@ -147,7 +153,9 @@ namespace AutoWashPro.BLL.Services
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
                     CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value.ToVnTime() : (DateTime?)null,
-                    ActualDurationMinutes = b.ActualDurationMinutes
+                    ActualDurationMinutes = b.ActualDurationMinutes,
+                    CustomerTierName = b.User?.CustomerProfile?.Tier?.TierName ?? "WalkIn / Standard",
+                    CustomerTierPoints = b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0
                 };
             }).ToList();
         }
@@ -178,8 +186,7 @@ namespace AutoWashPro.BLL.Services
                 if (booking.Status != "Processing" && booking.Status != "Completed")
                     throw new BadRequestException("Can only complete processing vehicles.");
 
-                if (booking.ProcessingStaffId != staffUserId)
-                    throw new BadRequestException("You are not assigned to this vehicle.");
+                booking.ProcessingStaffId = staffUserId;
             }
 
             var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";

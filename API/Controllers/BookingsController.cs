@@ -49,6 +49,15 @@ namespace AutoWashPro.API.Controllers
             var result = await _bookingService.GetAvailableSlotsAsync(userId, request);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
+
+        [HttpPost("check-slots-with-suggestions")]
+        public async Task<IActionResult> CheckSlotsWithSuggestions([FromBody] CheckAvailableSlotsRequestDTO request)
+        {
+            int userId = GetUserId();
+            var result = await _bookingService.GetAvailableSlotsWithSuggestionAsync(userId, request);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
         [HttpPost("{bookingId}/trigger-email")]
         [Authorize]
         public IActionResult TriggerConfirmationEmail(int bookingId)

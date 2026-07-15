@@ -7,16 +7,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BLL.Helpers;
+using BLL.Services.Interface;
+using BLL.DTOs.Business;
 
 namespace AutoWashPro.BLL.Services
 {
     public class ManagerService : IManagerService
     {
         private readonly AutoWashDbContext _context;
+        private readonly IBranchRevenueAnalyticsService _branchRevenueAnalyticsService;
 
-        public ManagerService(AutoWashDbContext context)
+        public ManagerService(AutoWashDbContext context, IBranchRevenueAnalyticsService branchRevenueAnalyticsService)
         {
             _context = context;
+            _branchRevenueAnalyticsService = branchRevenueAnalyticsService;
         }
 
         private async Task<EmployeeProfile> GetManagerProfileAsync(int managerUserId)
@@ -500,6 +504,12 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
 
             return true;
+        }
+
+        public async Task<MonthlyRevenueCampaignResultDTO> CheckRevenueStimulusCampaignAsync(int managerUserId, int? month = null, int? year = null)
+        {
+            var managerProfile = await GetManagerProfileAsync(managerUserId);
+            return await _branchRevenueAnalyticsService.CheckAndTriggerMonthlyRevenueCampaignAsync(managerProfile.BranchId!.Value, month, year);
         }
     }
 }

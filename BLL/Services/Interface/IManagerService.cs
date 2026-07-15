@@ -1,4 +1,5 @@
 using AutoWashPro.BLL.DTOs;
+using BLL.DTOs.Business;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -21,5 +22,6 @@ namespace AutoWashPro.BLL.Services
         Task<TimeSlotAdminResponseDTO> UpdateTimeSlotAsync(int managerUserId, int slotId, UpdateTimeSlotDTO request);
         Task<bool> DeleteTimeSlotAsync(int managerUserId, int slotId);
         Task<bool> DeactivateStaffAsync(int managerUserId, int staffUserId);
+        Task<MonthlyRevenueCampaignResultDTO> CheckRevenueStimulusCampaignAsync(int managerUserId, int? month = null, int? year = null);
     }
 }
