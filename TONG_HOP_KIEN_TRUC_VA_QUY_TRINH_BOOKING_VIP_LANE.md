@@ -199,5 +199,11 @@ Hệ thống SmartWash Pro tích hợp một **Hệ sinh thái AI lai (Hybrid AI
      - Kèm theo **Ghi chú giải thích AI (`ProposalNote`)** tường tận cho Quản lý hiểu rõ lý do đề xuất.
   4. **👉 Trải nghiệm tối thượng cho Quản lý:** Quản lý chỉ việc mở màn hình Dashboard là đã thấy AI phân tích xong, vẽ sẵn Voucher và giải thích lý do. Quản lý chỉ cần bấm **1 nút duy nhất [✔ Phê duyệt (`Approve`)]** là Voucher chính thức phát hành thẳng vào ví của khách hàng!
 
+### 6.3 Cơ chế Điều phối Cứu hộ Kẹt Tải Khẩn Cấp (Proactive Walk-in Surge Relocation)
+Khi chi nhánh bất ngờ đón lượng khách Vãng lai (Walk-in) tăng vọt, hệ thống hỗ trợ cơ chế quét và "sơ tán" khách đặt trước để bảo vệ trải nghiệm của họ:
+1. **Quét và Phát hiện (`Scan & Notify`)**: Hệ thống chủ động rà soát các lịch `Pending` trong 2 giờ tới, tự động tìm chi nhánh lân cận trống lịch.
+2. **Tặng Voucher đền bù**: Hệ thống lập tức tạo 1 Voucher "Đền bù dời lịch" trị giá 50,000 VND.
+3. **Cơ chế Dời lịch tự động (`Accept Relocation`)**: Khi khách hàng đồng ý, hệ thống tự động dời `BranchId`, áp dụng Voucher giảm 50K trực tiếp vào hóa đơn. Quan trọng nhất, Backend tự động **trừ Tải trọng (`CapacityWeight`) ở chi nhánh bị kẹt** và cộng sang chi nhánh mới, giúp giải phóng ngay lập tức không gian làm việc cho thợ.
+
 ---
 *Tài liệu tổng hợp bởi đội ngũ Kiến trúc sư Hệ thống SmartWash Pro.*

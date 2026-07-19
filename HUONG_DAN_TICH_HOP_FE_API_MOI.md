@@ -176,6 +176,43 @@ Hệ thống Backend đã bổ sung bảo mật và ràng buộc nghiệp vụ c
   `"This voucher is only valid for use at branch #3 (Chi nhánh Cao Thắng Quận 3)."` -> FE cần bắt lỗi này để hiển thị thông báo rõ ràng cho khách.
 
 ---
+
+### 3. API Khách Hàng Đồng Ý Dời Lịch Khẩn Cấp (Accept Relocation)
+Khi chi nhánh đột xuất bị kẹt tải do quá đông khách Walk-in, hệ thống sẽ bắn Push Notification đề xuất dời lịch (kèm Voucher 50K). Khách hàng bấm **[Đồng Ý]** trên App thì FE gọi API này để hệ thống dời lịch sang chi nhánh thay thế.
+
+* **Endpoint:** `POST /api/v1/bookings/{id}/accept-relocation`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN}`
+* **Content-Type:** `application/json`
+
+#### 📥 Request Body
+```json
+{
+  "alternativeBranchId": 2,
+  "voucherCode": "SURGE_REL_1_123"
+}
+```
+
+#### 📤 Response
+```json
+{
+  "statusCode": 200,
+  "message": "Relocation accepted and voucher applied successfully.",
+  "data": {
+    "bookingId": 123,
+    "licensePlate": "51G-123.45",
+    "serviceNames": ["Rửa xe tiêu chuẩn"],
+    "scheduledTime": "2026-07-19T10:00:00Z",
+    "status": "Pending",
+    "originalPrice": 100000,
+    "pointDiscountAmount": 0,
+    "voucherDiscountAmount": 50000,
+    "finalAmount": 50000
+  }
+}
+```
+*Ghi chú: Khi API này thành công, backend đã tự động giải phóng công suất (capacity) ở chi nhánh cũ và cộng tải vào chi nhánh mới.*
+
+---
 ---
 
 ## PHẦN 2: DÀNH CHO QUẢN LÝ CHI NHÁNH (MANAGER PORTAL - WEB ADMIN/DASHBOARD)
@@ -415,6 +452,39 @@ Khi Manager bấm **[✖ Từ chối Đề xuất]**, hệ thống đóng đề 
   1. **[✏️ Sửa đổi thông số (`Modify`)]** $\rightarrow$ Mở modal nhập `% giảm giá`, `Số ngày hết hạn` $\rightarrow$ Gọi `PUT /proposals/{id}`.
   2. **[✔ Phê duyệt & Phát hành ngay (`Approve`)]** $\rightarrow$ Gọi `POST /proposals/{id}/approve` $\rightarrow$ Phát hành thẳng vào ví khách hàng.
   3. **[✖ Từ chối (`Reject`)]** $\rightarrow$ Gọi `POST /proposals/{id}/reject`.
+
+---
+
+### 3. API Quét Tải & Bắn Thông Báo Kẹt Xe Khẩn Cấp (Proactive Relocation)
+API này dùng để quét các lịch đặt trước trong 2 tiếng tới tại chi nhánh. Nếu quản lý thấy chi nhánh đang quá tải do khách vãng lai (hoặc hệ thống chạy ngầm CronJob quét định kỳ), API sẽ tự động tạo Voucher giảm giá đền bù 50,000 VND và lên danh sách các khách hàng cần gửi cảnh báo xin dời chi nhánh.
+
+* **Endpoint:** `POST /api/v1/manager/branch-overload/scan-and-notify-relocation`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUA_MANAGER}`
+
+#### 📤 Response:
+```json
+{
+  "statusCode": 200,
+  "message": "Scanned for overloaded bookings. Relocation proposals generated and simulated notifications sent.",
+  "data": [
+    {
+      "bookingId": 123,
+      "customerName": "Nguyễn Văn A",
+      "licensePlate": "51G-123.45",
+      "scheduledTime": "2026-07-19T10:00:00Z",
+      "originalBranchId": 1,
+      "alternativeBranchId": 2,
+      "voucherCode": "SURGE_REL_1_123",
+      "discountAmount": 50000
+    }
+  ]
+}
+```
+
+#### 💻 Hướng dẫn UI cho Manager (FE):
+- Manager bấm nút **[Quét cảnh báo Kẹt tải]** trên Dashboard.
+- Hiển thị danh sách khách hàng (`data`) vừa được hệ thống tự động bắn Push Notification đề nghị dời lịch.
+- Manager có thể theo dõi xem khách nào đã đồng ý dời đi để điều phối thợ rửa xe.
 
 ---
 ---
