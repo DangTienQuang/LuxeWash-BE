@@ -2476,6 +2476,98 @@ namespace AutoWashPro.BLL.Services
             return completedCount;
         }
 
+        public async Task<BookingResponseDTO> AcceptRelocationAsync(int userId, int bookingId, AcceptRelocationRequestDTO request)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.BookingDetails)
+                    .ThenInclude(d => d.Service)
+                .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
+
+            if (booking == null)
+            {
+                throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found or does not belong to the user.");
+            }
+
+            if (booking.Status != "Pending")
+            {
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Cannot relocate booking in status: {booking.Status}");
+            }
+
+            var alternativeBranch = await _context.Branches.FindAsync(request.AlternativeBranchId);
+            if (alternativeBranch == null || !alternativeBranch.IsActive)
+            {
+                throw new AutoWashPro.BLL.Exceptions.NotFoundException("Alternative branch not found or inactive.");
+            }
+
+            var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == request.VoucherCode && v.BranchId == request.AlternativeBranchId && v.IsActive);
+            if (voucher == null || voucher.ApprovalStatus != "Approved")
+            {
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Voucher is invalid or not approved.");
+            }
+
+            // Adjust Capacity
+            var originalSlot = await _context.TimeSlots
+                .FirstOrDefaultAsync(ts => booking.ScheduledTime.TimeOfDay >= ts.StartTime && booking.ScheduledTime.TimeOfDay <= ts.EndTime);
+
+            if (originalSlot != null)
+            {
+                var originalCapacity = await _context.DailySlotCapacities
+                    .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.SlotId == originalSlot.SlotId);
+                
+                if (originalCapacity != null)
+                {
+                    originalCapacity.BookedWeight = Math.Max(0, originalCapacity.BookedWeight - booking.CapacityWeight);
+                }
+
+                var newCapacity = await _context.DailySlotCapacities
+                    .FirstOrDefaultAsync(c => c.BranchId == request.AlternativeBranchId && c.Date == booking.ScheduledTime.Date && c.SlotId == originalSlot.SlotId);
+                
+                if (newCapacity == null)
+                {
+                    newCapacity = new DAL.Entities.DailySlotCapacity
+                    {
+                        BranchId = request.AlternativeBranchId,
+                        Date = booking.ScheduledTime.Date,
+                        SlotId = originalSlot.SlotId,
+                        BookedWeight = booking.CapacityWeight
+                    };
+                    _context.DailySlotCapacities.Add(newCapacity);
+                }
+                else
+                {
+                    newCapacity.BookedWeight += booking.CapacityWeight;
+                }
+            }
+
+            // Apply Relocation
+            booking.BranchId = request.AlternativeBranchId;
+            booking.AppliedVoucherId = voucher.VoucherId;
+            
+            // Recalculate FinalAmount
+            decimal discount = voucher.DiscountAmount;
+            
+            booking.VoucherDiscountAmount = discount;
+            booking.FinalAmount = Math.Max(0, booking.OriginalPrice - booking.PointDiscountAmount - booking.VoucherDiscountAmount);
+            booking.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            var serviceNames = booking.BookingDetails.Select(d => d.Service.ServiceName).ToList();
+
+            return new BookingResponseDTO
+            {
+                BookingId = booking.BookingId,
+                LicensePlate = booking.LicensePlate,
+                ServiceNames = serviceNames,
+                ScheduledTime = booking.ScheduledTime,
+                Status = booking.Status,
+                OriginalPrice = booking.OriginalPrice,
+                PointDiscountAmount = booking.PointDiscountAmount,
+                VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                FinalAmount = booking.FinalAmount
+            };
+        }
+
         private static long GeneratePayOsOrderCode()
         {
             var timestampPart = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1_000_000_000_000;

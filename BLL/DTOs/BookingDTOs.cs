@@ -201,6 +201,26 @@ namespace AutoWashPro.BLL.DTOs
 
         public int? ActualVehicleTypeId { get; set; }
     }
+
+    public class RelocationProposalDTO
+    {
+        public int BookingId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public string LicensePlate { get; set; } = string.Empty;
+        public DateTime ScheduledTime { get; set; }
+        public int OriginalBranchId { get; set; }
+        public int AlternativeBranchId { get; set; }
+        public string VoucherCode { get; set; } = string.Empty;
+        public decimal DiscountAmount { get; set; }
+    }
+
+    public class AcceptRelocationRequestDTO
+    {
+        [Required]
+        public int AlternativeBranchId { get; set; }
+        [Required]
+        public string VoucherCode { get; set; } = string.Empty;
+    }
 }
 
 namespace AutoWashPro.BLL.DTOs

@@ -541,5 +541,74 @@ namespace AutoWashPro.BLL.Services
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.GenerateComprehensiveStimulusAnalysisAsync(managerProfile.BranchId!.Value, month, year);
         }
+
+        public async Task<List<RelocationProposalDTO>> ScanAndNotifyRelocationAsync(int managerUserId)
+        {
+            var managerProfile = await GetManagerProfileAsync(managerUserId);
+            int branchId = managerProfile.BranchId!.Value;
+
+            var now = DateTime.UtcNow;
+            var twoHoursLater = now.AddHours(2);
+
+            var pendingBookings = await _context.Bookings
+                .Include(b => b.User)
+                    .ThenInclude(u => u.CustomerProfile)
+                .Where(b => b.BranchId == branchId 
+                            && b.Status == "Pending" 
+                            && b.ScheduledTime >= now 
+                            && b.ScheduledTime <= twoHoursLater)
+                .ToListAsync();
+
+            var proposals = new List<RelocationProposalDTO>();
+
+            if (!pendingBookings.Any()) return proposals;
+
+            var alternativeBranch = await _context.Branches
+                .Where(b => b.BranchId != branchId && b.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (alternativeBranch == null) return proposals;
+
+            foreach (var booking in pendingBookings)
+            {
+                string voucherCode = $"SURGE_REL_{branchId}_{booking.BookingId}";
+                var existingVoucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == voucherCode);
+                
+                if (existingVoucher == null)
+                {
+                    existingVoucher = new Voucher
+                    {
+                        Code = voucherCode,
+                        ProposalNote = $"Voucher đền bù do dời lịch khẩn cấp sang {alternativeBranch.Name}",
+                        DiscountAmount = 50000,
+                        VoucherType = AutoWashPro.DAL.Enums.VoucherType.Discount,
+                        MinOrderAmount = 0,
+                        StartDate = now,
+                        ExpiryDate = now.AddDays(7),
+                        IsActive = true,
+                        MaxUsages = 1,
+                        CurrentUsageCount = 0,
+                        ApprovalStatus = "Approved", 
+                        BranchId = alternativeBranch.BranchId
+                    };
+                    _context.Vouchers.Add(existingVoucher);
+                }
+
+                proposals.Add(new RelocationProposalDTO
+                {
+                    BookingId = booking.BookingId,
+                    CustomerName = booking.User?.CustomerProfile?.FullName ?? "Khách hàng",
+                    LicensePlate = booking.LicensePlate,
+                    ScheduledTime = booking.ScheduledTime,
+                    OriginalBranchId = branchId,
+                    AlternativeBranchId = alternativeBranch.BranchId,
+                    VoucherCode = voucherCode,
+                    DiscountAmount = 20
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return proposals;
+        }
     }
 }

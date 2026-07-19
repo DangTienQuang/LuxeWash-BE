@@ -172,5 +172,12 @@ namespace API.Controllers.Manager
             var result = await _managerService.GenerateComprehensiveStimulusAnalysisAsync(GetUserId(), month, year);
             return Ok(new { statusCode = 200, message = "Comprehensive analysis and proposals generated successfully.", data = result });
         }
+
+        [HttpPost("branch-overload/scan-and-notify-relocation")]
+        public async Task<IActionResult> ScanAndNotifyRelocation()
+        {
+            var result = await _managerService.ScanAndNotifyRelocationAsync(GetUserId());
+            return Ok(new { statusCode = 200, message = "Scanned for overloaded bookings. Relocation proposals generated and simulated notifications sent.", data = result });
+        }
     }
 }

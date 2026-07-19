@@ -28,5 +28,6 @@ namespace AutoWashPro.BLL.Services
         Task<MonthlyRevenueCampaignResultDTO> ApproveProposalAsync(int managerUserId, int voucherId);
         Task<bool> RejectProposalAsync(int managerUserId, int voucherId, string? rejectReason);
         Task<BranchComprehensiveStimulusDTO> GenerateComprehensiveStimulusAnalysisAsync(int managerUserId, int? month = null, int? year = null);
+        Task<List<RelocationProposalDTO>> ScanAndNotifyRelocationAsync(int managerUserId);
     }
 }
