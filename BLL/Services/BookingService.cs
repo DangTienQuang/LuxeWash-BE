@@ -1316,13 +1316,68 @@ namespace AutoWashPro.BLL.Services
                 })
                 .ToListAsync();
 
+            var proposals = await GetRelocationProposalsAsync(userId);
+
             foreach (var b in bookings)
             {
                 if (b.ProcessingStartTime.HasValue) b.ProcessingStartTime = b.ProcessingStartTime.Value.ToVnTime();
                 if (b.CompletedTime.HasValue) b.CompletedTime = b.CompletedTime.Value.ToVnTime();
+
+                var proposal = proposals.FirstOrDefault(p => p.BookingId == b.BookingId);
+                if (proposal != null)
+                {
+                    b.HasPendingRelocation = true;
+                    b.Relocation = proposal;
+                }
             }
 
             return bookings;
+        }
+
+        public async Task<List<RelocationProposalCustomerDTO>> GetRelocationProposalsAsync(int userId)
+        {
+            var now = DateTime.UtcNow;
+            
+            var pendingBookings = await _context.Bookings
+                .Include(b => b.Branch)
+                .Include(b => b.BookingDetails).ThenInclude(d => d.Service)
+                .Where(b => b.UserId == userId && b.Status == "Pending" && b.ScheduledTime >= now)
+                .ToListAsync();
+
+            var proposals = new List<RelocationProposalCustomerDTO>();
+
+            foreach (var booking in pendingBookings)
+            {
+                string voucherCodePrefix = $"SURGE_REL_{booking.BranchId}_{booking.BookingId}";
+                var relocationVoucher = await _context.Vouchers
+                    .Include(v => v.Branch)
+                    .FirstOrDefaultAsync(v => v.Code == voucherCodePrefix 
+                        && v.IsActive 
+                        && v.CurrentUsageCount == 0 
+                        && v.ExpiryDate > now);
+
+                if (relocationVoucher != null && relocationVoucher.Branch != null)
+                {
+                    proposals.Add(new RelocationProposalCustomerDTO
+                    {
+                        BookingId = booking.BookingId,
+                        LicensePlate = booking.LicensePlate ?? "",
+                        ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
+                        ScheduledTime = booking.ScheduledTime,
+                        OriginalBranchId = booking.BranchId,
+                        OriginalBranchName = booking.Branch?.Name ?? "",
+                        AlternativeBranchId = relocationVoucher.BranchId.Value,
+                        AlternativeBranchName = relocationVoucher.Branch.Name,
+                        AlternativeBranchAddress = relocationVoucher.Branch.Address ?? "",
+                        AlternativeBranchDistanceKm = 2.8, 
+                        VoucherCode = relocationVoucher.Code,
+                        VoucherDiscountAmount = relocationVoucher.DiscountAmount,
+                        ProposalExpiresAt = relocationVoucher.ExpiryDate
+                    });
+                }
+            }
+
+            return proposals;
         }
 
         public async Task<bool> CancelBookingAsync(int userId, int bookingId)
@@ -2488,6 +2543,11 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found or does not belong to the user.");
             }
 
+            if (booking.ScheduledTime <= DateTime.UtcNow)
+            {
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("This relocation proposal has expired because the scheduled time has passed.");
+            }
+
             if (booking.Status != "Pending")
             {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Cannot relocate booking in status: {booking.Status}");
@@ -2507,7 +2567,7 @@ namespace AutoWashPro.BLL.Services
 
             // Adjust Capacity
             var originalSlot = await _context.TimeSlots
-                .FirstOrDefaultAsync(ts => booking.ScheduledTime.TimeOfDay >= ts.StartTime && booking.ScheduledTime.TimeOfDay <= ts.EndTime);
+                .FirstOrDefaultAsync(ts => ts.BranchId == booking.BranchId && booking.ScheduledTime.TimeOfDay >= ts.StartTime && booking.ScheduledTime.TimeOfDay <= ts.EndTime);
 
             if (originalSlot != null)
             {
@@ -2518,23 +2578,35 @@ namespace AutoWashPro.BLL.Services
                 {
                     originalCapacity.BookedWeight = Math.Max(0, originalCapacity.BookedWeight - booking.CapacityWeight);
                 }
+            }
 
+            var alternativeSlot = await _context.TimeSlots
+                .FirstOrDefaultAsync(ts => ts.BranchId == request.AlternativeBranchId && booking.ScheduledTime.TimeOfDay >= ts.StartTime && booking.ScheduledTime.TimeOfDay <= ts.EndTime);
+
+            if (alternativeSlot != null)
+            {
                 var newCapacity = await _context.DailySlotCapacities
-                    .FirstOrDefaultAsync(c => c.BranchId == request.AlternativeBranchId && c.Date == booking.ScheduledTime.Date && c.SlotId == originalSlot.SlotId);
+                    .FirstOrDefaultAsync(c => c.BranchId == request.AlternativeBranchId && c.Date == booking.ScheduledTime.Date && c.SlotId == alternativeSlot.SlotId);
                 
                 if (newCapacity == null)
                 {
+                    if (booking.CapacityWeight > alternativeSlot.MaxCapacity)
+                        throw new AutoWashPro.BLL.Exceptions.BadRequestException("The alternative branch is fully booked for this time slot.");
+                        
                     newCapacity = new DAL.Entities.DailySlotCapacity
                     {
                         BranchId = request.AlternativeBranchId,
                         Date = booking.ScheduledTime.Date,
-                        SlotId = originalSlot.SlotId,
+                        SlotId = alternativeSlot.SlotId,
                         BookedWeight = booking.CapacityWeight
                     };
                     _context.DailySlotCapacities.Add(newCapacity);
                 }
                 else
                 {
+                    if (newCapacity.BookedWeight + booking.CapacityWeight > alternativeSlot.MaxCapacity)
+                        throw new AutoWashPro.BLL.Exceptions.BadRequestException("The alternative branch is fully booked for this time slot.");
+                        
                     newCapacity.BookedWeight += booking.CapacityWeight;
                 }
             }

@@ -76,7 +76,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("CustomerId", "CreatedAt");
 
-                    b.ToTable("AIAuditLogs");
+                    b.ToTable("AIAuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.AIDecisionHistory", b =>
@@ -155,7 +155,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("CustomerId", "CreatedAt");
 
-                    b.ToTable("AIDecisionHistories");
+                    b.ToTable("AIDecisionHistories", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.AILearning", b =>
@@ -218,7 +218,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("ScenarioId", "VoucherId");
 
-                    b.ToTable("AILearnings");
+                    b.ToTable("AILearnings", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Booking", b =>
@@ -337,7 +337,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("VehicleId");
 
-                    b.ToTable("Bookings");
+                    b.ToTable("Bookings", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.BookingDetail", b =>
@@ -361,7 +361,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("ServiceId");
 
-                    b.ToTable("BookingDetails");
+                    b.ToTable("BookingDetails", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.BookingDocument", b =>
@@ -388,7 +388,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("BookingId");
 
-                    b.ToTable("BookingDocuments");
+                    b.ToTable("BookingDocuments", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.BookingMaterialUsage", b =>
@@ -447,7 +447,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("MaterialId");
 
-                    b.ToTable("BookingMaterialUsages");
+                    b.ToTable("BookingMaterialUsages", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Branch", b =>
@@ -482,7 +482,7 @@ namespace DAL.Migrations
 
                     b.HasKey("BranchId");
 
-                    b.ToTable("Branches");
+                    b.ToTable("Branches", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CarModel", b =>
@@ -521,7 +521,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("VehicleTypeId");
 
-                    b.ToTable("CarModels");
+                    b.ToTable("CarModels", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerBehaviorHistory", b =>
@@ -565,7 +565,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("CustomerId", "BehaviorType", "DetectedOn");
 
-                    b.ToTable("CustomerBehaviorHistories");
+                    b.ToTable("CustomerBehaviorHistories", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerFeatureProfile", b =>
@@ -777,7 +777,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("MembershipTierId");
 
-                    b.ToTable("CustomerFeatureProfiles");
+                    b.ToTable("CustomerFeatureProfiles", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.CustomerProfile", b =>
@@ -840,7 +840,7 @@ namespace DAL.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("CustomerProfiles");
+                    b.ToTable("CustomerProfiles", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.DailySlotCapacity", b =>
@@ -873,7 +873,7 @@ namespace DAL.Migrations
                     b.HasIndex("SlotId", "Date", "BranchId")
                         .IsUnique();
 
-                    b.ToTable("DailySlotCapacities");
+                    b.ToTable("DailySlotCapacities", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.EmployeeProfile", b =>
@@ -893,7 +893,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.ToTable("EmployeeProfiles");
+                    b.ToTable("EmployeeProfiles", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ExtraMaterialUsageRequest", b =>
@@ -951,7 +951,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("BranchId", "Status", "CreatedAt");
 
-                    b.ToTable("ExtraMaterialUsageRequests");
+                    b.ToTable("ExtraMaterialUsageRequests", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.FeatureDefinition", b =>
@@ -1003,7 +1003,7 @@ namespace DAL.Migrations
 
                     b.HasKey("FeatureId");
 
-                    b.ToTable("FeatureDefinitions");
+                    b.ToTable("FeatureDefinitions", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.InventoryTransaction", b =>
@@ -1071,7 +1071,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("WarehouseId");
 
-                    b.ToTable("InventoryTransactions");
+                    b.ToTable("InventoryTransactions", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.KnowledgeCategory", b =>
@@ -1099,7 +1099,7 @@ namespace DAL.Migrations
 
                     b.HasKey("CategoryId");
 
-                    b.ToTable("KnowledgeCategories");
+                    b.ToTable("KnowledgeCategories", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.KnowledgeScenario", b =>
@@ -1167,7 +1167,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.ToTable("KnowledgeScenarios");
+                    b.ToTable("KnowledgeScenarios", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Lane", b =>
@@ -1194,7 +1194,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.ToTable("Lanes");
+                    b.ToTable("Lanes", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ManagerProfile", b =>
@@ -1223,7 +1223,7 @@ namespace DAL.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("ManagerProfiles");
+                    b.ToTable("ManagerProfiles", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Material", b =>
@@ -1271,7 +1271,7 @@ namespace DAL.Migrations
 
                     b.HasKey("MaterialId");
 
-                    b.ToTable("Materials");
+                    b.ToTable("Materials", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialBatch", b =>
@@ -1330,7 +1330,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("WarehouseId");
 
-                    b.ToTable("MaterialBatches");
+                    b.ToTable("MaterialBatches", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.MaterialUnit", b =>
@@ -1368,7 +1368,7 @@ namespace DAL.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("MaterialUnits");
+                    b.ToTable("MaterialUnits", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.OvertimeRequest", b =>
@@ -1415,7 +1415,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("StaffUserId");
 
-                    b.ToTable("OvertimeRequests");
+                    b.ToTable("OvertimeRequests", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.PointLedger", b =>
@@ -1450,7 +1450,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("PointLedgers");
+                    b.ToTable("PointLedgers", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioAction", b =>
@@ -1498,7 +1498,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("VoucherId");
 
-                    b.ToTable("ScenarioActions");
+                    b.ToTable("ScenarioActions", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioCondition", b =>
@@ -1538,7 +1538,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("ScenarioId");
 
-                    b.ToTable("ScenarioConditions");
+                    b.ToTable("ScenarioConditions", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioExclusion", b =>
@@ -1569,7 +1569,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("ScenarioId");
 
-                    b.ToTable("ScenarioExclusions");
+                    b.ToTable("ScenarioExclusions", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioExplanation", b =>
@@ -1592,7 +1592,7 @@ namespace DAL.Migrations
 
                     b.HasKey("ScenarioId");
 
-                    b.ToTable("ScenarioExplanations");
+                    b.ToTable("ScenarioExplanations", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ScenarioMessageTemplate", b =>
@@ -1628,7 +1628,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("ScenarioId");
 
-                    b.ToTable("ScenarioMessageTemplates");
+                    b.ToTable("ScenarioMessageTemplates", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Service", b =>
@@ -1650,7 +1650,7 @@ namespace DAL.Migrations
 
                     b.HasKey("ServiceId");
 
-                    b.ToTable("Services");
+                    b.ToTable("Services", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ServiceMaterialUsage", b =>
@@ -1688,7 +1688,7 @@ namespace DAL.Migrations
                     b.HasIndex("ServiceId", "VehicleTypeId", "MaterialId")
                         .IsUnique();
 
-                    b.ToTable("ServiceMaterialUsages");
+                    b.ToTable("ServiceMaterialUsages", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ServicePrice", b =>
@@ -1723,7 +1723,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("VehicleTypeId");
 
-                    b.ToTable("ServicePrices");
+                    b.ToTable("ServicePrices", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.ShiftSwapRequest", b =>
@@ -1769,7 +1769,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("ToAssignmentId");
 
-                    b.ToTable("ShiftSwapRequests");
+                    b.ToTable("ShiftSwapRequests", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.StaffLaneAssignment", b =>
@@ -1798,7 +1798,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("WorkShiftId");
 
-                    b.ToTable("StaffLaneAssignments");
+                    b.ToTable("StaffLaneAssignments", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.StaffProfile", b =>
@@ -1827,7 +1827,7 @@ namespace DAL.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("StaffProfiles");
+                    b.ToTable("StaffProfiles", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.StaffShiftAssignment", b =>
@@ -1867,7 +1867,7 @@ namespace DAL.Migrations
                     b.HasIndex("StaffUserId", "WorkShiftId", "WorkDate")
                         .IsUnique();
 
-                    b.ToTable("StaffShiftAssignments");
+                    b.ToTable("StaffShiftAssignments", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Tier", b =>
@@ -1892,7 +1892,7 @@ namespace DAL.Migrations
 
                     b.HasKey("TierId");
 
-                    b.ToTable("Tiers");
+                    b.ToTable("Tiers", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.TimeSlot", b =>
@@ -1920,7 +1920,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.ToTable("TimeSlots");
+                    b.ToTable("TimeSlots", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Transaction", b =>
@@ -1968,7 +1968,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("WalletId");
 
-                    b.ToTable("Transactions");
+                    b.ToTable("Transactions", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.User", b =>
@@ -2018,7 +2018,7 @@ namespace DAL.Migrations
                     b.HasIndex("PhoneNumber")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.UserVoucher", b =>
@@ -2061,7 +2061,7 @@ namespace DAL.Migrations
                     b.HasIndex("UserId", "VoucherId", "TriggerKey")
                         .IsUnique();
 
-                    b.ToTable("UserVouchers");
+                    b.ToTable("UserVouchers", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Vehicle", b =>
@@ -2107,7 +2107,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("VehicleTypeId");
 
-                    b.ToTable("Vehicles");
+                    b.ToTable("Vehicles", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.VehicleConditionMaterialMultiplier", b =>
@@ -2134,7 +2134,7 @@ namespace DAL.Migrations
                     b.HasIndex("VehicleCondition")
                         .IsUnique();
 
-                    b.ToTable("VehicleConditionMaterialMultipliers");
+                    b.ToTable("VehicleConditionMaterialMultipliers", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.VehicleType", b =>
@@ -2156,7 +2156,7 @@ namespace DAL.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("VehicleTypes");
+                    b.ToTable("VehicleTypes", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Voucher", b =>
@@ -2259,7 +2259,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("VehicleTypeId");
 
-                    b.ToTable("Vouchers");
+                    b.ToTable("Vouchers", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Wallet", b =>
@@ -2283,7 +2283,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Wallets");
+                    b.ToTable("Wallets", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Warehouse", b =>
@@ -2315,7 +2315,7 @@ namespace DAL.Migrations
                     b.HasIndex("Type", "BranchId")
                         .IsUnique();
 
-                    b.ToTable("Warehouses");
+                    b.ToTable("Warehouses", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.WarehouseStock", b =>
@@ -2346,7 +2346,7 @@ namespace DAL.Migrations
                     b.HasIndex("WarehouseId", "MaterialId")
                         .IsUnique();
 
-                    b.ToTable("WarehouseStocks");
+                    b.ToTable("WarehouseStocks", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.WorkShift", b =>
@@ -2371,7 +2371,7 @@ namespace DAL.Migrations
 
                     b.HasKey("WorkShiftId");
 
-                    b.ToTable("WorkShifts");
+                    b.ToTable("WorkShifts", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.AIConversationLog", b =>
@@ -2403,7 +2403,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AIConversationLogs");
+                    b.ToTable("AIConversationLogs", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.AIKnowledgeBase", b =>
@@ -2434,7 +2434,7 @@ namespace DAL.Migrations
 
                     b.HasKey("KnowledgeId");
 
-                    b.ToTable("AIKnowledgeBases");
+                    b.ToTable("AIKnowledgeBases", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.BusinessProfile", b =>
@@ -2518,7 +2518,7 @@ namespace DAL.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("BusinessProfiles");
+                    b.ToTable("BusinessProfiles", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.FleetImportBatch", b =>
@@ -2554,7 +2554,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("BusinessProfileId");
 
-                    b.ToTable("FleetImportBatches");
+                    b.ToTable("FleetImportBatches", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.FleetImportError", b =>
@@ -2577,7 +2577,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("FleetImportBatchId");
 
-                    b.ToTable("FleetImportErrors");
+                    b.ToTable("FleetImportErrors", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.FleetVehicle", b =>
@@ -2637,7 +2637,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("VehicleTypeId");
 
-                    b.ToTable("FleetVehicles");
+                    b.ToTable("FleetVehicles", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.FleetWashLog", b =>
@@ -2685,7 +2685,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("StaffUserId");
 
-                    b.ToTable("FleetWashLogs");
+                    b.ToTable("FleetWashLogs", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.Invoice", b =>
@@ -2733,7 +2733,7 @@ namespace DAL.Migrations
                     b.HasIndex("InvoiceCode")
                         .IsUnique();
 
-                    b.ToTable("Invoices");
+                    b.ToTable("Invoices", (string)null);
                 });
 
             modelBuilder.Entity("DAL.Entities.InvoiceItem", b =>
@@ -2767,7 +2767,7 @@ namespace DAL.Migrations
 
                     b.HasIndex("InvoiceId");
 
-                    b.ToTable("InvoiceItems");
+                    b.ToTable("InvoiceItems", (string)null);
                 });
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.AIAuditLog", b =>

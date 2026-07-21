@@ -804,3 +804,42 @@ Hệ thống AutoWashPro cung cấp cơ chế ưu đãi đặc quyền toàn di�
 - Mọi API trên đều trả về format chuẩn JSON: `{ "statusCode": 200, "message": "Success", "data": ... }`.
 - Nếu gặp lỗi nghiệp vụ (Voucher hết hạn, sai chi nhánh, xe chưa thanh toán, không tìm thấy...), Backend sẽ trả về `statusCode: 400/404` kèm trường `message` mô tả chi tiết tiếng Anh/tiếng Việt.
 - Chúc đội ngũ Frontend tích hợp thành công và tạo ra giao diện thật mượt mà, ấn tượng cho người dùng! 🚀
+
+## PHẦN 5: API DỜI LỊCH CHỦ ĐỘNG (PROACTIVE RELOCATION)
+
+Tính năng Dời lịch Chủ động cho phép Manager phân tích tình trạng quá tải tại chi nhánh và đề xuất chuyển khách hàng sang chi nhánh lân cận (kèm Voucher 50k). 
+
+### 1. Dành cho Manager (Web Admin / Dashboard)
+
+**Endpoint:** POST /api/v1/manager/scan-relocation
+**Headers:** Authorization: Bearer {JWT_TOKEN_MANAGER}
+**Mô tả:** Trigger quét toàn bộ các Booking đang Pending tại chi nhánh hiện tại của Manager. Nếu chi nhánh đang full tải (do khách Walk-in đông), hệ thống sẽ tìm chi nhánh khác còn trống cùng khung giờ, và tạo Voucher 50k cho khách.
+
+* **Response:**
+  Trường hợp có khách cần dời, trả về danh sách RelocationProposalCustomerDTO. Manager gọi xong API này thì trên màn hình sẽ hiện popup thông báo: "Đã gửi đề xuất dời lịch cho X khách hàng".
+
+### 2. Dành cho Khách hàng (Customer Mobile App)
+
+Khách hàng khi mở App sẽ thấy thông báo dời lịch, hoặc cờ HasPendingRelocation trong lịch sử đặt lịch.
+
+**A. API Lấy Danh sách Đề xuất Dời lịch (MỚI)**
+* **Endpoint:** GET /api/v1/bookings/relocation-proposals
+* **Headers:** Authorization: Bearer {JWT_TOKEN_CUSTOMER}
+* **Response:** Trả về mảng RelocationProposalDTO (bao gồm BookingId, AlternativeBranchId, AlternativeBranchName, VoucherCode, DiscountAmount, ScheduledTime). Dùng API này để build màn hình "Bạn có lời mời dời lịch".
+
+**B. Nâng cấp API Lịch sử Booking**
+* **Endpoint:** GET /api/v1/bookings/me
+* **Thay đổi:** Trong mỗi object BookingResponseDTO trả về, Backend đã chèn thêm trường HasPendingRelocation (boolean) và Relocation (thông tin dời lịch). FE dựa vào đây để đánh badge chấm đỏ.
+
+**C. API Đồng ý Dời Lịch**
+* **Endpoint:** POST /api/v1/bookings/{bookingId}/accept-relocation
+* **Headers:** Authorization: Bearer {JWT_TOKEN_CUSTOMER}
+* **Body:**
+`json
+{
+  "alternativeBranchId": 2,
+  "voucherCode": "SURGE_REL_1_99"
+}
+`
+* **Mô tả:** Khách hàng đồng ý dời lịch. Backend sẽ tự cập nhật Booking sang chi nhánh mới, add Voucher vào Booking, và tự động cân bằng Tải trọng Sức chứa (Capacity) giữa 2 chi nhánh.
+

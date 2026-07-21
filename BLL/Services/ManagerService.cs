@@ -603,7 +603,7 @@ namespace AutoWashPro.BLL.Services
                     OriginalBranchId = branchId,
                     AlternativeBranchId = alternativeBranch.BranchId,
                     VoucherCode = voucherCode,
-                    DiscountAmount = 20
+                    DiscountAmount = 50000
                 });
             }
 

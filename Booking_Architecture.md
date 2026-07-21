@@ -207,3 +207,16 @@ Khi chi nhánh bất ngờ đón lượng khách Vãng lai (Walk-in) tăng vọt
 
 ---
 *Tài liệu tổng hợp bởi đội ngũ Kiến trúc sư Hệ thống SmartWash Pro.*
+
+---
+
+## 4. QUY TRÌNH DỜI LỊCH CHỦ ĐỘNG (PROACTIVE RELOCATION) DÀNH CHO MANAGER
+
+### 4.1 Bối cảnh
+Khi một chi nhánh bất ngờ nhận lượng lớn khách vãng lai (Walk-in), dẫn đến nguy cơ quá tải trong các khung giờ tiếp theo (Ảnh hưởng đến trải nghiệm của khách hàng đã đặt lịch trước).
+
+### 4.2 Giải pháp AI Relocation
+1. **Quét tải trọng (Scan & Notify):** Quản lý chi nhánh gọi API POST /api/v1/manager/scan-relocation để rà soát toàn bộ Booking Pending trong khung giờ sắp tới.
+2. **Thuật toán tìm điểm đến:** Hệ thống quét các chi nhánh lân cận trong bán kính cho phép. Nếu chi nhánh B có khung giờ (TimeSlot) tương ứng còn đủ chỗ trống (dựa trên MaxCapacity và CapacityWeight của dịch vụ), hệ thống sẽ chọn chi nhánh B.
+3. **Phát hành Voucher:** Hệ thống tự động sinh Voucher giảm giá 50.000 VNĐ (SURGE_REL_{branchId}_{bookingId}) gắn liền với chi nhánh B.
+4. **Phản hồi Khách hàng:** Khách hàng thấy thông báo/badge dời lịch qua API GET /api/v1/bookings/relocation-proposals. Khách hàng bấm **Đồng ý**, hệ thống chạy POST /api/v1/bookings/{bookingId}/accept-relocation để tự động đổi chi nhánh, áp mã giảm giá và cân bằng sức chứa giữa 2 chi nhánh.

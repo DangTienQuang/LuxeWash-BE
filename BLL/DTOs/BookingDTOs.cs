@@ -174,6 +174,9 @@ namespace AutoWashPro.BLL.DTOs
         public DateTime? ProcessingStartTime { get; set; }
         public DateTime? CompletedTime { get; set; }
         public int? ActualDurationMinutes { get; set; }
+        
+        public bool HasPendingRelocation { get; set; } = false;
+        public RelocationProposalCustomerDTO? Relocation { get; set; }
     }
 
     public class AdminBookingResponseDTO : BookingResponseDTO
@@ -212,6 +215,23 @@ namespace AutoWashPro.BLL.DTOs
         public int AlternativeBranchId { get; set; }
         public string VoucherCode { get; set; } = string.Empty;
         public decimal DiscountAmount { get; set; }
+    }
+
+    public class RelocationProposalCustomerDTO
+    {
+        public int BookingId { get; set; }
+        public string LicensePlate { get; set; } = string.Empty;
+        public List<string> ServiceNames { get; set; } = new List<string>();
+        public DateTime ScheduledTime { get; set; }
+        public int OriginalBranchId { get; set; }
+        public string OriginalBranchName { get; set; } = string.Empty;
+        public int AlternativeBranchId { get; set; }
+        public string AlternativeBranchName { get; set; } = string.Empty;
+        public string AlternativeBranchAddress { get; set; } = string.Empty;
+        public double AlternativeBranchDistanceKm { get; set; }
+        public string VoucherCode { get; set; } = string.Empty;
+        public decimal VoucherDiscountAmount { get; set; }
+        public DateTime ProposalExpiresAt { get; set; }
     }
 
     public class AcceptRelocationRequestDTO

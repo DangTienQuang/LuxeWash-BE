@@ -116,6 +116,14 @@ namespace AutoWashPro.API.Controllers
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
+        [HttpGet("relocation-proposals")]
+        public async Task<IActionResult> GetRelocationProposals()
+        {
+            int userId = GetUserId();
+            var result = await _bookingService.GetRelocationProposalsAsync(userId);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
         [Authorize(Roles = "Admin,Manager,Staff")]
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetBookingsByUserId(int userId)
