@@ -155,7 +155,8 @@ namespace AutoWashPro.BLL.Services
                     CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                     ActualDurationMinutes = b.ActualDurationMinutes,
                     CustomerTierName = b.User?.CustomerProfile?.Tier?.TierName ?? "WalkIn / Standard",
-                    CustomerTierPoints = b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0
+                    CustomerTierPoints = b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0,
+                    UserId = b.UserId
                 };
             }).ToList();
         }

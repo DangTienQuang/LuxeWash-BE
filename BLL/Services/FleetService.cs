@@ -125,7 +125,8 @@ namespace BLL.Services
                 importedPlates.Add(licensePlate);
 
                 var vehicleType = await _context.VehicleTypes
-                    .FirstOrDefaultAsync(x => x.Name == vehicleTypeName);
+                    .FirstOrDefaultAsync(x => x.Name.ToLower().Contains(vehicleTypeName.ToLower()) || 
+                                              x.Name == vehicleTypeName);
 
                 if (vehicleType == null)
                 {
