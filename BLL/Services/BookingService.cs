@@ -766,7 +766,7 @@ namespace AutoWashPro.BLL.Services
             var activeBooking = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
-                .Where(b => NormalizeLicensePlate(b.LicensePlate) == normalizedPlate
+                .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
                 .OrderByDescending(b => b.BookingId)
                 .FirstOrDefaultAsync();
@@ -777,7 +777,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(x => x.Booking)
                     .ThenInclude(b => b!.BookingDetails)
                         .ThenInclude(bd => bd.Service)
-                .Where(x => NormalizeLicensePlate(x.FleetVehicle.LicensePlate) == normalizedPlate
+                .Where(x => (x.FleetVehicle.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
                          && (x.Status == "CheckedIn" || x.Status == "Processing" || x.Status == "Assigned"))
                 .OrderByDescending(x => x.FleetWashLogId)
                 .FirstOrDefaultAsync();
