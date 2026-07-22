@@ -143,6 +143,20 @@ builder.Services.AddSingleton<PaddleOcrService>(sp =>
 
 QuestPDF.Settings.License = LicenseType.Community;
 
+// 5.3 Firebase Cloud Messaging Integration
+var firebaseKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "smartwash-a9f29-firebase-adminsdk-fbsvc-8310300076.json");
+if (File.Exists(firebaseKeyPath))
+{
+    FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
+    {
+        Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(firebaseKeyPath)
+    });
+}
+else
+{
+    Console.WriteLine($"[WARNING] Firebase key file not found at {firebaseKeyPath}. Push notifications will not work.");
+}
+
 // ==============================================================================
 // 6. DEPENDENCY INJECTION (BLL Services)
 // ==============================================================================
