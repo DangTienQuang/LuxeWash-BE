@@ -21,4 +21,9 @@ namespace AutoWashPro.BLL.Exceptions
     {
         public UnauthorizedException(string message) : base(message) { }
     }
+
+    public class ConflictException : Exception
+    {
+        public ConflictException(string message) : base(message) { }
+    }
 }

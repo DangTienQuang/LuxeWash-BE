@@ -94,6 +94,6 @@ namespace AutoWashPro.DAL.Entities
 
         public DateTime? OverloadNotifiedAt { get; set; }
 
-        public OverloadSuggestion? OverloadSuggestion { get; set; }
+        public ICollection<OverloadSuggestion> OverloadSuggestions { get; set; } = new List<OverloadSuggestion>();
     }
 }

@@ -78,9 +78,12 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Can only check in vehicles in Pending status.");
             }
 
-            int laneIdToAssign = booking.ProcessingLaneId ?? await _laneSchedulerService.GetBestAvailableLaneAsync(booking.BranchId, booking.BookingType == "Business");
+            if (booking.ProcessingLaneId == null)
+            {
+                var laneId = await _laneSchedulerService.AssignBestAvailableLaneAtomicAsync(bookingId);
+                if (laneId > 0) booking.ProcessingLaneId = laneId;
+            }
 
-            booking.ProcessingLaneId = laneIdToAssign > 0 ? laneIdToAssign : (int?)null;
             booking.ProcessingStaffId = staffUserId;
             booking.Status = "CheckedIn";
 
@@ -191,6 +194,22 @@ namespace AutoWashPro.BLL.Services
             {
                  if (booking.Status != "CheckedIn" && booking.Status != "Processing")
                      throw new BadRequestException("Can only start processing checked-in vehicles.");
+                     
+                 if (booking.FinalAmount > 0)
+                 {
+                     var hasCompletedPayment = await _context.Transactions
+                         .AnyAsync(t => t.ReferenceBookingId == bookingId && t.Status == "Completed");
+                     if (!hasCompletedPayment)
+                     {
+                         throw new BadRequestException("Chưa thanh toán. Không thể bắt đầu rửa xe.");
+                     }
+                 }
+
+                 if (booking.ProcessingLaneId == null)
+                 {
+                     throw new BadRequestException("Xe chưa được phân làn. Không thể bắt đầu rửa.");
+                 }
+
                  booking.ProcessingStaffId = staffUserId;
                  booking.ProcessingStartTime = DateTime.UtcNow;
                  booking.CompletedTime = null;
@@ -247,6 +266,11 @@ namespace AutoWashPro.BLL.Services
             }
 
             await _context.SaveChangesAsync();
+
+            if (isCompletingNow && booking.ProcessingLaneId.HasValue)
+            {
+                await _laneSchedulerService.AssignNextVehicleInQueueAsync(booking.ProcessingLaneId.Value);
+            }
 
             return true;
         }

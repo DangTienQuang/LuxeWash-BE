@@ -94,6 +94,15 @@ namespace AutoWashPro.BLL.Services
                 var targetDate = booking.ScheduledTime.Date;
                 var targetTime = booking.ScheduledTime.TimeOfDay;
 
+                var activeSuggestion = await _context.OverloadSuggestions
+                    .Where(s => s.BookingId == booking.BookingId && !s.IsProcessed && s.ExpiresAt > DateTime.UtcNow)
+                    .FirstOrDefaultAsync();
+
+                if (activeSuggestion != null)
+                {
+                    continue; // Skip this booking, it already has an active suggestion
+                }
+
                 Branch? bestBranch = null;
                 int bestSlotId = 0;
 
@@ -154,11 +163,13 @@ namespace AutoWashPro.BLL.Services
                         Body = $"Chi nhánh {currentBranch.Name} hiện đang quá tải. Bạn có muốn đổi sang {bestBranch.Name} hoặc hủy/giữ chỗ? Nhận Voucher 10% nếu bạn đồng ý chuyển!",
                         Data = new OverloadNotificationData
                         {
+                            SuggestionId = suggestion.Id,
                             BookingId = booking.BookingId,
                             SuggestedBranchId = bestBranch.BranchId,
                             SuggestedBranchName = bestBranch.Name,
                             SuggestedSlotId = bestSlotId,
-                            SuggestedTime = booking.ScheduledTime
+                            SuggestedTime = booking.ScheduledTime,
+                            ExpiresAt = suggestion.ExpiresAt
                         }
                     };
 

@@ -890,11 +890,13 @@ Nếu Push Notification bị miss, FE có thể gọi API này lúc khách hàng
     "statusCode": 200,
     "message": "Success",
     "data": {
+      "suggestionId": 45,
       "bookingId": 123,
       "suggestedBranchId": 2,
       "suggestedBranchName": "SmartWash Quận 7",
       "suggestedSlotId": 45,
-      "suggestedTime": "2026-07-22T08:00:00Z"
+      "suggestedTime": "2026-07-22T08:00:00Z",
+      "expiresAt": "2026-07-22T08:15:00Z"
     }
   }
   ```
@@ -905,15 +907,14 @@ Dựa trên `OverloadSuggestion` lấy được, FE hiển thị Popup với 3 n
 * **Body:**
   ```json
   {
-    "decision": "Switch", // "Keep", "Switch", hoặc "Cancel"
-    "alternativeBranchId": 2, // Phải truyền khớp với thông tin lấy từ API Get (nếu decision là Switch)
-    "suggestedTime": "2026-07-22T08:00:00Z" // Phải truyền khớp (nếu decision là Switch)
+    "suggestionId": 45, // Truyền ID của suggestion lấy từ API trên
+    "decision": "Switch" // "Keep", "Switch", hoặc "Cancel"
   }
   ```
 * **Luồng Backend Xử lý (AI & Transaction Atomicity):**
   * `Keep`: Đánh dấu `IsWaitAccepted = true`. Khách chấp nhận chờ lâu. Booking giữ nguyên.
-  * `Switch`: Chuyển booking sang chi nhánh mới (cân bằng tải). Backend **tự động phát hành Voucher giảm 10%** trừ thẳng vào `FinalAmount` của booking này như một lời xin lỗi/cảm ơn. Trả về `UpdatedBooking` chứa giá mới.
-  * `Cancel`: Hủy booking. Backend **tự động hoàn tiền 100% (Refund)** nếu khách đã thanh toán qua ví (Wallet) hoặc PayOS.
+  * `Switch`: Chuyển booking sang chi nhánh mới (cân bằng tải). Backend **tự động phát hành Voucher giảm 10%** bù đắp sự bất tiện này. Trả về `UpdatedBooking` chứa thông tin giá mới và đối tượng `Voucher` mới phát hành.
+  * `Cancel`: Hủy booking. Backend **tự động hoàn tiền 100% (Refund)** nếu khách đã thanh toán qua ví (Wallet) hoặc PayOS, đồng thời hoàn lại điểm và voucher đã dùng (nếu có). Trả về thông tin hoàn tiền trong đối tượng `Refund`.
 
 ---
 

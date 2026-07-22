@@ -48,6 +48,10 @@ namespace AutoWashPro.API.Middlewares
                         statusCode = 401;
                         message = unauthorizedEx.Message;
                         break;
+                    case ConflictException conflictEx:
+                        statusCode = 409;
+                        message = conflictEx.Message;
+                        break;
                     case DbUpdateConcurrencyException concurrencyEx:
                         statusCode = 409;
                         message = "Data was modified by another transaction. Please reload and try again.";
