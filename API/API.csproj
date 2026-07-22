@@ -67,7 +67,7 @@
     <None Update="tessdata\vie.traineddata">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="smartwash-a9f29-firebase-adminsdk-fbsvc-a500ee26aa.json">
+    <None Update="smartwash-a9f29-firebase-adminsdk-fbsvc-82f3d78d83.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
