@@ -8,7 +8,7 @@ using AutoWashPro.DAL.Entities;
 
 namespace AutoWashPro.API.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/v1/notifications")]
     [ApiController]
     [Authorize]
     public class NotificationController : ControllerBase
@@ -25,7 +25,7 @@ namespace AutoWashPro.API.Controllers
             public string Token { get; set; } = null!;
         }
 
-        [HttpPost("register-token")]
+        [HttpPost("token")]
         public async Task<IActionResult> RegisterToken([FromBody] FcmTokenDto request)
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -33,11 +33,11 @@ namespace AutoWashPro.API.Controllers
                 return Unauthorized();
 
             if (string.IsNullOrWhiteSpace(request.Token))
-                return BadRequest("Token is required.");
+                return BadRequest(new { statusCode = 400, message = "Token is required.", data = (object?)null, details = (object?)null });
 
-            // Check if token already exists for this user
+            // Find token globally across all users
             var existingToken = await _context.UserFcmTokens
-                .FirstOrDefaultAsync(t => t.UserId == userId && t.Token == request.Token);
+                .FirstOrDefaultAsync(t => t.Token == request.Token);
 
             if (existingToken == null)
             {
@@ -49,18 +49,23 @@ namespace AutoWashPro.API.Controllers
                     LastUsedAt = System.DateTime.UtcNow
                 };
                 _context.UserFcmTokens.Add(newToken);
-                await _context.SaveChangesAsync();
             }
             else
             {
+                // Reassign token to current user if it belonged to someone else
+                if (existingToken.UserId != userId)
+                {
+                    existingToken.UserId = userId;
+                }
                 existingToken.LastUsedAt = System.DateTime.UtcNow;
-                await _context.SaveChangesAsync();
             }
 
-            return Ok(new { message = "FCM token registered successfully." });
+            await _context.SaveChangesAsync();
+
+            return Ok(new { statusCode = 200, message = "FCM token registered successfully.", data = (object?)null, details = (object?)null });
         }
 
-        [HttpDelete("remove-token")]
+        [HttpDelete("token")]
         public async Task<IActionResult> RemoveToken([FromBody] FcmTokenDto request)
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -68,7 +73,7 @@ namespace AutoWashPro.API.Controllers
                 return Unauthorized();
 
             if (string.IsNullOrWhiteSpace(request.Token))
-                return BadRequest("Token is required.");
+                return BadRequest(new { statusCode = 400, message = "Token is required.", data = (object?)null, details = (object?)null });
 
             var existingToken = await _context.UserFcmTokens
                 .FirstOrDefaultAsync(t => t.UserId == userId && t.Token == request.Token);
@@ -79,7 +84,7 @@ namespace AutoWashPro.API.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            return Ok(new { message = "FCM token removed successfully." });
+            return Ok(new { statusCode = 200, message = "FCM token removed successfully.", data = (object?)null, details = (object?)null });
         }
     }
 }

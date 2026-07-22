@@ -31,5 +31,6 @@ namespace AutoWashPro.DAL.Entities
         public bool IsProcessed { get; set; } = false;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime ExpiresAt { get; set; }
     }
 }

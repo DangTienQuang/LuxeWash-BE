@@ -124,6 +124,16 @@ namespace AutoWashPro.BLL.Services
 
                 if (bestBranch != null)
                 {
+                    // Invalidate old suggestions for this booking
+                    var oldSuggestions = await _context.OverloadSuggestions
+                        .Where(s => s.BookingId == booking.BookingId && !s.IsProcessed)
+                        .ToListAsync();
+                    
+                    foreach(var old in oldSuggestions)
+                    {
+                        old.IsProcessed = true;
+                    }
+
                     // Save the suggestion to DB
                     var suggestion = new OverloadSuggestion
                     {
@@ -131,7 +141,8 @@ namespace AutoWashPro.BLL.Services
                         SuggestedBranchId = bestBranch.BranchId,
                         SuggestedBranchName = bestBranch.Name,
                         SuggestedSlotId = bestSlotId,
-                        SuggestedTime = booking.ScheduledTime
+                        SuggestedTime = booking.ScheduledTime,
+                        ExpiresAt = DateTime.UtcNow.AddMinutes(5)
                     };
                     _context.OverloadSuggestions.Add(suggestion);
                     await _context.SaveChangesAsync(); // Save to generate ID

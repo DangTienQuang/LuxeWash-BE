@@ -20,5 +20,7 @@ namespace AutoWashPro.BLL.DTOs
         public string? CustomerTierName { get; set; }
         public int? CustomerTierPoints { get; set; }
         public int? UserId { get; set; }
+        public int? ProcessingLaneId { get; set; }
+        public string? ProcessingLaneName { get; set; }
     }
 }

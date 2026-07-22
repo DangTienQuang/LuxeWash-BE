@@ -146,6 +146,32 @@ namespace BLL.Services
             return bestLaneId;
         }
 
+        public async Task<int> AssignBestAvailableLaneAtomicAsync(int bookingId)
+        {
+            using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
+            {
+                var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == bookingId);
+                if (booking == null || booking.ProcessingLaneId != null) 
+                    return booking?.ProcessingLaneId ?? 0;
+
+                int laneId = await GetBestAvailableLaneAsync(booking.BranchId, booking.BookingType == "Business");
+                if (laneId > 0)
+                {
+                    booking.ProcessingLaneId = laneId;
+                    await _context.SaveChangesAsync();
+                }
+
+                await dbTransaction.CommitAsync();
+                return laneId;
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
+        }
+
         public async Task<bool> AssignNextVehicleInQueueAsync(int laneId)
         {
             var lane = await _context.Lanes.FindAsync(laneId);
@@ -159,13 +185,32 @@ namespace BLL.Services
                 .Where(b => b.BranchId == lane.BranchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null)
                 .ToListAsync();
 
-            if (!waitingBookings.Any()) return false;
+            var paidOrFreeBookings = new List<AutoWashPro.DAL.Entities.Booking>();
+            foreach (var b in waitingBookings)
+            {
+                if (b.FinalAmount == 0)
+                {
+                    paidOrFreeBookings.Add(b);
+                }
+                else
+                {
+                    var isPaid = await _context.Transactions.AnyAsync(t => t.ReferenceBookingId == b.BookingId 
+                        && t.Status == "Completed" 
+                        && (t.TransactionType == "Payment" || t.TransactionType == "WalkInPayment" || t.TransactionType == "BookingPayment"));
+                    if (isPaid)
+                    {
+                        paidOrFreeBookings.Add(b);
+                    }
+                }
+            }
+
+            if (!paidOrFreeBookings.Any()) return false;
 
             // Sort queue:
             // 1. Scheduled (Non-WalkIn) > WalkIn
             // 2. High Tier > Low Tier
             // 3. Earliest Update Time
-            var nextBooking = waitingBookings
+            var nextBooking = paidOrFreeBookings
                 .OrderByDescending(b => b.BookingType != "WalkIn")
                 .ThenByDescending(b => b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0)
                 .ThenBy(b => b.UpdatedAt)

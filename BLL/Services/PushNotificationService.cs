@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AutoWashPro.DAL.Data;
 using Microsoft.EntityFrameworkCore;
+using AutoWashPro.DAL.Entities;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -36,7 +37,24 @@ namespace AutoWashPro.BLL.Services
                 return false;
             }
 
+            var fcmData = new Dictionary<string, string>();
+            if (request.Data != null)
+            {
+                var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                var jsonString = JsonSerializer.Serialize(request.Data, options);
+                var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonString);
+                if (dict != null)
+                {
+                    foreach (var kvp in dict)
+                    {
+                        fcmData[kvp.Key] = kvp.Value.ToString();
+                    }
+                }
+            }
+
             bool allSuccess = true;
+            var tokensToRemove = new List<UserFcmToken>();
+
             foreach (var userToken in user.FcmTokens)
             {
                 var message = new Message()
@@ -47,10 +65,7 @@ namespace AutoWashPro.BLL.Services
                         Title = request.Title,
                         Body = request.Body
                     },
-                    Data = new Dictionary<string, string>
-                    {
-                        { "payload", JsonSerializer.Serialize(request.Data) }
-                    },
+                    Data = fcmData,
                     Webpush = new WebpushConfig
                     {
                         FcmOptions = new WebpushFcmOptions
@@ -65,11 +80,32 @@ namespace AutoWashPro.BLL.Services
                     string response = await FirebaseMessaging.DefaultInstance.SendAsync(message);
                     _logger.LogInformation("Successfully sent message via FCM to token {Token}: {Response}", userToken.Token, response);
                 }
-                catch (System.Exception ex)
+                catch (FirebaseMessagingException ex)
                 {
                     _logger.LogError(ex, "Error sending FCM push notification to User {UserId} with token {Token}", request.UserId, userToken.Token);
+                    
+                    if (ex.MessagingErrorCode == MessagingErrorCode.Unregistered || 
+                        ex.MessagingErrorCode == MessagingErrorCode.InvalidArgument)
+                    {
+                        tokensToRemove.Add(userToken);
+                    }
+                    else
+                    {
+                        allSuccess = false;
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    _logger.LogError(ex, "Unexpected error sending FCM to User {UserId} with token {Token}", request.UserId, userToken.Token);
                     allSuccess = false;
                 }
+            }
+
+            if (tokensToRemove.Any())
+            {
+                _context.UserFcmTokens.RemoveRange(tokensToRemove);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Removed {Count} invalid FCM tokens for User {UserId}", tokensToRemove.Count, request.UserId);
             }
 
             return allSuccess;

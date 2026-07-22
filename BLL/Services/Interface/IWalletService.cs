@@ -16,5 +16,7 @@ namespace AutoWashPro.BLL.Services
         Task RefundSpendablePointsAsync(int userId, int pointsToRefund, string reason, int? referenceBookingId = null);
         Task RefundBalanceAsync(int userId, decimal amount, string reason);
         Task<int> AwardCompletionPointsAsync(int userId, int pointsEarned, int bookingId);
+        Task ConfirmTransactionPaymentAsync(int transactionId, decimal? webhookAmount, string orderCode);
+        Task MarkTransactionTerminalAsync(int transactionId, string terminalStatus);
     }
 }

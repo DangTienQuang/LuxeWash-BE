@@ -75,6 +75,10 @@ namespace AutoWashPro.DAL.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<UserFcmToken>()
+                .HasIndex(t => t.Token)
+                .IsUnique();
+
             modelBuilder.Entity<Vehicle>()
                 .HasIndex(v => v.LicensePlate)
                 .IsUnique();

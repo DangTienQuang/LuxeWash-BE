@@ -843,3 +843,93 @@ Khách hàng khi mở App sẽ thấy thông báo dời lịch, hoặc cờ HasP
 `
 * **Mô tả:** Khách hàng đồng ý dời lịch. Backend sẽ tự cập nhật Booking sang chi nhánh mới, add Voucher vào Booking, và tự động cân bằng Tải trọng Sức chứa (Capacity) giữa 2 chi nhánh.
 
+---
+
+## PHẦN 6: HỆ THỐNG ĐIỀU PHỐI OVERLOAD FCM VÀ TỰ ĐỘNG CẤP LÀN (ATOMIC LANE SCHEDULING)
+
+Phần này đặc tả cấu trúc API và nghiệp vụ xử lý khi hệ thống bị quá tải, cũng như logic cấp làn và thanh toán để FE code UI/UX chuẩn xác nhất.
+
+### 1. API Quản lý FCM Token (Push Notification)
+Backend đã hỗ trợ đa thiết bị cho mỗi User. Mỗi lần user đăng nhập trên một thiết bị mới, FE cần gọi API này để lưu Token.
+
+**A. Đăng ký FCM Token (Khi Mở App / Đăng nhập)**
+* **Endpoint:** `POST /api/v1/notifications/token`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUSTOMER}`
+* **Body:**
+  ```json
+  {
+    "token": "string_fcm_token_day_du"
+  }
+  ```
+* **Response (Standard Format):**
+  ```json
+  {
+    "statusCode": 200,
+    "message": "FCM token registered successfully.",
+    "data": null,
+    "details": null
+  }
+  ```
+
+**B. Xóa FCM Token (Khi Đăng xuất)**
+* **Endpoint:** `DELETE /api/v1/notifications/token`
+* **Body:** Giống như đăng ký (Truyền token hiện tại của máy để xóa khỏi DB).
+
+---
+
+### 2. Nghiệp vụ Xử lý Quá tải (Overload Workflow)
+Khi AI Server phát hiện chi nhánh sắp quá tải trong khung giờ khách muốn đặt, nó sẽ bắn Push Notification (hoặc FE lấy qua API) gợi ý khách dời lịch sang chi nhánh khác trống hơn.
+
+**A. Lấy gợi ý quá tải đang chờ xử lý**
+Nếu Push Notification bị miss, FE có thể gọi API này lúc khách hàng vừa đặt lịch xong hoặc vừa mở App để kiểm tra xem có gợi ý dời lịch nào đang chờ quyết định không. Gợi ý có thời hạn (TTL), nếu hết hạn API sẽ trả về rỗng.
+* **Endpoint:** `GET /api/v1/bookings/{bookingId}/overload-suggestion`
+* **Headers:** `Authorization: Bearer {JWT_TOKEN_CUSTOMER}`
+* **Response (nếu có):**
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Success",
+    "data": {
+      "bookingId": 123,
+      "suggestedBranchId": 2,
+      "suggestedBranchName": "SmartWash Quận 7",
+      "suggestedSlotId": 45,
+      "suggestedTime": "2026-07-22T08:00:00Z"
+    }
+  }
+  ```
+
+**B. Đưa ra Quyết định (Keep / Switch / Cancel)**
+Dựa trên `OverloadSuggestion` lấy được, FE hiển thị Popup với 3 nút bấm tương ứng:
+* **Endpoint:** `POST /api/v1/bookings/{bookingId}/handle-overload-suggestion`
+* **Body:**
+  ```json
+  {
+    "decision": "Switch", // "Keep", "Switch", hoặc "Cancel"
+    "alternativeBranchId": 2, // Phải truyền khớp với thông tin lấy từ API Get (nếu decision là Switch)
+    "suggestedTime": "2026-07-22T08:00:00Z" // Phải truyền khớp (nếu decision là Switch)
+  }
+  ```
+* **Luồng Backend Xử lý (AI & Transaction Atomicity):**
+  * `Keep`: Đánh dấu `IsWaitAccepted = true`. Khách chấp nhận chờ lâu. Booking giữ nguyên.
+  * `Switch`: Chuyển booking sang chi nhánh mới (cân bằng tải). Backend **tự động phát hành Voucher giảm 10%** trừ thẳng vào `FinalAmount` của booking này như một lời xin lỗi/cảm ơn. Trả về `UpdatedBooking` chứa giá mới.
+  * `Cancel`: Hủy booking. Backend **tự động hoàn tiền 100% (Refund)** nếu khách đã thanh toán qua ví (Wallet) hoặc PayOS.
+
+---
+
+### 3. Nghiệp vụ Thanh Toán và Cấp Làn (Staff & Walk-In)
+
+Hệ thống Backend đã bọc Transaction (Serializable) ở mức cao nhất để **đảm bảo không bao giờ có chuyện 2 xe vào cùng 1 làn**. FE cần lưu ý các ràng buộc sau:
+
+**A. API Tạo Walk-In Booking (`POST /api/v1/bookings/walk-in`)**
+* DTO trả về đã được bổ sung 3 trường: `processingLaneId`, `processingLaneName`, và `isWaitingForLane`.
+* **Nếu thanh toán Tiền mặt (Cash) hoặc Wallet:** Giao dịch thành công ngay -> Backend cấp làn ngay lập tức -> `isWaitingForLane = false`, có `processingLaneId`. Xe được phép tiến thẳng vào làn.
+* **Nếu thanh toán PayOS:** Trạng thái tiền là `Pending` -> Backend **TỪ CHỐI** cấp làn -> `processingLaneId = null`, `isWaitingForLane = true`. Xe bị đưa vào "Hàng chờ thanh toán".
+  * **Giải pháp cho FE:** FE show mã QR PayOS cho khách. Ngay khi khách quét xong, Webhook của PayOS gọi về Backend -> Backend tự động kiểm tra xem xe này đang trong hàng chờ không -> Tự động tìm Làn tốt nhất và gán làn -> Staff/FE chỉ cần gọi API polling Check Status là sẽ thấy `processingLaneId` đã có data.
+
+**B. Ràng Buộc (Constraints) Dành Cho Staff Web/App**
+Khi Staff ấn nút **"Tiến hành rửa xe (Processing)"** gọi API `UpdateBookingStatusAsync`, Backend sẽ kiểm tra 2 lớp bảo mật:
+1. **Kiểm tra Thanh toán:** Nếu `FinalAmount > 0` mà chưa có giao dịch nào hoàn tất (`Completed`), Backend sẽ văng lỗi HTTP 400. Xe chưa trả tiền không được rửa.
+2. **Kiểm tra Làn:** Nếu Booking chưa có `ProcessingLaneId`, Backend sẽ văng lỗi HTTP 400. (Lỗi này thường xảy ra nếu Staff cố ý ép xe từ "Hàng chờ" vào rửa khi chưa được Hệ thống AI phân làn).
+
+FE cần dùng 2 tiêu chí trên để disable (làm mờ) nút **"Bắt đầu rửa"** trên màn hình của Staff cho tới khi thanh toán xong và có làn.

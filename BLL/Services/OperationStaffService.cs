@@ -98,6 +98,11 @@ namespace AutoWashPro.BLL.Services
         {
             var targetDate = date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
 
+            var staffBranchId = await _context.EmployeeProfiles
+                .Where(e => e.EmployeeId == staffUserId)
+                .Select(e => e.BranchId)
+                .FirstOrDefaultAsync();
+
             var bookings = await _context.Bookings
                 .Include(b => b.BookingDetails)
                 .ThenInclude(d => d.Service)
@@ -105,7 +110,9 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.User)
                 .ThenInclude(u => u!.CustomerProfile)
                 .ThenInclude(p => p!.Tier)
-                .Where(b => (b.Status == "CheckedIn" || b.Status == "Processing")
+                .Include(b => b.ProcessingLane)
+                .Where(b => b.BranchId == staffBranchId
+                         && (b.Status == "CheckedIn" || b.Status == "Processing")
                          && (b.ScheduledTime.Date == targetDate || b.ProcessingStartTime.HasValue))
                 .OrderByDescending(b => b.User != null && b.User.CustomerProfile != null && b.User.CustomerProfile.Tier != null
                                          ? b.User.CustomerProfile.Tier.MinAccumulatedPoints
@@ -162,7 +169,9 @@ namespace AutoWashPro.BLL.Services
                     ActualDurationMinutes = b.ActualDurationMinutes,
                     CustomerTierName = b.User?.CustomerProfile?.Tier?.TierName ?? "WalkIn / Standard",
                     CustomerTierPoints = b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0,
-                    UserId = b.UserId
+                    UserId = b.UserId,
+                    ProcessingLaneId = b.ProcessingLaneId,
+                    ProcessingLaneName = b.ProcessingLane?.Name
                 };
             }).ToList();
         }

@@ -195,6 +195,8 @@ namespace AutoWashPro.BLL.DTOs
         public string? OrderCode { get; set; }
         public decimal? Amount { get; set; }
         public DateTime? PaidAt { get; set; }
+        public int? ProcessingLaneId { get; set; }
+        public string? ProcessingLaneName { get; set; }
     }
 
     public class UpdateVehicleConditionDTO
