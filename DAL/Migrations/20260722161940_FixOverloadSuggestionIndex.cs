@@ -35,6 +35,12 @@ namespace DAL.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // P2: Data may now contain multiple OverloadSuggestions per BookingId (one-to-many).
+            // Rolling back to a UNIQUE index here would fail if duplicate data exists.
+            // If rollback to one-to-one is absolutely required, you must implement data cleanup 
+            // before creating the unique index:
+            // migrationBuilder.Sql("DELETE FROM OverloadSuggestions WHERE ...");
+
             migrationBuilder.DropForeignKey(
                 name: "FK_OverloadSuggestions_Bookings_BookingId",
                 table: "OverloadSuggestions");
@@ -46,8 +52,7 @@ namespace DAL.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_OverloadSuggestions_BookingId",
                 table: "OverloadSuggestions",
-                column: "BookingId",
-                unique: true);
+                column: "BookingId");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_OverloadSuggestions_Bookings_BookingId",

@@ -289,7 +289,7 @@ builder.Services.AddScoped<IBookingAttendanceService, BookingAttendanceService>(
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.Configure<BLL.Helpers.CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
 
-builder.Services.AddHostedService<AutoWashPro.API.Workers.AnnualTierResetWorker>();
+// Note: AnnualTierResetWorker is already registered at line 247; duplicate removed.
 
 builder.Services.AddSingleton(provider =>
 {

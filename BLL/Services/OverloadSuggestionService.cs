@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoWashPro.DAL.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -13,34 +14,47 @@ namespace AutoWashPro.BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly IPushNotificationService _pushNotificationService;
+        private readonly ILogger<OverloadSuggestionService> _logger;
 
-        public OverloadSuggestionService(AutoWashDbContext context, IPushNotificationService pushNotificationService)
+        public OverloadSuggestionService(
+            AutoWashDbContext context,
+            IPushNotificationService pushNotificationService,
+            ILogger<OverloadSuggestionService> logger)
         {
             _context = context;
             _pushNotificationService = pushNotificationService;
+            _logger = logger;
         }
 
-        public async Task CheckAndTriggerOverloadAsync(int branchId)
+        /// <summary>
+        /// P0.3 + P0.5: Checks branch overload, creates OverloadSuggestion rows atomically per booking,
+        /// and sends FCM. Returns a structured scan result.
+        /// </summary>
+        public async Task<OverloadScanResultDTO> CheckAndTriggerOverloadAsync(int branchId)
         {
+            var result = new OverloadScanResultDTO();
+
             var now = DateTime.UtcNow;
             var windowEnd = now.AddHours(2);
             var today = now.Date;
             var timeNow = now.TimeOfDay;
             var timeEnd = windowEnd.TimeOfDay;
 
-            // 1. Check if overloaded
+            // 1. Check if branch is overloaded
             var queueLength = await _context.Bookings
                 .CountAsync(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null);
 
             var impactedBookings = await _context.Bookings
                 .Include(b => b.User)
-                .Where(b => b.BranchId == branchId 
-                         && b.Status == "Pending" 
+                .Where(b => b.BranchId == branchId
+                         && b.Status == "Pending"
                          && !b.IsWaitAccepted
                          && b.UserId != null
                          && b.ScheduledTime >= now
                          && b.ScheduledTime <= windowEnd)
                 .ToListAsync();
+
+            result.ScannedBookings = impactedBookings.Count;
 
             // Total booked weight in the current window
             var totalBookedWeight = impactedBookings.Sum(b => b.CapacityWeight > 0 ? b.CapacityWeight : 1);
@@ -49,29 +63,29 @@ namespace AutoWashPro.BLL.Services
             var relevantCapacities = await _context.DailySlotCapacities
                 .Include(dsc => dsc.TimeSlot)
                 .Where(dsc => dsc.BranchId == branchId && dsc.Date == today
-                           && dsc.TimeSlot.StartTime < timeEnd 
+                           && dsc.TimeSlot.StartTime < timeEnd
                            && dsc.TimeSlot.EndTime > timeNow)
                 .ToListAsync();
 
             var maxCapacity = relevantCapacities.Sum(c => c.TimeSlot.MaxCapacity);
 
-            // Overload Condition: Walk-ins + Booked Cars >= MaxCapacity
-            // Or if MaxCapacity is 0 (no slots config), fallback to QueueLength >= 5
+            // Not overloaded — early exit
             if (maxCapacity > 0)
             {
-                if ((queueLength + totalBookedWeight) < maxCapacity) return; // Not overloaded
+                if ((queueLength + totalBookedWeight) < maxCapacity) return result;
             }
             else
             {
-                if (queueLength < 5) return; // Fallback threshold
+                if (queueLength < 5) return result; // Fallback threshold
             }
 
-            if (!impactedBookings.Any()) return;
+            if (!impactedBookings.Any()) return result;
 
             var currentBranch = await _context.Branches.FirstOrDefaultAsync(b => b.BranchId == branchId);
-            if (currentBranch == null || !currentBranch.Latitude.HasValue || !currentBranch.Longitude.HasValue) return;
+            if (currentBranch == null || !currentBranch.Latitude.HasValue || !currentBranch.Longitude.HasValue)
+                return result;
 
-            // 3. Find nearby branches
+            // 2. Find nearby active branches
             var otherBranches = await _context.Branches
                 .Where(b => b.IsActive && b.BranchId != branchId && b.Latitude.HasValue && b.Longitude.HasValue)
                 .ToListAsync();
@@ -80,70 +94,83 @@ namespace AutoWashPro.BLL.Services
                 .Select(b => new
                 {
                     Branch = b,
-                    Distance = CalculateHaversine(currentBranch.Latitude.Value, currentBranch.Longitude.Value, b.Latitude.Value, b.Longitude.Value)
+                    Distance = CalculateHaversine(
+                        currentBranch.Latitude!.Value, currentBranch.Longitude!.Value,
+                        b.Latitude!.Value, b.Longitude!.Value)
                 })
                 .OrderBy(x => x.Distance)
-                .Take(5) // Check top 5 closest
+                .Take(5)
                 .ToList();
 
-            if (!nearbyBranches.Any()) return;
+            if (!nearbyBranches.Any()) return result;
 
-            // 4. For each booking, find a suitable branch
+            // 3. For each impacted booking, atomically check + create suggestion
             foreach (var booking in impactedBookings)
             {
                 var targetDate = booking.ScheduledTime.Date;
                 var targetTime = booking.ScheduledTime.TimeOfDay;
 
-                var activeSuggestion = await _context.OverloadSuggestions
-                    .Where(s => s.BookingId == booking.BookingId && !s.IsProcessed && s.ExpiresAt > DateTime.UtcNow)
-                    .FirstOrDefaultAsync();
-
-                if (activeSuggestion != null)
+                // P0.5: Atomic check-and-create using a Serializable transaction per booking
+                // to prevent two concurrent triggers from inserting duplicate active suggestions.
+                using var suggTx = await _context.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
+                try
                 {
-                    continue; // Skip this booking, it already has an active suggestion
-                }
-
-                Branch? bestBranch = null;
-                int bestSlotId = 0;
-
-                foreach (var nb in nearbyBranches)
-                {
-                    // Check if target branch has walk-in jam
-                    var targetQueueLength = await _context.Bookings
-                        .CountAsync(b => b.BranchId == nb.Branch.BranchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null);
-                    
-                    if (targetQueueLength >= 3) continue; // Too many walk-ins, don't suggest
-
-                    // Check slot capacity
-                    var dsc = await _context.DailySlotCapacities
-                        .Include(c => c.TimeSlot)
-                        .Where(c => c.BranchId == nb.Branch.BranchId 
-                                 && c.Date == targetDate 
-                                 && c.TimeSlot.StartTime <= targetTime 
-                                 && c.TimeSlot.EndTime > targetTime)
+                    // Re-check inside the transaction
+                    var activeSuggestion = await _context.OverloadSuggestions
+                        .Where(s => s.BookingId == booking.BookingId && !s.IsProcessed && s.ExpiresAt > DateTime.UtcNow)
                         .FirstOrDefaultAsync();
 
-                    if (dsc != null && (dsc.BookedWeight + (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1)) <= dsc.TimeSlot.MaxCapacity)
+                    if (activeSuggestion != null)
                     {
-                        bestBranch = nb.Branch;
-                        bestSlotId = dsc.SlotId;
-                        break;
+                        // Already has an active suggestion — skip
+                        result.SkippedActiveSuggestions++;
+                        await suggTx.RollbackAsync();
+                        continue;
                     }
-                }
 
-                if (bestBranch != null)
-                {
-                    // Invalidate old suggestions for this booking
-                    var oldSuggestions = await _context.OverloadSuggestions
+                    // Find the best available destination branch/slot
+                    Branch? bestBranch = null;
+                    int bestSlotId = 0;
+
+                    foreach (var nb in nearbyBranches)
+                    {
+                        var targetQueueLength = await _context.Bookings
+                            .CountAsync(b => b.BranchId == nb.Branch.BranchId
+                                         && b.Status == "CheckedIn"
+                                         && b.ProcessingLaneId == null);
+
+                        if (targetQueueLength >= 3) continue; // Too busy
+
+                        var dsc = await _context.DailySlotCapacities
+                            .Include(c => c.TimeSlot)
+                            .Where(c => c.BranchId == nb.Branch.BranchId
+                                     && c.Date == targetDate
+                                     && c.TimeSlot.StartTime <= targetTime
+                                     && c.TimeSlot.EndTime > targetTime)
+                            .FirstOrDefaultAsync();
+
+                        if (dsc != null && (dsc.BookedWeight + (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1)) <= dsc.TimeSlot.MaxCapacity)
+                        {
+                            bestBranch = nb.Branch;
+                            bestSlotId = dsc.SlotId;
+                            break;
+                        }
+                    }
+
+                    if (bestBranch == null)
+                    {
+                        await suggTx.RollbackAsync();
+                        continue; // No suitable destination found
+                    }
+
+                    // Invalidate any stale (expired but not yet marked processed) suggestions
+                    var stale = await _context.OverloadSuggestions
                         .Where(s => s.BookingId == booking.BookingId && !s.IsProcessed)
                         .ToListAsync();
-                    
-                    foreach(var old in oldSuggestions)
-                    {
-                        old.IsProcessed = true;
-                    }
+                    foreach (var s in stale) s.IsProcessed = true;
 
-                    // Save the suggestion to DB
+                    // Insert new suggestion
                     var suggestion = new OverloadSuggestion
                     {
                         BookingId = booking.BookingId,
@@ -154,13 +181,21 @@ namespace AutoWashPro.BLL.Services
                         ExpiresAt = DateTime.UtcNow.AddMinutes(5)
                     };
                     _context.OverloadSuggestions.Add(suggestion);
-                    await _context.SaveChangesAsync(); // Save to generate ID
+                    await _context.SaveChangesAsync(); // Flush to generate suggestion.Id
 
+                    booking.OverloadNotifiedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                    await suggTx.CommitAsync();
+
+                    result.CreatedSuggestions++;
+
+                    // 4. Send FCM after commit so no notification on failed transaction
                     var pushRequest = new PushNotificationRequest
                     {
-                        UserId = booking.UserId.Value,
-                        Title = "Chi nhánh quá tải!",
-                        Body = $"Chi nhánh {currentBranch.Name} hiện đang quá tải. Bạn có muốn đổi sang {bestBranch.Name} hoặc hủy/giữ chỗ? Nhận Voucher 10% nếu bạn đồng ý chuyển!",
+                        UserId = booking.UserId!.Value,
+                        Title = "Branch Overloaded",
+                        Body = $"Branch '{currentBranch.Name}' is currently overloaded. " +
+                               $"Switch to '{bestBranch.Name}' and receive a 10% compensation voucher!",
                         Data = new OverloadNotificationData
                         {
                             SuggestionId = suggestion.Id,
@@ -173,25 +208,44 @@ namespace AutoWashPro.BLL.Services
                         }
                     };
 
-                    await _pushNotificationService.SendPushNotificationAsync(pushRequest);
-                    booking.OverloadNotifiedAt = DateTime.UtcNow; 
+                    try
+                    {
+                        await _pushNotificationService.SendPushNotificationAsync(pushRequest);
+                        result.NotificationsSent++;
+                    }
+                    catch (Exception ex)
+                    {
+                        // FCM failure must NOT undo the already-committed suggestion
+                        _logger.LogError(ex,
+                            "Failed to send overload FCM for Booking {BookingId} (SuggestionId={SuggestionId}). " +
+                            "Suggestion is committed; customer may not be notified in real time.",
+                            booking.BookingId, suggestion.Id);
+                        result.NotificationsFailed++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "Error creating overload suggestion for Booking {BookingId}. Rolling back.",
+                        booking.BookingId);
+                    try { await suggTx.RollbackAsync(); } catch { /* already rolled back */ }
                 }
             }
 
-            await _context.SaveChangesAsync();
+            return result;
         }
 
-        private double CalculateHaversine(double lat1, double lon1, double lat2, double lon2)
+        private static double CalculateHaversine(double lat1, double lon1, double lat2, double lon2)
         {
-            var R = 6371; // Radius of earth in km
+            const double R = 6371; // Earth radius in km
             var dLat = (lat2 - lat1) * Math.PI / 180;
             var dLon = (lon2 - lon1) * Math.PI / 180;
-            var a = 
-                Math.Sin(dLat/2) * Math.Sin(dLat/2) +
-                Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) * 
-                Math.Sin(dLon/2) * Math.Sin(dLon/2); 
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1-a)); 
-            return R * c; 
+            var a =
+                Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c;
         }
     }
 }

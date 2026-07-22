@@ -1,11 +1,13 @@
-using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace AutoWashPro.BLL.DTOs
 {
     public class HandleOverloadDecisionDTO
     {
-        public int SuggestionId { get; set; }
-        // "Switch", "Cancel", "Keep"
+        /// <summary>
+        /// Valid values: "Switch", "Cancel", "Keep"
+        /// </summary>
+        [Required]
         public string Decision { get; set; } = null!;
     }
 }

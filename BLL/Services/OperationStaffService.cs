@@ -44,7 +44,7 @@ namespace AutoWashPro.BLL.Services
                 return new StaffLaneTaskDTO
                 {
                     LaneId = 0,
-                    LaneName = "Mọi làn rửa xe (All Lanes)",
+                    LaneName = "All Lanes",
                     AssignedDate = targetDate
                 };
             }
@@ -94,10 +94,9 @@ namespace AutoWashPro.BLL.Services
 
             await _context.SaveChangesAsync();
 
-            // Trigger Overload Logic in background after check-in
-            #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-            _overloadSuggestionService.CheckAndTriggerOverloadAsync(booking.BranchId);
-            #pragma warning restore CS4014
+            // P0.4: Await the overload check — do NOT fire-and-forget with a scoped DbContext,
+            // as the scope may be disposed before the async task completes (ObjectDisposedException).
+            await _overloadSuggestionService.CheckAndTriggerOverloadAsync(booking.BranchId);
 
             return true;
         }
@@ -206,13 +205,13 @@ namespace AutoWashPro.BLL.Services
                          .AnyAsync(t => t.ReferenceBookingId == bookingId && t.Status == "Completed");
                      if (!hasCompletedPayment)
                      {
-                         throw new BadRequestException("Chưa thanh toán. Không thể bắt đầu rửa xe.");
+                         throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
                      }
                  }
 
                  if (booking.ProcessingLaneId == null)
                  {
-                     throw new BadRequestException("Xe chưa được phân làn. Không thể bắt đầu rửa.");
+                     throw new BadRequestException("Booking does not have an assigned lane; cannot start processing.");
                  }
 
                  booking.ProcessingStaffId = staffUserId;
