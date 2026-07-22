@@ -144,7 +144,7 @@ builder.Services.AddSingleton<PaddleOcrService>(sp =>
 QuestPDF.Settings.License = LicenseType.Community;
 
 // 5.3 Firebase Cloud Messaging Integration
-var firebaseKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "smartwash-a9f29-firebase-adminsdk-fbsvc-8310300076.json");
+var firebaseKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "smartwash-a9f29-firebase-adminsdk-fbsvc-a500ee26aa.json");
 if (File.Exists(firebaseKeyPath))
 {
     FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
