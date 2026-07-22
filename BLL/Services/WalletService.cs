@@ -23,14 +23,16 @@ namespace AutoWashPro.BLL.Services
         private readonly ILogger<WalletService> _logger;
         private readonly ITierService _tierService;
         private readonly IEmailService _emailService;
+        private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
 
-        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService)
+        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService)
         {
             _context = context;
             _payOSClient = payOSClient;
             _logger = logger;
             _tierService = tierService;
             _emailService = emailService;
+            _laneSchedulerService = laneSchedulerService;
         }
 
         public async Task<WalletResponseDTO> GetWalletInfoAsync(int userId)
@@ -311,6 +313,15 @@ namespace AutoWashPro.BLL.Services
                     foreach (var pendingPayment in otherPendingWalkInPayments)
                     {
                         pendingPayment.Status = "Expired";
+                    }
+
+                    if (booking.ProcessingLaneId == null && booking.Status == "CheckedIn")
+                    {
+                        var bestLaneId = await _laneSchedulerService.GetBestAvailableLaneAsync(booking.BranchId, false);
+                        if (bestLaneId > 0)
+                        {
+                            booking.ProcessingLaneId = bestLaneId;
+                        }
                     }
                 }
                 else

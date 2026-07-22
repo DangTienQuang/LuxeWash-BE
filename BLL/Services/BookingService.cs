@@ -2188,6 +2188,29 @@ namespace AutoWashPro.BLL.Services
                     }
                 }
 
+                int? processingLaneId = null;
+                string? processingLaneName = null;
+                bool isWaitingForLane = true;
+
+                var isPaymentCompleted = await _context.Transactions.AnyAsync(t => t.ReferenceBookingId == booking.BookingId && (t.TransactionType == "WalkInPayment" || t.TransactionType == "Payment") && t.Status == "Completed");
+                
+                if (isPaymentCompleted)
+                {
+                    var bestLaneId = await _laneSchedulerService.GetBestAvailableLaneAsync(request.BranchId, false);
+                    if (bestLaneId > 0)
+                    {
+                        var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == bestLaneId);
+                        if (lane != null)
+                        {
+                            booking.ProcessingLaneId = bestLaneId;
+                            processingLaneId = bestLaneId;
+                            processingLaneName = lane.Name;
+                            isWaitingForLane = false;
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                }
+
                 await transaction.CommitAsync();
 
                 var serviceNames = await _context.Services.Where(s => request.ServiceIds.Contains(s.ServiceId)).Select(s => s.ServiceName).ToListAsync();
@@ -2203,7 +2226,10 @@ namespace AutoWashPro.BLL.Services
                     PointDiscountAmount = booking.PointDiscountAmount,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
                     FinalAmount = booking.FinalAmount,
-                    PaymentUrl = paymentUrl
+                    PaymentUrl = paymentUrl,
+                    ProcessingLaneId = processingLaneId,
+                    ProcessingLaneName = processingLaneName,
+                    IsWaitingForLane = isWaitingForLane
                 };
             }
             catch (DbUpdateException ex)

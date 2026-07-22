@@ -158,6 +158,9 @@ namespace AutoWashPro.BLL.DTOs
     public class WalkInBookingResponseDTO : BookingResponseDTO
     {
         public string? PaymentUrl { get; set; }
+        public int? ProcessingLaneId { get; set; }
+        public string? ProcessingLaneName { get; set; }
+        public bool IsWaitingForLane { get; set; }
     }
 
     public class BookingResponseDTO
