@@ -86,7 +86,7 @@ namespace BLL.Services
                     var latestBooking = bookingsOnLane.First();
                     // Hardcode max lane occupancy to 15 mins since detailing is done outside
                     int estimatedMinutes = 15;
-                    var baseTime = latestBooking.ProcessingStartTime ?? latestBooking.ScheduledTime;
+                    var baseTime = latestBooking.ProcessingStartTime ?? latestBooking.UpdatedAt ?? DateTime.UtcNow;
                     // Fallback to now if baseTime is too old/invalid
                     if (baseTime < DateTime.UtcNow.AddDays(-1)) baseTime = DateTime.UtcNow;
 
@@ -177,51 +177,71 @@ namespace BLL.Services
             var lane = await _context.Lanes.FindAsync(laneId);
             if (lane == null) return false;
 
-            // Query all pending bookings that are checked in at this branch but waiting for a lane
-            var waitingBookings = await _context.Bookings
-                .Include(b => b.User)
-                    .ThenInclude(u => u.CustomerProfile)
-                        .ThenInclude(cp => cp.Tier)
-                .Where(b => b.BranchId == lane.BranchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null)
-                .ToListAsync();
-
-            var paidOrFreeBookings = new List<AutoWashPro.DAL.Entities.Booking>();
-            foreach (var b in waitingBookings)
+            int retryCount = 3;
+            while (retryCount > 0)
             {
-                if (b.FinalAmount == 0)
+                try
                 {
-                    paidOrFreeBookings.Add(b);
-                }
-                else
-                {
-                    var isPaid = await _context.Transactions.AnyAsync(t => t.ReferenceBookingId == b.BookingId 
-                        && t.Status == "Completed" 
-                        && (t.TransactionType == "Payment" || t.TransactionType == "WalkInPayment" || t.TransactionType == "BookingPayment"));
-                    if (isPaid)
+                    using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+
+                    // Query all pending bookings that are checked in at this branch but waiting for a lane
+                    var waitingBookings = await _context.Bookings
+                        .Include(b => b.User)
+                            .ThenInclude(u => u.CustomerProfile)
+                                .ThenInclude(cp => cp.Tier)
+                        .Where(b => b.BranchId == lane.BranchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null)
+                        .ToListAsync();
+
+                    var paidOrFreeBookings = new List<AutoWashPro.DAL.Entities.Booking>();
+                    foreach (var b in waitingBookings)
                     {
-                        paidOrFreeBookings.Add(b);
+                        var isPaid = await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, b);
+                        if (isPaid)
+                        {
+                            paidOrFreeBookings.Add(b);
+                        }
                     }
+
+                    if (!paidOrFreeBookings.Any()) return false;
+
+                    // Sort queue:
+                    // 1. Scheduled (Non-WalkIn) > WalkIn
+                    // 2. High Tier > Low Tier
+                    // 3. Earliest Update Time
+                    var nextBooking = paidOrFreeBookings
+                        .OrderByDescending(b => b.BookingType != "WalkIn")
+                        .ThenByDescending(b => b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0)
+                        .ThenBy(b => b.UpdatedAt)
+                        .First();
+
+                    if (nextBooking.ProcessingLaneId == null)
+                    {
+                        nextBooking.ProcessingLaneId = laneId;
+                        nextBooking.ProcessingStaffId = null; // Can be assigned later by staff
+                        nextBooking.UpdatedAt = DateTime.UtcNow;
+
+                        await _context.SaveChangesAsync();
+                        await dbTransaction.CommitAsync();
+                        return true;
+                    }
+                    
+                    return false;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    retryCount--;
+                    if (retryCount == 0) throw;
+                    await Task.Delay(50);
+                }
+                catch (MySqlConnector.MySqlException ex) when (ex.Number == 1213 || ex.Number == 1205) // Deadlock or Lock wait timeout
+                {
+                    retryCount--;
+                    if (retryCount == 0) throw;
+                    await Task.Delay(50);
                 }
             }
-
-            if (!paidOrFreeBookings.Any()) return false;
-
-            // Sort queue:
-            // 1. Scheduled (Non-WalkIn) > WalkIn
-            // 2. High Tier > Low Tier
-            // 3. Earliest Update Time
-            var nextBooking = paidOrFreeBookings
-                .OrderByDescending(b => b.BookingType != "WalkIn")
-                .ThenByDescending(b => b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0)
-                .ThenBy(b => b.UpdatedAt)
-                .First();
-
-            nextBooking.ProcessingLaneId = laneId;
-            nextBooking.ProcessingStaffId = null; // Can be assigned later by staff
-            nextBooking.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-            return true;
+            
+            return false;
         }
 
         // ── Public: EAL simulation ───────────────────────────────────────────

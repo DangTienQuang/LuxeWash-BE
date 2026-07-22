@@ -344,32 +344,96 @@ namespace AutoWashPro.BLL.Services
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
 
-            var booking = await _context.Bookings
-                .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.BranchId == managerProfile.BranchId);
-
-            if (booking == null)
+            int retryCount = 3;
+            while (retryCount > 0)
             {
-                throw new NotFoundException("Booking not found in your branch.");
+                try
+                {
+                    using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+
+                    var booking = await _context.Bookings
+                        .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.BranchId == managerProfile.BranchId);
+
+                    if (booking == null)
+                    {
+                        throw new NotFoundException("Booking not found in your branch.");
+                    }
+
+                    if (booking.Status != "Pending" && booking.Status != "CheckedIn")
+                    {
+                        throw new BadRequestException("Booking is not in a valid state for check-in and assignment.");
+                    }
+
+                    if (booking.Status == "CheckedIn" && booking.ProcessingLaneId != null && booking.ProcessingLaneId != assignment.LaneId)
+                    {
+                        throw new BadRequestException("Booking already has a lane assigned. Please use reassignment.");
+                    }
+
+                    if (!await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))
+                    {
+                        throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
+                    }
+
+                    var validLane = await _context.Lanes
+                        .FirstOrDefaultAsync(l => l.LaneId == assignment.LaneId && l.BranchId == managerProfile.BranchId);
+
+                    if (validLane == null)
+                    {
+                        throw new BadRequestException("Lane is invalid or does not belong to your branch.");
+                    }
+
+                    if (!validLane.IsActive)
+                    {
+                        throw new BadRequestException("LANE_INACTIVE");
+                    }
+
+                    bool isBusinessBooking = booking.BookingType == "Business";
+                    if (validLane.IsBusinessLane != isBusinessBooking)
+                    {
+                        throw new BadRequestException("LANE_TYPE_MISMATCH");
+                    }
+
+                    // Check if lane is available (not reserved by another active booking/wash log)
+                    bool laneOccupied = await _context.Bookings.AnyAsync(b => 
+                        b.ProcessingLaneId == assignment.LaneId 
+                        && b.BookingId != bookingId 
+                        && (b.Status == "Processing" || b.Status == "CheckedIn"));
+
+                    if (!laneOccupied)
+                    {
+                        laneOccupied = await _context.FleetWashLogs.AnyAsync(f => 
+                            f.LaneId == assignment.LaneId 
+                            && (f.Status == "Processing" || f.Status == "CheckedIn" || f.Status == "Assigned"));
+                    }
+
+                    if (laneOccupied)
+                    {
+                        throw new BadRequestException("LANE_UNAVAILABLE");
+                    }
+
+                    booking.ProcessingLaneId = assignment.LaneId;
+                    booking.Status = "CheckedIn";
+                    booking.UpdatedAt = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync();
+                    await dbTransaction.CommitAsync();
+                    return true;
+                }
+                catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+                {
+                    retryCount--;
+                    if (retryCount == 0) throw;
+                    await Task.Delay(50);
+                }
+                catch (MySqlConnector.MySqlException ex) when (ex.Number == 1213 || ex.Number == 1205) // Deadlock or Lock wait timeout
+                {
+                    retryCount--;
+                    if (retryCount == 0) throw;
+                    await Task.Delay(50);
+                }
             }
-
-            if (booking.Status != "Pending" && booking.Status != "CheckedIn")
-            {
-                throw new BadRequestException("Booking is not in a valid state for check-in and assignment.");
-            }
-
-            var validLane = await _context.Lanes
-                .AnyAsync(l => l.LaneId == assignment.LaneId && l.BranchId == managerProfile.BranchId);
-
-            if (!validLane)
-            {
-                throw new BadRequestException("Lane is invalid or does not belong to your branch.");
-            }
-
-            booking.ProcessingLaneId = assignment.LaneId;
-            booking.Status = "CheckedIn";
-
-            await _context.SaveChangesAsync();
-            return true;
+            
+            return false;
         }
 
         public async Task<LaneDTO> UpdateLaneAsync(int managerUserId, int laneId, UpdateLaneDTO request)

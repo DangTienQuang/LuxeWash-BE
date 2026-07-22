@@ -78,6 +78,11 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Can only check in vehicles in Pending status.");
             }
 
+            if (!await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))
+            {
+                throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
+            }
+
             if (booking.ProcessingLaneId == null)
             {
                 var laneId = await _laneSchedulerService.AssignBestAvailableLaneAtomicAsync(bookingId);
