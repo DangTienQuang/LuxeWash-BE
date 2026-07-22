@@ -49,6 +49,7 @@ appsettings.Staging.json
 .env
 .env.*
 secrets.json
+*-firebase-adminsdk-*.json
 
 # 6. Database cục bộ (Nếu có test bằng SQLite/LocalDB)
 *.db
