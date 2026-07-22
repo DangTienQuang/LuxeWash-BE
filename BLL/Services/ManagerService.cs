@@ -18,15 +18,18 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashDbContext _context;
         private readonly IBranchRevenueAnalyticsService _branchRevenueAnalyticsService;
         private readonly IOverloadSuggestionService _overloadSuggestionService;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
 
         public ManagerService(
             AutoWashDbContext context,
             IBranchRevenueAnalyticsService branchRevenueAnalyticsService,
-            IOverloadSuggestionService overloadSuggestionService)
+            IOverloadSuggestionService overloadSuggestionService,
+            AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
         {
             _context = context;
             _branchRevenueAnalyticsService = branchRevenueAnalyticsService;
             _overloadSuggestionService = overloadSuggestionService;
+            _laneDisplayPublisher = laneDisplayPublisher;
         }
 
         private async Task<EmployeeProfile> GetManagerProfileAsync(int managerUserId)
@@ -423,6 +426,18 @@ namespace AutoWashPro.BLL.Services
 
                     await _context.SaveChangesAsync();
                     await dbTransaction.CommitAsync();
+
+                    var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                    {
+                        BranchId = managerProfile.BranchId.Value,
+                        Type = "Assigned",
+                        BookingId = booking.BookingId,
+                        LicensePlate = vehicle?.LicensePlate,
+                        LaneId = validLane.LaneId,
+                        LaneName = validLane.Name
+                    });
+
                     return true;
                 }
                 catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)

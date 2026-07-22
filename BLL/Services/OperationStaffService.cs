@@ -19,14 +19,16 @@ namespace AutoWashPro.BLL.Services
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
         private readonly global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService _overloadSuggestionService;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
 
-        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService)
+        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
         {
             _context = context;
             _walletService = walletService;
             _bookingMaterialUsageService = bookingMaterialUsageService;
             _laneSchedulerService = laneSchedulerService;
             _overloadSuggestionService = overloadSuggestionService;
+            _laneDisplayPublisher = laneDisplayPublisher;
         }
 
         public async Task<StaffLaneTaskDTO?> GetTodayLaneAssignmentAsync(int staffUserId, DateTime? date = null)
@@ -93,6 +95,25 @@ namespace AutoWashPro.BLL.Services
             booking.Status = "CheckedIn";
 
             await _context.SaveChangesAsync();
+
+            if (booking.ProcessingLaneId.HasValue)
+            {
+                // We need the license plate and lane name for the event
+                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == booking.ProcessingLaneId.Value);
+                if (lane != null)
+                {
+                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                    {
+                        BranchId = booking.BranchId,
+                        Type = "Reading", // Or CheckedIn depending on the stage, using Reading as an example
+                        BookingId = booking.BookingId,
+                        LicensePlate = vehicle?.LicensePlate,
+                        LaneId = lane.LaneId,
+                        LaneName = lane.Name
+                    });
+                }
+            }
 
             // P0.4: Await the overload check — do NOT fire-and-forget with a scoped DbContext,
             // as the scope may be disposed before the async task completes (ObjectDisposedException).
@@ -273,7 +294,36 @@ namespace AutoWashPro.BLL.Services
 
             if (isCompletingNow && booking.ProcessingLaneId.HasValue)
             {
+                var laneName = await _context.Lanes
+                    .Where(l => l.LaneId == booking.ProcessingLaneId.Value)
+                    .Select(l => l.Name)
+                    .FirstOrDefaultAsync() ?? $"Lane {booking.ProcessingLaneId.Value}";
+
+                // Fire cleared event because this booking finished.
+                await _laneDisplayPublisher.PublishClearAsync(
+                    booking.BranchId,
+                    booking.ProcessingLaneId.Value,
+                    laneName
+                );
+
                 await _laneSchedulerService.AssignNextVehicleInQueueAsync(booking.ProcessingLaneId.Value);
+            }
+            else if (newStatus == "Processing" && booking.ProcessingLaneId.HasValue)
+            {
+                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == booking.ProcessingLaneId.Value);
+                if (lane != null)
+                {
+                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                    {
+                        BranchId = booking.BranchId,
+                        Type = "Processing",
+                        BookingId = booking.BookingId,
+                        LicensePlate = vehicle?.LicensePlate,
+                        LaneId = lane.LaneId,
+                        LaneName = lane.Name
+                    });
+                }
             }
 
             return true;

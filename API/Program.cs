@@ -96,6 +96,19 @@ builder.Services.AddAuthentication(x =>
         ValidateIssuer = false,
         ValidateAudience = false
     };
+    x.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/lane-display"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -209,6 +222,7 @@ builder.Services.AddScoped<IOperationStaffService, OperationStaffService>();
 builder.Services.AddScoped<IBusinessBookingService, BusinessBookingService>();
 builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 builder.Services.AddScoped<ILaneSchedulerService, LaneSchedulerService>();
+builder.Services.AddSingleton<AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService, AutoWashPro.BLL.Services.Operations.LaneDisplayPublisherService>();
 builder.Services.AddScoped<IFleetService, FleetService>();
 builder.Services.AddScoped<IMaterialService, MaterialService>();
 builder.Services.AddScoped<IServiceMaterialUsageService, ServiceMaterialUsageService>();
@@ -249,8 +263,9 @@ builder.Services.AddHostedService<AutoWashPro.API.Workers.CRMCampaignWorker>();
 builder.Services.AddHostedService<AutoWashPro.API.Workers.AutoWashCompletionWorker>();
 
 // ==============================================================================
-// 8. SWAGGER CONFIGURATION
+// 8. SIGNALR & SWAGGER CONFIGURATION
 // ==============================================================================
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -325,6 +340,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<AutoWashPro.BLL.Hubs.LaneDisplayHub>("/hubs/lane-display");
 
 // ==============================================================================
 // 10. DATABASE MIGRATION ON STARTUP

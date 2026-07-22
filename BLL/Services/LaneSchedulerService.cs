@@ -15,10 +15,12 @@ namespace BLL.Services
         // Grace window past slot end before we reject the booking.
         // Absorbs real-world arrival variance without cascading into the next slot.
         private const int SlotGraceMinutes = 15;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
 
-        public LaneSchedulerService(AutoWashDbContext context)
+        public LaneSchedulerService(AutoWashDbContext context, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
         {
             _context = context;
+            _laneDisplayPublisher = laneDisplayPublisher;
         }
 
         // ── Public: projection ───────────────────────────────────────────────
@@ -222,6 +224,18 @@ namespace BLL.Services
 
                         await _context.SaveChangesAsync();
                         await dbTransaction.CommitAsync();
+
+                        // Fire event to UI
+                        await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                        {
+                            BranchId = nextBooking.BranchId,
+                            Type = "Assigned",
+                            BookingId = nextBooking.BookingId,
+                            LicensePlate = nextBooking.Vehicle?.LicensePlate,
+                            LaneId = laneId,
+                            LaneName = lane.Name
+                        });
+
                         return true;
                     }
                     
