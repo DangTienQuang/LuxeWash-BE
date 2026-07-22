@@ -124,6 +124,18 @@ namespace AutoWashPro.BLL.Services
 
                 if (bestBranch != null)
                 {
+                    // Save the suggestion to DB
+                    var suggestion = new OverloadSuggestion
+                    {
+                        BookingId = booking.BookingId,
+                        SuggestedBranchId = bestBranch.BranchId,
+                        SuggestedBranchName = bestBranch.Name,
+                        SuggestedSlotId = bestSlotId,
+                        SuggestedTime = booking.ScheduledTime
+                    };
+                    _context.OverloadSuggestions.Add(suggestion);
+                    await _context.SaveChangesAsync(); // Save to generate ID
+
                     var pushRequest = new PushNotificationRequest
                     {
                         UserId = booking.UserId.Value,
@@ -140,7 +152,7 @@ namespace AutoWashPro.BLL.Services
                     };
 
                     await _pushNotificationService.SendPushNotificationAsync(pushRequest);
-                    booking.IsWaitAccepted = true; 
+                    booking.OverloadNotifiedAt = DateTime.UtcNow; 
                 }
             }
 

@@ -144,17 +144,35 @@ builder.Services.AddSingleton<PaddleOcrService>(sp =>
 QuestPDF.Settings.License = LicenseType.Community;
 
 // 5.3 Firebase Cloud Messaging Integration
-var firebaseKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "smartwash-a9f29-firebase-adminsdk-fbsvc-82f3d78d83.json");
-if (File.Exists(firebaseKeyPath))
+try
 {
-    FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
+    var credentialEnv = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+    var credentialJson = builder.Configuration["FirebaseAdmin:CredentialJson"];
+
+    if (!string.IsNullOrEmpty(credentialEnv))
     {
-        Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(firebaseKeyPath)
-    });
+        FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
+        {
+            Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(credentialEnv)
+        });
+        Console.WriteLine("[INFO] Firebase initialized using GOOGLE_APPLICATION_CREDENTIALS.");
+    }
+    else if (!string.IsNullOrEmpty(credentialJson))
+    {
+        FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
+        {
+            Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(credentialJson)
+        });
+        Console.WriteLine("[INFO] Firebase initialized using User Secrets / Configuration.");
+    }
+    else
+    {
+        Console.WriteLine("[WARNING] Firebase credentials not found in env or secrets. Push notifications will fail.");
+    }
 }
-else
+catch (Exception ex)
 {
-    Console.WriteLine($"[WARNING] Firebase key file not found at {firebaseKeyPath}. Push notifications will not work.");
+    Console.WriteLine($"[ERROR] Failed to initialize Firebase: {ex.Message}");
 }
 
 // ==============================================================================

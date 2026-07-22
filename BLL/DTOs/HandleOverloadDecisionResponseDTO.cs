@@ -1,0 +1,10 @@
+namespace AutoWashPro.BLL.DTOs
+{
+    public class HandleOverloadDecisionResponseDTO
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = null!;
+        public BookingResponseDTO? UpdatedBooking { get; set; }
+        public VoucherResponseDTO? Voucher { get; set; }
+    }
+}

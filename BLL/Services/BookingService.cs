@@ -2667,36 +2667,123 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
-        public async Task<bool> HandleOverloadDecisionAsync(int userId, int bookingId, HandleOverloadDecisionDTO request)
+        public async Task<OverloadSuggestionResponseDTO?> GetPendingOverloadSuggestionAsync(int userId, int bookingId)
+        {
+            var suggestion = await _context.OverloadSuggestions
+                .Include(s => s.Booking)
+                .Where(s => s.BookingId == bookingId && s.Booking.UserId == userId && !s.IsProcessed)
+                .OrderByDescending(s => s.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (suggestion == null) return null;
+
+            return new OverloadSuggestionResponseDTO
+            {
+                BookingId = suggestion.BookingId,
+                SuggestedBranchId = suggestion.SuggestedBranchId,
+                SuggestedBranchName = suggestion.SuggestedBranchName,
+                SuggestedSlotId = suggestion.SuggestedSlotId,
+                SuggestedTime = suggestion.SuggestedTime
+            };
+        }
+
+        public async Task<HandleOverloadDecisionResponseDTO> HandleOverloadDecisionAsync(int userId, int bookingId, HandleOverloadDecisionDTO request)
         {
             var booking = await _context.Bookings
+                .Include(b => b.BookingDetails)
+                .ThenInclude(bd => bd.Service)
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
 
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found");
-
             if (booking.Status != "Pending") throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking is not pending.");
+
+            var suggestion = await _context.OverloadSuggestions
+                .Where(s => s.BookingId == bookingId && !s.IsProcessed)
+                .OrderByDescending(s => s.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (suggestion == null) throw new AutoWashPro.BLL.Exceptions.BadRequestException("No pending overload suggestion found.");
+
+            var response = new HandleOverloadDecisionResponseDTO { Success = true };
 
             if (request.Decision == "Keep")
             {
                 booking.IsWaitAccepted = true;
+                suggestion.IsProcessed = true;
                 await _context.SaveChangesAsync();
-                return true;
+                response.Message = "You have chosen to keep your current booking and wait.";
+                response.UpdatedBooking = new BookingResponseDTO
+                {
+                    BookingId = booking.BookingId,
+                    LicensePlate = booking.LicensePlate ?? "",
+                    ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
+                    ScheduledTime = booking.ScheduledTime,
+                    Status = booking.Status,
+                    OriginalPrice = booking.OriginalPrice,
+                    VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                    PointDiscountAmount = booking.PointDiscountAmount,
+                    FinalAmount = booking.FinalAmount
+                };
+                return response;
             }
 
             if (request.Decision == "Cancel")
             {
+                var oldSlot = await _context.DailySlotCapacities
+                    .Include(c => c.TimeSlot)
+                    .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.TimeSlot.StartTime <= booking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > booking.ScheduledTime.TimeOfDay);
+                
+                if (oldSlot != null)
+                {
+                    oldSlot.BookedWeight = Math.Max(0, oldSlot.BookedWeight - (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1));
+                }
+
                 booking.Status = "Cancelled";
+                suggestion.IsProcessed = true;
+                await _context.SaveChangesAsync();
+                
+                response.Message = "Booking cancelled due to overload. Penalty waived.";
+                response.UpdatedBooking = new BookingResponseDTO
+                {
+                    BookingId = booking.BookingId,
+                    LicensePlate = booking.LicensePlate ?? "",
+                    ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
+                    ScheduledTime = booking.ScheduledTime,
+                    Status = booking.Status,
+                    OriginalPrice = booking.OriginalPrice,
+                    VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                    PointDiscountAmount = booking.PointDiscountAmount,
+                    FinalAmount = booking.FinalAmount
+                };
+                return response;
             }
             else if (request.Decision == "Switch")
             {
-                if (!request.SuggestedBranchId.HasValue || !request.SuggestedTime.HasValue)
-                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("Missing branch or time suggestion.");
+                if (request.SuggestedBranchId != suggestion.SuggestedBranchId || request.SuggestedTime != suggestion.SuggestedTime)
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("Decision parameters do not match the pending suggestion.");
 
-                booking.BranchId = request.SuggestedBranchId.Value;
-                booking.ScheduledTime = request.SuggestedTime.Value;
-                booking.IsWaitAccepted = true;
+                var oldSlot = await _context.DailySlotCapacities
+                    .Include(c => c.TimeSlot)
+                    .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.TimeSlot.StartTime <= booking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > booking.ScheduledTime.TimeOfDay);
                 
-                // Create 10% Voucher because they agreed to switch
+                if (oldSlot != null)
+                {
+                    oldSlot.BookedWeight = Math.Max(0, oldSlot.BookedWeight - (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1));
+                }
+
+                var newSlot = await _context.DailySlotCapacities
+                    .FirstOrDefaultAsync(c => c.SlotId == suggestion.SuggestedSlotId);
+                
+                if (newSlot != null)
+                {
+                    newSlot.BookedWeight += (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1);
+                }
+
+                booking.BranchId = suggestion.SuggestedBranchId;
+                booking.ScheduledTime = suggestion.SuggestedTime;
+                booking.IsWaitAccepted = true;
+                suggestion.IsProcessed = true;
+                
                 decimal discountValue = booking.OriginalPrice > 0 ? booking.OriginalPrice * 0.10m : 50000m;
                 var voucher = new Voucher
                 {
@@ -2721,14 +2808,35 @@ namespace AutoWashPro.BLL.Services
                     ReceivedDate = DateTime.UtcNow
                 };
                 _context.UserVouchers.Add(userVoucher);
+                await _context.SaveChangesAsync();
+
+                response.Message = "Switched to new branch successfully. You received a 10% voucher!";
+                response.UpdatedBooking = new BookingResponseDTO
+                {
+                    BookingId = booking.BookingId,
+                    LicensePlate = booking.LicensePlate ?? "",
+                    ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
+                    ScheduledTime = booking.ScheduledTime,
+                    Status = booking.Status,
+                    OriginalPrice = booking.OriginalPrice,
+                    VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                    PointDiscountAmount = booking.PointDiscountAmount,
+                    FinalAmount = booking.FinalAmount
+                };
+                response.Voucher = new VoucherResponseDTO
+                {
+                    VoucherId = voucher.VoucherId,
+                    Code = voucher.Code,
+                    DiscountAmount = voucher.DiscountAmount,
+                    ExpiryDate = voucher.ExpiryDate,
+                    IsActive = voucher.IsActive
+                };
+                return response;
             }
             else
             {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid decision");
             }
-
-            await _context.SaveChangesAsync();
-            return true;
         }
 
         private static long GeneratePayOsOrderCode()

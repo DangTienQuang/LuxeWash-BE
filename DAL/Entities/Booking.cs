@@ -91,5 +91,9 @@ namespace AutoWashPro.DAL.Entities
         public FleetVehicle? FleetVehicle { get; set; }
 
         public bool IsWaitAccepted { get; set; } = false;
+
+        public DateTime? OverloadNotifiedAt { get; set; }
+
+        public OverloadSuggestion? OverloadSuggestion { get; set; }
     }
 }

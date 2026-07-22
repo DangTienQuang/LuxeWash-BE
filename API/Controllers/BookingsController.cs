@@ -181,6 +181,14 @@ namespace AutoWashPro.API.Controllers
         }
 
         [Authorize]
+        [HttpGet("{id}/overload-suggestion")]
+        public async Task<IActionResult> GetPendingOverloadSuggestion(int id)
+        {
+            var result = await _bookingService.GetPendingOverloadSuggestionAsync(GetUserId(), id);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
+        [Authorize]
         [HttpPost("{id}/handle-overload-suggestion")]
         public async Task<IActionResult> HandleOverloadSuggestion(int id, [FromBody] HandleOverloadDecisionDTO request)
         {
