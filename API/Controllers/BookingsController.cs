@@ -179,5 +179,13 @@ namespace AutoWashPro.API.Controllers
             var result = await _bookingService.AcceptRelocationAsync(GetUserId(), id, request);
             return Ok(new { statusCode = 200, message = "Relocation accepted and voucher applied successfully.", data = result });
         }
+
+        [Authorize]
+        [HttpPost("{id}/handle-overload-suggestion")]
+        public async Task<IActionResult> HandleOverloadSuggestion(int id, [FromBody] HandleOverloadDecisionDTO request)
+        {
+            var result = await _bookingService.HandleOverloadDecisionAsync(GetUserId(), id, request);
+            return Ok(new { statusCode = 200, message = "Overload suggestion handled successfully.", data = result });
+        }
     }
 }

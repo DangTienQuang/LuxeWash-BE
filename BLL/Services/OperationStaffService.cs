@@ -17,12 +17,16 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashDbContext _context;
         private readonly IWalletService _walletService;
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
+        private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
+        private readonly global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService _overloadSuggestionService;
 
-        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService)
+        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService)
         {
             _context = context;
             _walletService = walletService;
             _bookingMaterialUsageService = bookingMaterialUsageService;
+            _laneSchedulerService = laneSchedulerService;
+            _overloadSuggestionService = overloadSuggestionService;
         }
 
         public async Task<StaffLaneTaskDTO?> GetTodayLaneAssignmentAsync(int staffUserId, DateTime? date = null)
@@ -74,17 +78,19 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Can only check in vehicles in Pending status.");
             }
 
-            int laneIdToAssign = assignment?.LaneId ?? booking.ProcessingLaneId ?? await _context.Lanes.Where(l => l.BranchId == booking.BranchId && l.IsActive).Select(l => l.LaneId).FirstOrDefaultAsync();
-            if (laneIdToAssign == 0)
-            {
-                laneIdToAssign = await _context.Lanes.Select(l => l.LaneId).FirstOrDefaultAsync();
-            }
+            int laneIdToAssign = booking.ProcessingLaneId ?? await _laneSchedulerService.GetBestAvailableLaneAsync(booking.BranchId, booking.BookingType == "Business");
 
-            booking.ProcessingLaneId = laneIdToAssign;
+            booking.ProcessingLaneId = laneIdToAssign > 0 ? laneIdToAssign : (int?)null;
             booking.ProcessingStaffId = staffUserId;
             booking.Status = "CheckedIn";
 
             await _context.SaveChangesAsync();
+
+            // Trigger Overload Logic in background after check-in
+            #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+            _overloadSuggestionService.CheckAndTriggerOverloadAsync(booking.BranchId);
+            #pragma warning restore CS4014
+
             return true;
         }
 

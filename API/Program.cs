@@ -160,6 +160,8 @@ builder.Services.AddScoped<IVoucherService, VoucherService>();
 builder.Services.AddScoped<IVoucherCampaignService, VoucherCampaignService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITimeSlotService, TimeSlotService>();
+builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
+builder.Services.AddScoped<IOverloadSuggestionService, OverloadSuggestionService>();
 builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
 builder.Services.AddScoped<IAIModerationService, AIModerationService>();
 builder.Services.AddHttpClient<ILLMService, GeminiAIService>();

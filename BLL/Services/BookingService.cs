@@ -23,6 +23,7 @@ namespace AutoWashPro.BLL.Services
         private readonly IPayOsService _payOsService;
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
         private readonly IOccupancyService _occupancyService;
+        private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
 
         public BookingService(
             AutoWashDbContext context,
@@ -33,7 +34,8 @@ namespace AutoWashPro.BLL.Services
             IVoucherCampaignService voucherCampaignService,
             IPayOsService payOsService,
             IBookingMaterialUsageService bookingMaterialUsageService,
-            IOccupancyService occupancyService)
+            IOccupancyService occupancyService,
+            global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService)
         {
             _context = context;
             _walletService = walletService;
@@ -44,6 +46,7 @@ namespace AutoWashPro.BLL.Services
             _payOsService = payOsService;
             _bookingMaterialUsageService = bookingMaterialUsageService;
             _occupancyService = occupancyService;
+            _laneSchedulerService = laneSchedulerService;
         }
 
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
@@ -804,6 +807,11 @@ namespace AutoWashPro.BLL.Services
                     activeFleetLog.Status = "Completed";
                     activeFleetLog.CompletedTime = DateTime.UtcNow;
                     await _context.SaveChangesAsync();
+
+                    if (activeFleetLog.LaneId > 0)
+                    {
+                        await _laneSchedulerService.AssignNextVehicleInQueueAsync(activeFleetLog.LaneId.Value);
+                    }
                 }
 
                 var updatedBooking = await _context.Bookings
@@ -832,6 +840,11 @@ namespace AutoWashPro.BLL.Services
                 activeFleetLog.Status = "Completed";
                 activeFleetLog.CompletedTime = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
+                if (activeFleetLog.LaneId > 0)
+                {
+                    await _laneSchedulerService.AssignNextVehicleInQueueAsync(activeFleetLog.LaneId.Value);
+                }
 
                 return new BookingResponseDTO
                 {
@@ -864,6 +877,15 @@ namespace AutoWashPro.BLL.Services
                 && booking.FinalAmount > 0
                 && !await HasCompletedBookingPaymentAsync(booking.BookingId))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking is unpaid; cannot check in or complete.");
+
+            if (newStatus == "CheckedIn" && booking.ProcessingLaneId == null)
+            {
+                int laneIdToAssign = await _laneSchedulerService.GetBestAvailableLaneAsync(booking.BranchId, booking.BookingType == "Business");
+                if (laneIdToAssign > 0)
+                {
+                    booking.ProcessingLaneId = laneIdToAssign;
+                }
+            }
 
             var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
 
@@ -911,6 +933,11 @@ namespace AutoWashPro.BLL.Services
             if (isCompletingNow && booking.UserId.HasValue)
             {
                 await _voucherCampaignService.ProcessMilestoneCampaignsAsync(booking.UserId.Value);
+            }
+
+            if (isCompletingNow && booking.ProcessingLaneId.HasValue)
+            {
+                await _laneSchedulerService.AssignNextVehicleInQueueAsync(booking.ProcessingLaneId.Value);
             }
 
             return true;
@@ -2638,6 +2665,70 @@ namespace AutoWashPro.BLL.Services
                 VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount
             };
+        }
+
+        public async Task<bool> HandleOverloadDecisionAsync(int userId, int bookingId, HandleOverloadDecisionDTO request)
+        {
+            var booking = await _context.Bookings
+                .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
+
+            if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found");
+
+            if (booking.Status != "Pending") throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking is not pending.");
+
+            if (request.Decision == "Keep")
+            {
+                booking.IsWaitAccepted = true;
+                await _context.SaveChangesAsync();
+                return true;
+            }
+
+            if (request.Decision == "Cancel")
+            {
+                booking.Status = "Cancelled";
+            }
+            else if (request.Decision == "Switch")
+            {
+                if (!request.SuggestedBranchId.HasValue || !request.SuggestedTime.HasValue)
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("Missing branch or time suggestion.");
+
+                booking.BranchId = request.SuggestedBranchId.Value;
+                booking.ScheduledTime = request.SuggestedTime.Value;
+                booking.IsWaitAccepted = true;
+                
+                // Create 10% Voucher because they agreed to switch
+                decimal discountValue = booking.OriginalPrice > 0 ? booking.OriginalPrice * 0.10m : 50000m;
+                var voucher = new Voucher
+                {
+                    Code = $"OVL-{Guid.NewGuid().ToString().Substring(0, 6).ToUpper()}",
+                    DiscountAmount = discountValue,
+                    MaxUsages = 1,
+                    MaxUsagePerUser = 1,
+                    ExpiryDate = DateTime.UtcNow.AddMonths(1),
+                    IsActive = true,
+                    VoucherType = AutoWashPro.DAL.Enums.VoucherType.Discount,
+                    CampaignType = AutoWashPro.DAL.Enums.VoucherCampaignType.Manual,
+                    ProposalNote = "Overload compensation voucher 10%"
+                };
+                _context.Vouchers.Add(voucher);
+                await _context.SaveChangesAsync();
+
+                var userVoucher = new UserVoucher
+                {
+                    UserId = userId,
+                    VoucherId = voucher.VoucherId,
+                    ExpiryDate = voucher.ExpiryDate,
+                    ReceivedDate = DateTime.UtcNow
+                };
+                _context.UserVouchers.Add(userVoucher);
+            }
+            else
+            {
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid decision");
+            }
+
+            await _context.SaveChangesAsync();
+            return true;
         }
 
         private static long GeneratePayOsOrderCode()

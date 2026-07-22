@@ -23,10 +23,10 @@ namespace BLL.Services
 
         // ── Public: projection ───────────────────────────────────────────────
 
-        public async Task<Dictionary<int, DateTime>> GetLaneProjectedFreeTimesAsync(int branchId, DateTime slotStart)
+        public async Task<Dictionary<int, DateTime>> GetLaneProjectedFreeTimesAsync(int branchId, DateTime slotStart, bool isBusinessLane = false)
         {
             var lanes = await _context.Lanes
-                .Where(x => x.BranchId == branchId && x.IsActive)
+                .Where(x => x.BranchId == branchId && x.IsActive && x.IsBusinessLane == isBusinessLane)
                 .ToListAsync();
 
             // All logs that are still in progress at this branch
@@ -40,6 +40,15 @@ namespace BLL.Services
                      x.Status == "Processing"))
                 .ToListAsync();
 
+            var activeBookings = await _context.Bookings
+                .Include(x => x.BookingDetails)
+                .Include(x => x.ActualVehicleType)
+                .Where(x =>
+                    x.BranchId == branchId &&
+                    x.ProcessingLaneId != null &&
+                    (x.Status == "CheckedIn" || x.Status == "Processing" || x.Status == "Pending"))
+                .ToListAsync();
+
             var result = new Dictionary<int, DateTime>();
 
             foreach (var lane in lanes)
@@ -49,34 +58,125 @@ namespace BLL.Services
                     .OrderByDescending(x => x.CheckInTime)
                     .ToList();
 
-                if (!logsOnLane.Any())
+                var bookingsOnLane = activeBookings
+                    .Where(x => x.ProcessingLaneId == lane.LaneId)
+                    .OrderByDescending(x => x.ProcessingStartTime ?? x.ScheduledTime)
+                    .ToList();
+
+                if (!logsOnLane.Any() && !bookingsOnLane.Any())
                 {
                     // Lane is idle — free immediately from slot start
                     result[lane.LaneId] = slotStart;
                     continue;
                 }
 
-                // For the latest log on this lane, estimate when it finishes.
-                // We derive duration from the vehicle's weight + the service prices
-                // at that branch — no new DB columns needed.
-                var latestLog = logsOnLane.First();
-                var vehicleType = latestLog.FleetVehicle?.VehicleType;
-                int baseWeight = vehicleType?.BaseWeight ?? 1;
+                DateTime projectedFreeAt = slotStart;
 
-                var servicePrices = await _context.ServicePrices
-                    .Where(x =>
-                        x.BranchId == branchId &&
-                        x.VehicleTypeId == (vehicleType != null ? vehicleType.Id : 0))
-                    .ToListAsync();
+                if (logsOnLane.Any())
+                {
+                    var latestLog = logsOnLane.First();
+                    // Hardcode max lane occupancy to 15 mins since detailing is done outside
+                    int estimatedMinutes = 15;
+                    var logProjectedFreeAt = latestLog.CheckInTime.AddMinutes(estimatedMinutes);
+                    if (logProjectedFreeAt > projectedFreeAt) projectedFreeAt = logProjectedFreeAt;
+                }
 
-                int estimatedMinutes = WashTimeEstimator.EstimateMinutes(servicePrices);
+                if (bookingsOnLane.Any())
+                {
+                    var latestBooking = bookingsOnLane.First();
+                    // Hardcode max lane occupancy to 15 mins since detailing is done outside
+                    int estimatedMinutes = 15;
+                    var baseTime = latestBooking.ProcessingStartTime ?? latestBooking.ScheduledTime;
+                    // Fallback to now if baseTime is too old/invalid
+                    if (baseTime < DateTime.UtcNow.AddDays(-1)) baseTime = DateTime.UtcNow;
 
-                // ProjectedFreeAt = when the wash started + how long it takes
-                // If already in Processing, use CheckInTime as the start baseline
-                result[lane.LaneId] = latestLog.CheckInTime.AddMinutes(estimatedMinutes);
+                    var bookingProjectedFreeAt = baseTime.AddMinutes(estimatedMinutes);
+                    if (bookingProjectedFreeAt > projectedFreeAt) projectedFreeAt = bookingProjectedFreeAt;
+                }
+
+                result[lane.LaneId] = projectedFreeAt;
             }
 
             return result;
+        }
+
+        public async Task<int> GetBestAvailableLaneAsync(int branchId, bool isBusinessLane = false)
+        {
+            var lanes = await _context.Lanes
+                .Where(x => x.BranchId == branchId && x.IsActive && x.IsBusinessLane == isBusinessLane)
+                .ToListAsync();
+
+            if (!lanes.Any())
+            {
+                // Fallback to any active lane if no lane matches the exact business requirement
+                lanes = await _context.Lanes
+                    .Where(x => x.BranchId == branchId && x.IsActive)
+                    .ToListAsync();
+                
+                if (!lanes.Any()) return 0;
+            }
+
+            var projectedFreeTimes = await GetLaneProjectedFreeTimesAsync(branchId, DateTime.UtcNow, isBusinessLane);
+
+            // If projected free times dictionary doesn't have a lane (due to fallback above), add it with current time
+            foreach(var lane in lanes)
+            {
+                if (!projectedFreeTimes.ContainsKey(lane.LaneId))
+                {
+                    projectedFreeTimes[lane.LaneId] = DateTime.UtcNow;
+                }
+            }
+
+            // Find lanes that are currently free (or free within a tiny margin, e.g. 1 min)
+            var freeLanes = lanes
+                .Where(l => projectedFreeTimes[l.LaneId] <= DateTime.UtcNow.AddMinutes(1))
+                .ToList();
+
+            if (!freeLanes.Any())
+            {
+                return 0; // No lanes are currently free, must enter Waiting Queue
+            }
+
+            // Find the free lane with the earliest projected free time (usually all are in the past/now)
+            var bestLaneId = freeLanes
+                .Select(l => l.LaneId)
+                .OrderBy(id => projectedFreeTimes[id])
+                .First();
+
+            return bestLaneId;
+        }
+
+        public async Task<bool> AssignNextVehicleInQueueAsync(int laneId)
+        {
+            var lane = await _context.Lanes.FindAsync(laneId);
+            if (lane == null) return false;
+
+            // Query all pending bookings that are checked in at this branch but waiting for a lane
+            var waitingBookings = await _context.Bookings
+                .Include(b => b.User)
+                    .ThenInclude(u => u.CustomerProfile)
+                        .ThenInclude(cp => cp.Tier)
+                .Where(b => b.BranchId == lane.BranchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null)
+                .ToListAsync();
+
+            if (!waitingBookings.Any()) return false;
+
+            // Sort queue:
+            // 1. Scheduled (Non-WalkIn) > WalkIn
+            // 2. High Tier > Low Tier
+            // 3. Earliest Update Time
+            var nextBooking = waitingBookings
+                .OrderByDescending(b => b.BookingType != "WalkIn")
+                .ThenByDescending(b => b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0)
+                .ThenBy(b => b.UpdatedAt)
+                .First();
+
+            nextBooking.ProcessingLaneId = laneId;
+            nextBooking.ProcessingStaffId = null; // Can be assigned later by staff
+            nextBooking.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return true;
         }
 
         // ── Public: EAL simulation ───────────────────────────────────────────

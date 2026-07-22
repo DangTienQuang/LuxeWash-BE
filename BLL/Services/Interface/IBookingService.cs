@@ -33,5 +33,6 @@ namespace AutoWashPro.BLL.Services
         Task<BookingResponseDTO> AutoCheckInAndStartProcessingAsync(string licensePlate, int branchId, bool autoStart);
         Task<int> ProcessOverdueAutomatedWashesAsync();
         Task<BookingResponseDTO> AcceptRelocationAsync(int userId, int bookingId, AcceptRelocationRequestDTO request);
+        Task<bool> HandleOverloadDecisionAsync(int userId, int bookingId, HandleOverloadDecisionDTO request);
     }
 }

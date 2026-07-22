@@ -89,5 +89,7 @@ namespace AutoWashPro.DAL.Entities
 
         [ForeignKey(nameof(FleetVehicleId))]
         public FleetVehicle? FleetVehicle { get; set; }
+
+        public bool IsWaitAccepted { get; set; } = false;
     }
 }
