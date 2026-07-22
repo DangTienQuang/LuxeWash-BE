@@ -60,7 +60,7 @@ namespace AutoWashPro.BLL.Services
         {
             EnsurePersonnelRole(role);
             var user = await GetStaffUserAsync(staffUserId);
-            if (user.Role != role) throw new NotFoundException("Khong tim thay nhan su.");
+            if (user.Role != role) throw new NotFoundException("Staff not found.");
             return MapStaff(user);
         }
 
@@ -172,7 +172,7 @@ namespace AutoWashPro.BLL.Services
         {
             EnsurePersonnelRole(role);
             var user = await GetStaffUserAsync(staffUserId);
-            if (user.Role != role) throw new NotFoundException("Khong tim thay nhan su.");
+            if (user.Role != role) throw new NotFoundException("Staff not found.");
             return await UpdateStaffAsync(staffUserId, request);
         }
 
@@ -191,7 +191,7 @@ namespace AutoWashPro.BLL.Services
         {
             EnsurePersonnelRole(role);
             var user = await GetStaffUserAsync(staffUserId);
-            if (user.Role != role) throw new NotFoundException("Khong tim thay nhan su.");
+            if (user.Role != role) throw new NotFoundException("Staff not found.");
 
             user.Status = UserStatuses.Blocked;
             await _context.SaveChangesAsync();
