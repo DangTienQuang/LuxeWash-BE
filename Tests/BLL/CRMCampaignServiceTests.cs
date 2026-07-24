@@ -333,5 +333,185 @@ namespace AutoWashPro.Tests.BLL
             var scenarioCount = await _dbContext.KnowledgeScenarios.CountAsync(s => s.ScenarioCode == "WEATHER_CAMPAIGN");
             Assert.Equal(1, scenarioCount);
         }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_TooBusy_ReturnsBusyMessage()
+        {
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = 1, IsProlongedRain = true, OccupancyRate = 0.75 };
+
+            var result = await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            Assert.Equal("Simulation: Branch is too busy. No vouchers issued.", result);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_NoProlongedRain_ReturnsNoRainMessage()
+        {
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = 1, IsProlongedRain = false, OccupancyRate = 0.20 };
+
+            var result = await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            Assert.Equal("Simulation: No prolonged rain. No vouchers issued.", result);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_BranchNotFound_ReturnsNotFoundMessage()
+        {
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = 999, IsProlongedRain = true, OccupancyRate = 0.20 };
+
+            var result = await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            Assert.Equal("Simulation: Branch 999 not found or inactive. No vouchers issued.", result);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_BranchInactive_ReturnsNotFoundMessage()
+        {
+            var branch = new Branch { Name = "Inactive Branch", IsActive = false };
+            _dbContext.Branches.Add(branch);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = branch.BranchId, IsProlongedRain = true, OccupancyRate = 0.20 };
+
+            var result = await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            Assert.Contains("not found or inactive", result);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_VoucherMissing_CreatesVoucher()
+        {
+            var branch = new Branch { Name = "Sim Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = branch.BranchId, IsProlongedRain = true, OccupancyRate = 0.20 };
+
+            await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            var voucher = await _dbContext.Vouchers.FirstOrDefaultAsync(v => v.Code == $"RAIN_BR{branch.BranchId}");
+            Assert.NotNull(voucher);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_VoucherExists_ReusesIt()
+        {
+            var branch = new Branch { Name = "Sim Branch B", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            await _dbContext.SaveChangesAsync();
+
+            var voucherCode = $"RAIN_BR{branch.BranchId}";
+            _dbContext.Vouchers.Add(new Voucher
+            {
+                Code = voucherCode,
+                DiscountAmount = 30,
+                VoucherType = VoucherType.Discount,
+                CampaignType = VoucherCampaignType.Weather,
+                ExpiryDays = 1,
+                IsActive = true,
+                MaxUsagePerUser = 1,
+                MaxUsages = 999999,
+                StartDate = DateTime.UtcNow,
+                ExpiryDate = DateTime.UtcNow.AddYears(1)
+            });
+            await _dbContext.SaveChangesAsync();
+
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = branch.BranchId, IsProlongedRain = true, OccupancyRate = 0.20 };
+            await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            var count = await _dbContext.Vouchers.CountAsync(v => v.Code == voucherCode);
+            Assert.Equal(1, count);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_TargetCustomerFound_AssignsVoucher()
+        {
+            var branch = new Branch { Name = "Sim Branch C", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            await _dbContext.SaveChangesAsync();
+
+            var user = new User { PhoneNumber = "0992000001", Email = "simcustomer1@test.com", PasswordHash = "x", Role = "Customer", Status = "Active" };
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.CustomerFeatureProfiles.Add(new CustomerFeatureProfile { CustomerId = user.UserId, Customer = user, FavoriteBranchId = branch.BranchId });
+            await _dbContext.SaveChangesAsync();
+
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = branch.BranchId, IsProlongedRain = true, OccupancyRate = 0.20 };
+            var result = await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            Assert.Contains("Issued 1 vouchers", result);
+
+            var decisionHistory = await _dbContext.AIDecisionHistories.FirstOrDefaultAsync(d => d.CustomerId == user.UserId);
+            Assert.NotNull(decisionHistory);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_CustomerAtDifferentBranch_Excluded()
+        {
+            var branch = new Branch { Name = "Sim Branch D", IsActive = true };
+            var otherBranch = new Branch { Name = "Other Branch", IsActive = true };
+            _dbContext.Branches.AddRange(branch, otherBranch);
+            await _dbContext.SaveChangesAsync();
+
+            var user = new User { PhoneNumber = "0992000002", Email = "wrongbranch@test.com", PasswordHash = "x", Role = "Customer", Status = "Active" };
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.CustomerFeatureProfiles.Add(new CustomerFeatureProfile { CustomerId = user.UserId, Customer = user, FavoriteBranchId = otherBranch.BranchId });
+            await _dbContext.SaveChangesAsync();
+
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = branch.BranchId, IsProlongedRain = true, OccupancyRate = 0.20 };
+            var result = await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            Assert.Contains("Issued 0 vouchers", result);
+        }
+
+        [Fact]
+        public async Task SimulateSmartWeatherCampaignAsync_AlreadyIssuedToday_SkipsDuplicate()
+        {
+            var branch = new Branch { Name = "Sim Branch E", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            await _dbContext.SaveChangesAsync();
+
+            var user = new User { PhoneNumber = "0992000003", Email = "simdupe1@test.com", PasswordHash = "x", Role = "Customer", Status = "Active" };
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.CustomerFeatureProfiles.Add(new CustomerFeatureProfile { CustomerId = user.UserId, Customer = user, FavoriteBranchId = branch.BranchId });
+
+            var voucherCode = $"RAIN_BR{branch.BranchId}";
+            var voucher = new Voucher
+            {
+                Code = voucherCode,
+                DiscountAmount = 30,
+                VoucherType = VoucherType.Discount,
+                CampaignType = VoucherCampaignType.Weather,
+                ExpiryDays = 1,
+                IsActive = true,
+                MaxUsagePerUser = 1,
+                MaxUsages = 999999,
+                StartDate = DateTime.UtcNow,
+                ExpiryDate = DateTime.UtcNow.AddYears(1)
+            };
+            _dbContext.Vouchers.Add(voucher);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.UserVouchers.Add(new UserVoucher
+            {
+                UserId = user.UserId,
+                VoucherId = voucher.VoucherId,
+                ReceivedDate = DateTime.UtcNow,
+                ExpiryDate = DateTime.UtcNow.AddDays(1),
+                IsUsed = false,
+                TriggerKey = "SmartWeatherCampaign"
+            });
+            await _dbContext.SaveChangesAsync();
+
+            var request = new WeatherCampaignSimulationRequestDTO { BranchId = branch.BranchId, IsProlongedRain = true, OccupancyRate = 0.20 };
+            var result = await _sut.SimulateSmartWeatherCampaignAsync(request);
+
+            Assert.Contains("Issued 0 vouchers", result);
+        }
     }
 }
