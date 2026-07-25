@@ -1727,5 +1727,622 @@ namespace AutoWashPro.Tests.BLL
             Assert.Equal("Processing", result.Status);
             Assert.NotNull(result.ProcessingStartTime);
         }
+
+        [Fact]
+        public async Task UpdateVehicleConditionAsync_BookingNotFound_ThrowsNotFoundException()
+        {
+            var request = new UpdateVehicleConditionDTO { BookingId = 999, Condition = VehicleCondition.Dirty };
+
+            await Assert.ThrowsAsync<NotFoundException>(() => _sut.UpdateVehicleConditionAsync(1, 999, request));
+        }
+
+        [Fact]
+        public async Task UpdateVehicleConditionAsync_NotCheckedIn_ThrowsBadRequestException()
+        {
+            var booking = new Booking { LicensePlate = "51M11111", Status = "Pending", BranchId = 1, ScheduledTime = DateTime.UtcNow, OriginalPrice = 100000, FinalAmount = 100000 };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new UpdateVehicleConditionDTO { BookingId = booking.BookingId, Condition = VehicleCondition.Dirty };
+
+            await Assert.ThrowsAsync<BadRequestException>(() => _sut.UpdateVehicleConditionAsync(1, booking.BookingId, request));
+        }
+
+        [Fact]
+        public async Task UpdateVehicleConditionAsync_DirtyCondition_Applies20PercentSurcharge()
+        {
+            var user = await SeedActiveUser();
+            var wallet = new Wallet { UserId = user.UserId, Balance = 100000, Status = "Active" };
+            _dbContext.Wallets.Add(wallet);
+
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                UserId = user.UserId,
+                LicensePlate = "51M22222",
+                Status = "CheckedIn",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new UpdateVehicleConditionDTO { BookingId = booking.BookingId, Condition = VehicleCondition.Dirty };
+            var result = await _sut.UpdateVehicleConditionAsync(1, booking.BookingId, request);
+
+            Assert.True(result);
+            var updated = await _dbContext.Bookings.FirstAsync(b => b.BookingId == booking.BookingId);
+            Assert.Equal(120000, updated.FinalAmount); // 100000 + 20%
+
+            var updatedWallet = await _dbContext.Wallets.FirstAsync(w => w.UserId == user.UserId);
+            Assert.Equal(80000, updatedWallet.Balance); // 100000 - 20000
+        }
+
+        [Fact]
+        public async Task UpdateVehicleConditionAsync_VeryDirtyCondition_Applies50PercentSurcharge()
+        {
+            var user = await SeedActiveUser();
+            _dbContext.Wallets.Add(new Wallet { UserId = user.UserId, Balance = 200000, Status = "Active" });
+
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                UserId = user.UserId,
+                LicensePlate = "51M33333",
+                Status = "CheckedIn",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new UpdateVehicleConditionDTO { BookingId = booking.BookingId, Condition = VehicleCondition.VeryDirty };
+            await _sut.UpdateVehicleConditionAsync(1, booking.BookingId, request);
+
+            var updated = await _dbContext.Bookings.FirstAsync(b => b.BookingId == booking.BookingId);
+            Assert.Equal(150000, updated.FinalAmount); // 100000 + 50%
+        }
+
+        [Fact]
+        public async Task UpdateVehicleConditionAsync_InsufficientBalance_ThrowsBadRequestException()
+        {
+            var user = await SeedActiveUser();
+            _dbContext.Wallets.Add(new Wallet { UserId = user.UserId, Balance = 5000, Status = "Active" });
+
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                UserId = user.UserId,
+                LicensePlate = "51M44444",
+                Status = "CheckedIn",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new UpdateVehicleConditionDTO { BookingId = booking.BookingId, Condition = VehicleCondition.VeryDirty };
+
+            await Assert.ThrowsAsync<BadRequestException>(() => _sut.UpdateVehicleConditionAsync(1, booking.BookingId, request));
+        }
+
+        [Fact]
+        public async Task ForceCancelBookingsAsync_NoDateOrSlot_ThrowsBadRequestException()
+        {
+            var request = new ForceCancelRequestDTO { BranchId = 1, Reason = "Incident" };
+
+            await Assert.ThrowsAsync<BadRequestException>(() => _sut.ForceCancelBookingsAsync(request));
+        }
+
+        [Fact]
+        public async Task ForceCancelBookingsAsync_NoMatchingBookings_NoOp()
+        {
+            var request = new ForceCancelRequestDTO { BranchId = 1, AffectedDate = DateTime.UtcNow.AddDays(5), Reason = "Incident" };
+
+            await _sut.ForceCancelBookingsAsync(request); // should not throw
+        }
+
+        [Fact]
+        public async Task ForceCancelBookingsAsync_FilteredByDate_CancelsOnlyMatchingBookings()
+        {
+            var targetDate = DateTime.UtcNow.AddDays(2).Date;
+            var matchBooking = new Booking { LicensePlate = "51N11111", Status = "Pending", BranchId = 1, ScheduledTime = targetDate.AddHours(10), OriginalPrice = 0, FinalAmount = 0 };
+            var otherDateBooking = new Booking { LicensePlate = "51N22222", Status = "Pending", BranchId = 1, ScheduledTime = targetDate.AddDays(1).AddHours(10), OriginalPrice = 0, FinalAmount = 0 };
+            _dbContext.Bookings.AddRange(matchBooking, otherDateBooking);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new ForceCancelRequestDTO { BranchId = 1, AffectedDate = targetDate, Reason = "Incident" };
+            await _sut.ForceCancelBookingsAsync(request);
+
+            var updatedMatch = await _dbContext.Bookings.FirstAsync(b => b.BookingId == matchBooking.BookingId);
+            var updatedOther = await _dbContext.Bookings.FirstAsync(b => b.BookingId == otherDateBooking.BookingId);
+            Assert.Equal("CancelledBySystem", updatedMatch.Status);
+            Assert.Equal("Pending", updatedOther.Status);
+        }
+
+        [Fact]
+        public async Task ForceCancelBookingsAsync_WithCompletedPayment_RefundsWalletAndVoucher()
+        {
+            var user = await SeedActiveUser();
+            var wallet = new Wallet { UserId = user.UserId, Balance = 0, Status = "Active" };
+            _dbContext.Wallets.Add(wallet);
+
+            var targetDate = DateTime.UtcNow.AddDays(2).Date;
+            var booking = new Booking { UserId = user.UserId, LicensePlate = "51N33333", Status = "Pending", BranchId = 1, ScheduledTime = targetDate.AddHours(10), OriginalPrice = 100000, FinalAmount = 100000 };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.Transactions.Add(new Transaction { ReferenceBookingId = booking.BookingId, TransactionType = "BookingPayment", Status = "Completed", Amount = 100000, Description = "paid", CreatedAt = DateTime.UtcNow });
+            await _dbContext.SaveChangesAsync();
+
+            _walletMock.Setup(w => w.RefundBalanceAsync(user.UserId, 100000, It.IsAny<string>())).Returns(Task.CompletedTask);
+            _voucherMock.Setup(v => v.GenerateCompensationVoucherAsync(user.UserId)).Returns(Task.CompletedTask);
+
+            var request = new ForceCancelRequestDTO { BranchId = 1, AffectedDate = targetDate, Reason = "System incident" };
+            await _sut.ForceCancelBookingsAsync(request);
+
+            _walletMock.Verify(w => w.RefundBalanceAsync(user.UserId, 100000, It.IsAny<string>()), Times.Once);
+            _voucherMock.Verify(v => v.GenerateCompensationVoucherAsync(user.UserId), Times.Once);
+        }
+
+        [Fact]
+        public async Task SendBookingConfirmationEmailAsync_BookingNotFound_ReturnsFalse()
+        {
+            var result = await _sut.SendBookingConfirmationEmailAsync(1, 999);
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task SendBookingConfirmationEmailAsync_UserHasNoEmail_ReturnsFalse()
+        {
+            var user = new User { PhoneNumber = "0998000001", Email = null, PasswordHash = "x", Role = "Customer", Status = "Active" };
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking { UserId = user.UserId, LicensePlate = "51O11111", Status = "Pending", BranchId = 1, ScheduledTime = DateTime.UtcNow, OriginalPrice = 0, FinalAmount = 0 };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.SendBookingConfirmationEmailAsync(user.UserId, booking.BookingId);
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task SendBookingConfirmationEmailAsync_ValidBooking_SendsEmailAndReturnsTrue()
+        {
+            var user = await SeedActiveUser();
+            user.Email = "confirm@test.com";
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                UserId = user.UserId,
+                LicensePlate = "51O22222",
+                Status = "Pending",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.SendBookingConfirmationEmailAsync(user.UserId, booking.BookingId);
+
+            Assert.True(result);
+            _emailMock.Verify(e => e.SendEmailAsync(user.Email, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task SendBookingConfirmationEmailAsync_EmailServiceThrows_ReturnsFalse()
+        {
+            var user = await SeedActiveUser();
+            user.Email = "willfail@test.com";
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                UserId = user.UserId,
+                LicensePlate = "51O33333",
+                Status = "Pending",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            _emailMock.Setup(e => e.SendEmailAsync("willfail@test.com", It.IsAny<string>(), It.IsAny<string>())).ThrowsAsync(new Exception("SMTP down"));
+
+            var result = await _sut.SendBookingConfirmationEmailAsync(user.UserId, booking.BookingId);
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task ReportMismatchAsync_BookingNotFound_ThrowsNotFoundException()
+        {
+            await Assert.ThrowsAsync<NotFoundException>(() =>
+                _sut.ReportMismatchAsync(999, AutoWashPro.BLL.Enums.VehicleConditionEnum.Dirty, 1));
+        }
+
+        [Fact]
+        public async Task ReportMismatchAsync_NewPriceHigher_SetsSurcharge()
+        {
+            var vehicleTypeOld = new VehicleType { Name = "Sedan", BaseWeight = 3 };
+            var vehicleTypeNew = new VehicleType { Name = "SUV", BaseWeight = 5 };
+            _dbContext.VehicleTypes.AddRange(vehicleTypeOld, vehicleTypeNew);
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.ServicePrices.Add(new ServicePrice { ServiceId = service.ServiceId, VehicleTypeId = vehicleTypeNew.Id, BranchId = 1, Price = 150000, CapacityWeight = 5 });
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                LicensePlate = "51O44444",
+                Status = "CheckedIn",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            await _sut.ReportMismatchAsync(booking.BookingId, AutoWashPro.BLL.Enums.VehicleConditionEnum.Clean, vehicleTypeNew.Id);
+
+            var updated = await _dbContext.Bookings.FirstAsync(b => b.BookingId == booking.BookingId);
+            Assert.Equal(50000, updated.MismatchSurcharge); // 150000 - 100000
+        }
+
+        [Fact]
+        public async Task CreateBookingPaymentLinkAsync_DelegatesToWalletService()
+        {
+            var expected = new PaymentQrResponseDTO { BookingId = 5, Amount = 100000, OrderCode = "ORD1", PaymentUrl = "https://pay.example/1", PaymentType = "Wallet" };
+            _walletMock.Setup(w => w.CreatePaymentQrAsync(1, It.IsAny<PaymentQrRequestDTO>())).ReturnsAsync(expected);
+
+            var request = new CreateBookingPaymentLinkDTO { CancelUrl = "https://cancel", ReturnUrl = "https://return" };
+            var result = await _sut.CreateBookingPaymentLinkAsync(1, 5, request);
+
+            Assert.Equal("https://pay.example/1", result.PaymentUrl);
+            Assert.Equal(100000, result.Amount);
+        }
+
+        [Fact]
+        public async Task CheckCompatibilityAsync_DelegatesToValidateBookingCompatibility()
+        {
+            var user = await SeedActiveUser();
+            var vehicleType = new VehicleType { Name = "Sedan", BaseWeight = 3 };
+            _dbContext.VehicleTypes.Add(vehicleType);
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.Vehicles.Add(new Vehicle { UserId = user.UserId, LicensePlate = "51O55555", VehicleTypeId = vehicleType.Id, IsDeleted = false });
+            _dbContext.ServicePrices.Add(new ServicePrice { ServiceId = service.ServiceId, VehicleTypeId = vehicleType.Id, BranchId = 1, Price = 100000, CapacityWeight = 3 });
+
+            var slot = new TimeSlot { BranchId = 1, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), MaxCapacity = 10, IsVipOnly = false };
+            _dbContext.TimeSlots.Add(slot);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new CheckCompatibilityRequestDTO
+            {
+                BranchId = 1,
+                SlotId = slot.SlotId,
+                TargetDate = DateTime.UtcNow.AddDays(1),
+                LicensePlate = "51O55555",
+                ServiceIds = new List<int> { service.ServiceId }
+            };
+
+            var result = await _sut.CheckCompatibilityAsync(user.UserId, request);
+
+            Assert.True(result.IsCompatible);
+        }
+
+        [Fact]
+        public async Task GetAvailableSlotsWithSuggestionAsync_BranchNotFound_ThrowsNotFoundException()
+        {
+            var user = await SeedActiveUser();
+            var request = new CheckAvailableSlotsRequestDTO { BranchId = 999, TargetDate = DateTime.UtcNow.AddDays(1), VehicleTypeId = 1, ServiceIds = new List<int>() };
+
+            await Assert.ThrowsAsync<NotFoundException>(() => _sut.GetAvailableSlotsWithSuggestionAsync(user.UserId, request));
+        }
+
+        [Fact]
+        public async Task GetAvailableSlotsWithSuggestionAsync_LowOccupancy_NotOverloaded()
+        {
+            var user = await SeedActiveUser();
+            var branch = new Branch { Name = "Main Branch", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var slot = new TimeSlot { BranchId = branch.BranchId, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), MaxCapacity = 10 };
+            _dbContext.TimeSlots.Add(slot);
+            await _dbContext.SaveChangesAsync();
+
+            _occupancyMock.Setup(o => o.GetBranchOccupancyRateAsync(branch.BranchId, It.IsAny<DateTime>())).ReturnsAsync(0.10);
+
+            var request = new CheckAvailableSlotsRequestDTO { BranchId = branch.BranchId, TargetDate = DateTime.UtcNow.AddDays(1), VehicleTypeId = 1, ServiceIds = new List<int>() };
+            var result = await _sut.GetAvailableSlotsWithSuggestionAsync(user.UserId, request);
+
+            Assert.False(result.IsOverloaded);
+            Assert.False(result.HasAlternativeSuggestion);
+        }
+
+        [Fact]
+        public async Task GetAvailableSlotsWithSuggestionAsync_Overloaded_NoLatLong_NoSuggestion()
+        {
+            var user = await SeedActiveUser();
+            var branch = new Branch { Name = "No GPS Branch", IsActive = true, Latitude = null, Longitude = null };
+            _dbContext.Branches.Add(branch);
+            var slot = new TimeSlot { BranchId = branch.BranchId, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), MaxCapacity = 10 };
+            _dbContext.TimeSlots.Add(slot);
+            await _dbContext.SaveChangesAsync();
+
+            _occupancyMock.Setup(o => o.GetBranchOccupancyRateAsync(branch.BranchId, It.IsAny<DateTime>())).ReturnsAsync(0.90);
+
+            var request = new CheckAvailableSlotsRequestDTO { BranchId = branch.BranchId, TargetDate = DateTime.UtcNow.AddDays(1), VehicleTypeId = 1, ServiceIds = new List<int>() };
+            var result = await _sut.GetAvailableSlotsWithSuggestionAsync(user.UserId, request);
+
+            Assert.True(result.IsOverloaded);
+            Assert.False(result.HasAlternativeSuggestion);
+        }
+
+        [Fact]
+        public async Task GetAvailableSlotsWithSuggestionAsync_Overloaded_QualifyingAltBranch_SuggestsAndGrantsVoucher()
+        {
+            var user = await SeedActiveUser();
+            var branch = new Branch { Name = "Busy Branch", IsActive = true, Latitude = 10.0, Longitude = 106.0 };
+            var altBranch = new Branch { Name = "Quiet Branch", IsActive = true, Latitude = 10.01, Longitude = 106.01 }; // ~1.5km away
+            _dbContext.Branches.AddRange(branch, altBranch);
+
+            var slot = new TimeSlot { BranchId = branch.BranchId, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), MaxCapacity = 10 };
+            var altSlot = new TimeSlot { BranchId = altBranch.BranchId, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), MaxCapacity = 10 };
+            _dbContext.TimeSlots.AddRange(slot, altSlot);
+            await _dbContext.SaveChangesAsync();
+
+            _occupancyMock.Setup(o => o.GetBranchOccupancyRateAsync(branch.BranchId, It.IsAny<DateTime>())).ReturnsAsync(0.90);
+            _occupancyMock.Setup(o => o.GetBranchOccupancyRateAsync(altBranch.BranchId, It.IsAny<DateTime>())).ReturnsAsync(0.20);
+
+            var request = new CheckAvailableSlotsRequestDTO { BranchId = branch.BranchId, TargetDate = DateTime.UtcNow.AddDays(1), VehicleTypeId = 1, ServiceIds = new List<int>() };
+            var result = await _sut.GetAvailableSlotsWithSuggestionAsync(user.UserId, request);
+
+            Assert.True(result.IsOverloaded);
+            Assert.True(result.HasAlternativeSuggestion);
+            Assert.Equal(altBranch.BranchId, result.SuggestedAlternative.BranchId);
+            Assert.NotNull(result.IncentiveVoucher);
+
+            var granted = await _dbContext.UserVouchers.AnyAsync(uv => uv.UserId == user.UserId);
+            Assert.True(granted);
+        }
+
+        [Fact]
+        public async Task GetAvailableSlotsWithSuggestionAsync_AlreadyHasSwitchVoucher_DoesNotGrantDuplicate()
+        {
+            var user = await SeedActiveUser();
+            var branch = new Branch { Name = "Busy Branch 2", IsActive = true, Latitude = 10.0, Longitude = 106.0 };
+            var altBranch = new Branch { Name = "Quiet Branch 2", IsActive = true, Latitude = 10.01, Longitude = 106.01 };
+            _dbContext.Branches.AddRange(branch, altBranch);
+
+            var slot = new TimeSlot { BranchId = branch.BranchId, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), MaxCapacity = 10 };
+            var altSlot = new TimeSlot { BranchId = altBranch.BranchId, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), MaxCapacity = 10 };
+            _dbContext.TimeSlots.AddRange(slot, altSlot);
+            await _dbContext.SaveChangesAsync();
+
+            var voucher = new Voucher
+            {
+                Code = $"SWITCH_BR{altBranch.BranchId}_15%",
+                DiscountAmount = 15,
+                VoucherType = AutoWashPro.DAL.Enums.VoucherType.Discount,
+                CampaignType = AutoWashPro.DAL.Enums.VoucherCampaignType.Winback,
+                BranchId = altBranch.BranchId,
+                IsActive = true,
+                MaxUsagePerUser = 5,
+                MaxUsages = 999999,
+                StartDate = DateTime.UtcNow,
+                ExpiryDate = DateTime.UtcNow.AddYears(1)
+            };
+            _dbContext.Vouchers.Add(voucher);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.UserVouchers.Add(new UserVoucher { UserId = user.UserId, VoucherId = voucher.VoucherId, ReceivedDate = DateTime.UtcNow, ExpiryDate = DateTime.UtcNow.AddDays(1), IsUsed = false });
+            await _dbContext.SaveChangesAsync();
+
+            _occupancyMock.Setup(o => o.GetBranchOccupancyRateAsync(branch.BranchId, It.IsAny<DateTime>())).ReturnsAsync(0.90);
+            _occupancyMock.Setup(o => o.GetBranchOccupancyRateAsync(altBranch.BranchId, It.IsAny<DateTime>())).ReturnsAsync(0.20);
+
+            var request = new CheckAvailableSlotsRequestDTO { BranchId = branch.BranchId, TargetDate = DateTime.UtcNow.AddDays(1), VehicleTypeId = 1, ServiceIds = new List<int>() };
+            await _sut.GetAvailableSlotsWithSuggestionAsync(user.UserId, request);
+
+            var count = await _dbContext.UserVouchers.CountAsync(uv => uv.UserId == user.UserId && uv.VoucherId == voucher.VoucherId);
+            Assert.Equal(1, count); // still just the one, not duplicated
+        }
+
+        [Fact]
+        public async Task AcceptRelocationAsync_BookingNotFound_ThrowsNotFoundException()
+        {
+            var user = await SeedActiveUser();
+            var request = new AcceptRelocationRequestDTO { AlternativeBranchId = 1, VoucherCode = "X" };
+
+            await Assert.ThrowsAsync<NotFoundException>(() => _sut.AcceptRelocationAsync(user.UserId, 999, request));
+        }
+
+        [Fact]
+        public async Task AcceptRelocationAsync_NotPending_ThrowsBadRequestException()
+        {
+            var user = await SeedActiveUser();
+            var booking = new Booking { UserId = user.UserId, LicensePlate = "51P11111", Status = "CheckedIn", BranchId = 1, ScheduledTime = DateTime.UtcNow.AddHours(2), OriginalPrice = 0, FinalAmount = 0 };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new AcceptRelocationRequestDTO { AlternativeBranchId = 2, VoucherCode = "X" };
+
+            await Assert.ThrowsAsync<BadRequestException>(() => _sut.AcceptRelocationAsync(user.UserId, booking.BookingId, request));
+        }
+
+        [Fact]
+        public async Task AcceptRelocationAsync_ValidRelocation_UpdatesBranchAndAppliesDiscount()
+        {
+            var user = await SeedActiveUser();
+            var altBranch = new Branch { Name = "Alt Branch", IsActive = true };
+            _dbContext.Branches.Add(altBranch);
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            var voucher = new Voucher
+            {
+                Code = "RELOC15",
+                DiscountAmount = 15000,
+                VoucherType = AutoWashPro.DAL.Enums.VoucherType.Discount,
+                CampaignType = AutoWashPro.DAL.Enums.VoucherCampaignType.Winback,
+                BranchId = altBranch.BranchId,
+                IsActive = true,
+                ApprovalStatus = "Approved",
+                MaxUsagePerUser = 5,
+                MaxUsages = 999999,
+                StartDate = DateTime.UtcNow,
+                ExpiryDate = DateTime.UtcNow.AddYears(1)
+            };
+            _dbContext.Vouchers.Add(voucher);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                UserId = user.UserId,
+                LicensePlate = "51P22222",
+                Status = "Pending",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow.AddHours(2),
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                PointDiscountAmount = 0,
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var request = new AcceptRelocationRequestDTO { AlternativeBranchId = altBranch.BranchId, VoucherCode = "RELOC15" };
+            var result = await _sut.AcceptRelocationAsync(user.UserId, booking.BookingId, request);
+
+            Assert.Equal(altBranch.BranchId, (await _dbContext.Bookings.FirstAsync(b => b.BookingId == booking.BookingId)).BranchId);
+            Assert.Equal(15000, result.VoucherDiscountAmount);
+            Assert.Equal(85000, result.FinalAmount);
+        }
+
+        [Fact]
+        public async Task ProcessOverdueAutomatedWashesAsync_NoProcessingBookings_ReturnsZero()
+        {
+            var result = await _sut.ProcessOverdueAutomatedWashesAsync();
+
+            Assert.Equal(0, result);
+        }
+
+        [Fact]
+        public async Task ProcessOverdueAutomatedWashesAsync_NotYetOverdue_NotCompleted()
+        {
+            var vehicleType = new VehicleType { Name = "Sedan", BaseWeight = 3 };
+            _dbContext.VehicleTypes.Add(vehicleType);
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.ServicePrices.Add(new ServicePrice { ServiceId = service.ServiceId, VehicleTypeId = vehicleType.Id, BranchId = 1, Price = 100000, EstimatedDurationMinutes = 60 });
+            await _dbContext.SaveChangesAsync();
+
+            var vehicle = new Vehicle { LicensePlate = "51Q11111", VehicleTypeId = vehicleType.Id };
+            _dbContext.Vehicles.Add(vehicle);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                LicensePlate = "51Q11111",
+                VehicleId = vehicle.Id,
+                Status = "Processing",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                ProcessingStartTime = DateTime.UtcNow.AddMinutes(-10), // only 10 of 60 min elapsed
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.ProcessOverdueAutomatedWashesAsync();
+
+            Assert.Equal(0, result);
+        }
+
+        [Fact]
+        public async Task ProcessOverdueAutomatedWashesAsync_Overdue_CompletesAndAwardsPoints()
+        {
+            var user = await SeedActiveUser();
+            var vehicleType = new VehicleType { Name = "Sedan", BaseWeight = 3 };
+            _dbContext.VehicleTypes.Add(vehicleType);
+            var service = new Service { ServiceName = "Wash", IsActive = true };
+            _dbContext.Services.Add(service);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.ServicePrices.Add(new ServicePrice { ServiceId = service.ServiceId, VehicleTypeId = vehicleType.Id, BranchId = 1, Price = 100000, EstimatedDurationMinutes = 20 });
+            await _dbContext.SaveChangesAsync();
+
+            var vehicle = new Vehicle { LicensePlate = "51Q22222", VehicleTypeId = vehicleType.Id };
+            _dbContext.Vehicles.Add(vehicle);
+            await _dbContext.SaveChangesAsync();
+
+            var booking = new Booking
+            {
+                UserId = user.UserId,
+                LicensePlate = "51Q22222",
+                VehicleId = vehicle.Id,
+                Status = "Processing",
+                BranchId = 1,
+                ScheduledTime = DateTime.UtcNow,
+                OriginalPrice = 100000,
+                FinalAmount = 100000,
+                ProcessingStartTime = DateTime.UtcNow.AddMinutes(-25), // past the 20 min estimate
+                BookingDetails = new List<BookingDetail> { new BookingDetail { ServiceId = service.ServiceId, Price = 100000 } }
+            };
+            _dbContext.Bookings.Add(booking);
+            await _dbContext.SaveChangesAsync();
+
+            _walletMock.Setup(w => w.AwardCompletionPointsAsync(user.UserId, It.IsAny<int>(), booking.BookingId)).ReturnsAsync(100);
+
+            var result = await _sut.ProcessOverdueAutomatedWashesAsync();
+
+            Assert.Equal(1, result);
+            var updated = await _dbContext.Bookings.FirstAsync(b => b.BookingId == booking.BookingId);
+            Assert.Equal("Completed", updated.Status);
+            _walletMock.Verify(w => w.AwardCompletionPointsAsync(user.UserId, 100, booking.BookingId), Times.Once);
+        }
     }
 }

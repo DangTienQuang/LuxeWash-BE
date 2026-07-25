@@ -8,7 +8,7 @@ namespace BLL.DTOs.Fleet
 {
     public class FleetWalkInDTO
     {
-        public string LicensePLate { get; set; } = null!;
+        public string LicensePlate { get; set; } = null!;
         public int BranchId { get; set; }
     }
 }

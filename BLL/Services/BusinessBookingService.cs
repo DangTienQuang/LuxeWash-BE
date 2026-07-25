@@ -727,7 +727,7 @@ namespace BLL.Services
         {
             var vehicle = await _context.FleetVehicles
                 .FirstOrDefaultAsync(x =>
-                    x.LicensePlate == dto.LicensePLate &&
+                    x.LicensePlate == dto.LicensePlate &&
                     x.Status == "Active");
 
             if (vehicle == null)
