@@ -204,5 +204,206 @@ namespace AutoWashPro.Tests.BLL
 
             Assert.Equal("kilogram", result.Unit);
         }
+
+        [Fact]
+        public async Task GetStocksAsync_NoBranchFilter_ReturnsAll()
+        {
+            var branch = new Branch { Name = "Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true, DefaultMinStockLevel = 10 };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var warehouse = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch.BranchId, IsActive = true };
+            _dbContext.Warehouses.Add(warehouse);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.WarehouseStocks.Add(new WarehouseStock { WarehouseId = warehouse.WarehouseId, MaterialId = material.MaterialId, CurrentQuantity = 50, UpdatedAt = DateTime.UtcNow });
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.GetStocksAsync();
+
+            Assert.Single(result);
+        }
+
+        [Fact]
+        public async Task GetStocksAsync_FilterByBranch_ReturnsOnlyMatching()
+        {
+            var branch1 = new Branch { Name = "Branch A", IsActive = true };
+            var branch2 = new Branch { Name = "Branch B", IsActive = true };
+            _dbContext.Branches.AddRange(branch1, branch2);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true, DefaultMinStockLevel = 10 };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var wh1 = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch1.BranchId, IsActive = true };
+            var wh2 = new Warehouse { Name = "Kho B", Type = "Branch", BranchId = branch2.BranchId, IsActive = true };
+            _dbContext.Warehouses.AddRange(wh1, wh2);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.WarehouseStocks.AddRange(
+                new WarehouseStock { WarehouseId = wh1.WarehouseId, MaterialId = material.MaterialId, CurrentQuantity = 50, UpdatedAt = DateTime.UtcNow },
+                new WarehouseStock { WarehouseId = wh2.WarehouseId, MaterialId = material.MaterialId, CurrentQuantity = 30, UpdatedAt = DateTime.UtcNow }
+            );
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.GetStocksAsync(branch1.BranchId);
+
+            Assert.Single(result);
+            Assert.Equal(branch1.BranchId, result[0].BranchId);
+        }
+
+        [Fact]
+        public async Task GetStocksAsync_ComputesIsLowStockCorrectly()
+        {
+            var branch = new Branch { Name = "Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true, DefaultMinStockLevel = 20 };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var warehouse = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch.BranchId, IsActive = true };
+            _dbContext.Warehouses.Add(warehouse);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.WarehouseStocks.Add(new WarehouseStock { WarehouseId = warehouse.WarehouseId, MaterialId = material.MaterialId, CurrentQuantity = 5, UpdatedAt = DateTime.UtcNow }); // below default min of 20
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.GetStocksAsync();
+
+            Assert.True(result[0].IsLowStock);
+        }
+
+        [Fact]
+        public async Task GetBatchesAsync_ExpiringOnlyFalse_ReturnsAll()
+        {
+            var branch = new Branch { Name = "Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true, ExpiryWarningDays = 30 };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var warehouse = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch.BranchId, IsActive = true };
+            _dbContext.Warehouses.Add(warehouse);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.MaterialBatches.AddRange(
+                new MaterialBatch { MaterialId = material.MaterialId, WarehouseId = warehouse.WarehouseId, BatchCode = "B1", ImportedQuantity = 50, RemainingQuantity = 50, UnitCost = 1000, TotalCost = 50000, Status = "Active", ExpiryDate = DateTime.UtcNow.AddDays(100) },
+                new MaterialBatch { MaterialId = material.MaterialId, WarehouseId = warehouse.WarehouseId, BatchCode = "B2", ImportedQuantity = 20, RemainingQuantity = 20, UnitCost = 1000, TotalCost = 20000, Status = "Active", ExpiryDate = DateTime.UtcNow.AddDays(5) }
+            );
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.GetBatchesAsync();
+
+            Assert.Equal(2, result.Count);
+        }
+
+        [Fact]
+        public async Task GetBatchesAsync_ExpiringOnlyTrue_ReturnsOnlyWithinWarningWindow()
+        {
+            var branch = new Branch { Name = "Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true, ExpiryWarningDays = 10 };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var warehouse = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch.BranchId, IsActive = true };
+            _dbContext.Warehouses.Add(warehouse);
+            await _dbContext.SaveChangesAsync();
+
+            _dbContext.MaterialBatches.AddRange(
+                new MaterialBatch { MaterialId = material.MaterialId, WarehouseId = warehouse.WarehouseId, BatchCode = "B1", ImportedQuantity = 50, RemainingQuantity = 50, UnitCost = 1000, TotalCost = 50000, Status = "Active", ExpiryDate = DateTime.UtcNow.AddDays(100) }, // far away
+                new MaterialBatch { MaterialId = material.MaterialId, WarehouseId = warehouse.WarehouseId, BatchCode = "B2", ImportedQuantity = 20, RemainingQuantity = 20, UnitCost = 1000, TotalCost = 20000, Status = "Active", ExpiryDate = DateTime.UtcNow.AddDays(5) } // within 10-day window
+            );
+            await _dbContext.SaveChangesAsync();
+
+            var result = await _sut.GetBatchesAsync(expiringOnly: true);
+
+            Assert.Single(result);
+            Assert.Equal("B2", result[0].BatchCode);
+        }
+
+        [Fact]
+        public async Task DiscardBatchAsync_NotFound_ThrowsNotFoundException()
+        {
+            await Assert.ThrowsAsync<NotFoundException>(() => _sut.DiscardBatchAsync(999));
+        }
+
+        [Fact]
+        public async Task DiscardBatchAsync_AlreadyDepleted_MarksDepletedNoStockChange()
+        {
+            var branch = new Branch { Name = "Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var warehouse = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch.BranchId, IsActive = true };
+            _dbContext.Warehouses.Add(warehouse);
+            await _dbContext.SaveChangesAsync();
+
+            var batch = new MaterialBatch { MaterialId = material.MaterialId, WarehouseId = warehouse.WarehouseId, BatchCode = "B1", ImportedQuantity = 50, RemainingQuantity = 0, UnitCost = 1000, TotalCost = 50000, Status = "Active" };
+            _dbContext.MaterialBatches.Add(batch);
+            await _dbContext.SaveChangesAsync();
+
+            await _sut.DiscardBatchAsync(batch.MaterialBatchId);
+
+            var updated = await _dbContext.MaterialBatches.FirstAsync(b => b.MaterialBatchId == batch.MaterialBatchId);
+            Assert.Equal("Depleted", updated.Status);
+        }
+
+        [Fact]
+        public async Task DiscardBatchAsync_StockLowerThanBatch_ThrowsBadRequestException()
+        {
+            var branch = new Branch { Name = "Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var warehouse = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch.BranchId, IsActive = true };
+            _dbContext.Warehouses.Add(warehouse);
+            await _dbContext.SaveChangesAsync();
+
+            var batch = new MaterialBatch { MaterialId = material.MaterialId, WarehouseId = warehouse.WarehouseId, BatchCode = "B1", ImportedQuantity = 50, RemainingQuantity = 30, UnitCost = 1000, TotalCost = 50000, Status = "Active" };
+            _dbContext.MaterialBatches.Add(batch);
+            _dbContext.WarehouseStocks.Add(new WarehouseStock { WarehouseId = warehouse.WarehouseId, MaterialId = material.MaterialId, CurrentQuantity = 10, UpdatedAt = DateTime.UtcNow }); // less than batch's 30
+            await _dbContext.SaveChangesAsync();
+
+            await Assert.ThrowsAsync<BadRequestException>(() => _sut.DiscardBatchAsync(batch.MaterialBatchId));
+        }
+
+        [Fact]
+        public async Task DiscardBatchAsync_Valid_DiscardsAndCreatesTransaction()
+        {
+            var branch = new Branch { Name = "Branch A", IsActive = true };
+            _dbContext.Branches.Add(branch);
+            var material = new Material { Name = "Shampoo", Category = "Chemical", Unit = "liter", IsActive = true };
+            _dbContext.Materials.Add(material);
+            await _dbContext.SaveChangesAsync();
+
+            var warehouse = new Warehouse { Name = "Kho A", Type = "Branch", BranchId = branch.BranchId, IsActive = true };
+            _dbContext.Warehouses.Add(warehouse);
+            await _dbContext.SaveChangesAsync();
+
+            var batch = new MaterialBatch { MaterialId = material.MaterialId, WarehouseId = warehouse.WarehouseId, BatchCode = "B1", ImportedQuantity = 50, RemainingQuantity = 20, UnitCost = 1000, TotalCost = 50000, Status = "Active" };
+            _dbContext.MaterialBatches.Add(batch);
+            _dbContext.WarehouseStocks.Add(new WarehouseStock { WarehouseId = warehouse.WarehouseId, MaterialId = material.MaterialId, CurrentQuantity = 100, UpdatedAt = DateTime.UtcNow });
+            await _dbContext.SaveChangesAsync();
+
+            await _sut.DiscardBatchAsync(batch.MaterialBatchId, "Expired");
+
+            var updatedBatch = await _dbContext.MaterialBatches.FirstAsync(b => b.MaterialBatchId == batch.MaterialBatchId);
+            Assert.Equal(0, updatedBatch.RemainingQuantity);
+            Assert.Equal("Discarded", updatedBatch.Status);
+
+            var updatedStock = await _dbContext.WarehouseStocks.FirstAsync(s => s.WarehouseId == warehouse.WarehouseId);
+            Assert.Equal(80, updatedStock.CurrentQuantity); // 100 - 20
+
+            var tx = await _dbContext.InventoryTransactions.FirstOrDefaultAsync(t => t.MaterialBatchId == batch.MaterialBatchId);
+            Assert.NotNull(tx);
+            Assert.Equal("Discard", tx.TransactionType);
+            Assert.Equal("Expired", tx.Note);
+        }
     }
 }
