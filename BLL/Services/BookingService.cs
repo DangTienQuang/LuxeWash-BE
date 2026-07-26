@@ -1615,6 +1615,13 @@ namespace AutoWashPro.BLL.Services
             var booking = await _context.Bookings.FindAsync(bookingId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
 
+            if (booking.Status == "Processing" || booking.Status == "Completed")
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot mark an actively washing vehicle as No-Show.");
+
+            var gracePeriodEnd = booking.ScheduledTime.AddMinutes(30);
+            if (DateTime.UtcNow < gracePeriodEnd)
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot mark as No-Show before the grace period (30 mins) expires.");
+
             booking.Status = "NoShow";
             // GIỮ NGUYÊN TIỀN CỌC. TUYỆT ĐỐI KHÔNG GỌI HÀM HOÀN TIỀN (REFUND) Ở ĐÂY.
 
@@ -1639,6 +1646,9 @@ namespace AutoWashPro.BLL.Services
         {
             var booking = await _context.Bookings.Include(b => b.BookingDetails).FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
+
+            if (booking.Status == "Completed")
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot report mismatch on a completed wash.");
 
             booking.VehicleCondition = (AutoWashPro.DAL.Entities.VehicleCondition)condition;
             booking.ActualVehicleTypeId = actualTypeId;
@@ -2142,7 +2152,7 @@ namespace AutoWashPro.BLL.Services
 
             var query = _context.Bookings
                 .Include(b => b.User)
-                .Where(b => b.Status == "Pending" && b.BranchId == request.BranchId);
+                .Where(b => (b.Status == "Pending" || b.Status == "CheckedIn") && b.BranchId == request.BranchId);
 
             if (request.AffectedDate.HasValue)
             {

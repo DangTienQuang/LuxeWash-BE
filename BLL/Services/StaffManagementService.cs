@@ -4,6 +4,7 @@ using AutoWashPro.BLL.Exceptions;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
+using BLL.Helpers;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -359,6 +360,18 @@ namespace AutoWashPro.BLL.Services
         {
             ValidateTimeRange(request.StartTime, request.EndTime);
             await GetStaffUserAsync(staffUserId);
+
+            var today = DateTime.UtcNow.ToVnTime().Date;
+            if (request.WorkDate.Date < today)
+                throw new BadRequestException("Cannot request overtime for past dates.");
+
+            var duration = request.EndTime - request.StartTime;
+            if (duration.TotalHours > 4)
+                throw new BadRequestException("Overtime request exceeds the maximum legal limit of 4 hours per day.");
+
+            var pendingExists = await _context.OvertimeRequests.AnyAsync(o => o.StaffUserId == staffUserId && o.WorkDate.Date == request.WorkDate.Date && o.Status == "Pending");
+            if (pendingExists)
+                throw new BadRequestException("You already have a pending overtime request for this date.");
 
             var overtime = new OvertimeRequest
             {
