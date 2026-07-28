@@ -7,14 +7,18 @@ namespace API.Controllers.AI
 {
     [Route("api/v1/camera")]
     [ApiController]
-    [AllowAnonymous]
+    [Authorize(Roles = "Staff,Manager")]
     public class CameraController : ControllerBase
     {
         private readonly IBookingService _bookingService;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _publisherService;
+        private readonly AutoWashPro.DAL.Data.AutoWashDbContext _context;
 
-        public CameraController(IBookingService bookingService)
+        public CameraController(IBookingService bookingService, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService publisherService, AutoWashPro.DAL.Data.AutoWashDbContext context)
         {
             _bookingService = bookingService;
+            _publisherService = publisherService;
+            _context = context;
         }
 
         [HttpPost("check-in")]
@@ -22,6 +26,22 @@ namespace API.Controllers.AI
         {
             try
             {
+                var userIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (int.TryParse(userIdStr, out int userId))
+                {
+                    var employeeProfile = await _context.EmployeeProfiles.FindAsync(userId);
+                    if (employeeProfile != null && employeeProfile.BranchId.HasValue)
+                    {
+                        await _publisherService.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                        {
+                            Type = "reading",
+                            BranchId = employeeProfile.BranchId.Value,
+                            LicensePlate = plate,
+                            DisplayUntil = System.DateTime.UtcNow.AddSeconds(12)
+                        });
+                    }
+                }
+
                 var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(plate, "CheckedIn");
                 if (result.IsWaitingForLane)
                 {

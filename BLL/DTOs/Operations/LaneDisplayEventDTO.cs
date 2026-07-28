@@ -8,8 +8,11 @@ namespace AutoWashPro.BLL.DTOs.Operations
         public string Type { get; set; } = null!;
         public int? BookingId { get; set; }
         public string? LicensePlate { get; set; }
-        public int LaneId { get; set; }
-        public string LaneName { get; set; } = null!;
+        public int? LaneId { get; set; }
+        public string? LaneName { get; set; }
+        public string? Title { get; set; }
+        public string? Message { get; set; }
+        public string? ReasonCode { get; set; }
         public DateTime? DisplayUntil { get; set; }
     }
 }

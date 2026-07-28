@@ -229,11 +229,12 @@ namespace BLL.Services
                         await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
                         {
                             BranchId = nextBooking.BranchId,
-                            Type = "Assigned",
+                            Type = "assigned",
                             BookingId = nextBooking.BookingId,
                             LicensePlate = nextBooking.Vehicle?.LicensePlate,
                             LaneId = laneId,
-                            LaneName = lane.Name
+                            LaneName = lane.Name,
+                            DisplayUntil = DateTime.UtcNow.AddSeconds(15)
                         });
 
                         // Fire event to check-in barrier so it opens for the waiting vehicle

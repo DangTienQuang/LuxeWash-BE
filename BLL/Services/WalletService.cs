@@ -24,8 +24,9 @@ namespace AutoWashPro.BLL.Services
         private readonly ITierService _tierService;
         private readonly IEmailService _emailService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
 
-        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService)
+        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
         {
             _context = context;
             _payOSClient = payOSClient;
@@ -33,6 +34,7 @@ namespace AutoWashPro.BLL.Services
             _tierService = tierService;
             _emailService = emailService;
             _laneSchedulerService = laneSchedulerService;
+            _laneDisplayPublisher = laneDisplayPublisher;
         }
 
         public async Task<WalletResponseDTO> GetWalletInfoAsync(int userId)
@@ -435,6 +437,32 @@ namespace AutoWashPro.BLL.Services
                             if (bestLaneId > 0)
                             {
                                 booking.ProcessingLaneId = bestLaneId;
+                                var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == bestLaneId);
+                                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                                await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                                {
+                                    BranchId = booking.BranchId,
+                                    Type = "assigned",
+                                    BookingId = booking.BookingId,
+                                    LicensePlate = vehicle?.LicensePlate,
+                                    LaneId = bestLaneId,
+                                    LaneName = lane?.Name,
+                                    DisplayUntil = DateTime.UtcNow.AddSeconds(15)
+                                });
+                            }
+                            else
+                            {
+                                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                                await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                                {
+                                    BranchId = booking.BranchId,
+                                    Type = "waiting",
+                                    BookingId = booking.BookingId,
+                                    LicensePlate = vehicle?.LicensePlate,
+                                    ReasonCode = "NO_AVAILABLE_LANE",
+                                    Message = "Chưa có làn trống. Vui lòng giữ nguyên vị trí trước barie.",
+                                    DisplayUntil = DateTime.UtcNow.AddSeconds(20)
+                                });
                             }
                         }
                     }

@@ -9,8 +9,8 @@ namespace AutoWashPro.BLL.Services.Operations
     public interface ILaneDisplayPublisherService
     {
         Task PublishEventAsync(LaneDisplayEventDTO eventDto);
-        Task PublishClearAsync(int branchId, int laneId, string laneName);
-        Task<List<LaneDisplayLatestStateDTO>> GetLatestStateAsync(int branchId);
+        Task PublishClearAsync(int branchId, int? laneId, string? laneName);
+        Task<LaneDisplayLatestResponseDTO> GetLatestStateAsync(int branchId);
         Task PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName);
     }
 }

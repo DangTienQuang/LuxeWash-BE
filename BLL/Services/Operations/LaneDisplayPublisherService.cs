@@ -15,6 +15,10 @@ namespace AutoWashPro.BLL.Services.Operations
         private readonly ConcurrentDictionary<int, ConcurrentDictionary<int, LaneDisplayLatestStateDTO>> _stateTracker
             = new ConcurrentDictionary<int, ConcurrentDictionary<int, LaneDisplayLatestStateDTO>>();
 
+        // BranchId -> Latest Event
+        private readonly ConcurrentDictionary<int, LaneDisplayEventDTO> _latestBranchEvent
+            = new ConcurrentDictionary<int, LaneDisplayEventDTO>();
+
         private readonly IHubContext<LaneDisplayHub> _hubContext;
 
         private readonly System.IServiceProvider _serviceProvider;
@@ -27,27 +31,32 @@ namespace AutoWashPro.BLL.Services.Operations
 
         public async Task PublishEventAsync(LaneDisplayEventDTO eventDto)
         {
-            var branchDict = _stateTracker.GetOrAdd(eventDto.BranchId, _ => new ConcurrentDictionary<int, LaneDisplayLatestStateDTO>());
+            _latestBranchEvent[eventDto.BranchId] = eventDto;
 
-            var latestState = new LaneDisplayLatestStateDTO
+            if (eventDto.LaneId.HasValue)
             {
-                LaneId = eventDto.LaneId,
-                LaneName = eventDto.LaneName,
-                LatestEvent = eventDto
-            };
+                var branchDict = _stateTracker.GetOrAdd(eventDto.BranchId, _ => new ConcurrentDictionary<int, LaneDisplayLatestStateDTO>());
 
-            branchDict.AddOrUpdate(eventDto.LaneId, latestState, (_, __) => latestState);
+                var latestState = new LaneDisplayLatestStateDTO
+                {
+                    LaneId = eventDto.LaneId.Value,
+                    LaneName = eventDto.LaneName ?? $"Làn {eventDto.LaneId.Value}",
+                    LatestEvent = eventDto
+                };
+
+                branchDict.AddOrUpdate(eventDto.LaneId.Value, latestState, (_, __) => latestState);
+            }
 
             await _hubContext.Clients.Group($"branch:{eventDto.BranchId}:lane-display")
                 .SendAsync("ReceiveLaneUpdate", eventDto);
         }
 
-        public async Task PublishClearAsync(int branchId, int laneId, string laneName)
+        public async Task PublishClearAsync(int branchId, int? laneId, string? laneName)
         {
             var clearEvent = new LaneDisplayEventDTO
             {
                 BranchId = branchId,
-                Type = "Cleared",
+                Type = "cleared",
                 LaneId = laneId,
                 LaneName = laneName
             };
@@ -55,11 +64,26 @@ namespace AutoWashPro.BLL.Services.Operations
             await PublishEventAsync(clearEvent);
         }
 
-        public async Task<List<LaneDisplayLatestStateDTO>> GetLatestStateAsync(int branchId)
+        public async Task<LaneDisplayLatestResponseDTO> GetLatestStateAsync(int branchId)
         {
+            var response = new LaneDisplayLatestResponseDTO
+            {
+                BranchId = branchId,
+                ServerTime = DateTime.UtcNow
+            };
+
+            if (_latestBranchEvent.TryGetValue(branchId, out var latestEvent))
+            {
+                if (latestEvent.DisplayUntil == null || latestEvent.DisplayUntil >= DateTime.UtcNow)
+                {
+                    response.LatestEvent = latestEvent;
+                }
+            }
+
             if (_stateTracker.TryGetValue(branchId, out var branchDict) && !branchDict.IsEmpty)
             {
-                return branchDict.Values.ToList();
+                response.Lanes = branchDict.Values.ToList();
+                return response;
             }
 
             // Cache miss (e.g. app pool recycle). Reconstruct from database.
@@ -84,7 +108,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     evt = new LaneDisplayEventDTO
                     {
                         BranchId = branchId,
-                        Type = activeBooking.Status == "CheckedIn" ? "Assigned" : "Processing",
+                        Type = activeBooking.Status == "CheckedIn" ? "assigned" : "processing",
                         BookingId = activeBooking.BookingId,
                         LicensePlate = vehicle?.LicensePlate,
                         LaneId = lane.LaneId,
@@ -101,8 +125,9 @@ namespace AutoWashPro.BLL.Services.Operations
             }
 
             _stateTracker[branchId] = reconstructedDict;
+            response.Lanes = reconstructedDict.Values.ToList();
 
-            return reconstructedDict.Values.ToList();
+            return response;
         }
 
         public async Task PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName)

@@ -910,18 +910,30 @@ namespace AutoWashPro.BLL.Services
                         var lane = await _context.Lanes.FindAsync(booking.ProcessingLaneId);
                         laneName = lane?.Name;
                     }
-                    if (laneName != null)
+                    
+                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
                     {
-                        await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
-                        {
-                            BranchId = booking.BranchId,
-                            Type = newStatus == "CheckedIn" ? "Assigned" : "Processing",
-                            BookingId = booking.BookingId,
-                            LicensePlate = booking.LicensePlate,
-                            LaneId = booking.ProcessingLaneId.Value,
-                            LaneName = laneName
-                        });
-                    }
+                        BranchId = booking.BranchId,
+                        Type = newStatus == "CheckedIn" ? "assigned" : "processing",
+                        BookingId = booking.BookingId,
+                        LicensePlate = booking.LicensePlate,
+                        LaneId = booking.ProcessingLaneId,
+                        LaneName = laneName,
+                        DisplayUntil = DateTime.UtcNow.AddSeconds(15)
+                    });
+                }
+                else if (newStatus == "CheckedIn")
+                {
+                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                    {
+                        BranchId = booking.BranchId,
+                        Type = "waiting",
+                        BookingId = booking.BookingId,
+                        LicensePlate = booking.LicensePlate,
+                        ReasonCode = "NO_AVAILABLE_LANE",
+                        Message = "Chưa có làn trống. Vui lòng giữ nguyên vị trí trước barie.",
+                        DisplayUntil = DateTime.UtcNow.AddSeconds(20)
+                    });
                 }
             }
             else if (isCompletingNow || newStatus == "Cancelled" || newStatus == "CancelledBySystem" || newStatus == "Delayed")

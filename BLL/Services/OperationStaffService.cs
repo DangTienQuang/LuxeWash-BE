@@ -106,13 +106,28 @@ namespace AutoWashPro.BLL.Services
                     await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
                     {
                         BranchId = booking.BranchId,
-                        Type = "Reading", // Or CheckedIn depending on the stage, using Reading as an example
+                        Type = "assigned",
                         BookingId = booking.BookingId,
                         LicensePlate = vehicle?.LicensePlate,
                         LaneId = lane.LaneId,
-                        LaneName = lane.Name
+                        LaneName = lane.Name,
+                        DisplayUntil = DateTime.UtcNow.AddSeconds(15)
                     });
                 }
+            }
+            else
+            {
+                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                {
+                    BranchId = booking.BranchId,
+                    Type = "waiting",
+                    BookingId = booking.BookingId,
+                    LicensePlate = vehicle?.LicensePlate,
+                    ReasonCode = "NO_AVAILABLE_LANE",
+                    Message = "Chưa có làn trống. Vui lòng giữ nguyên vị trí trước barie.",
+                    DisplayUntil = DateTime.UtcNow.AddSeconds(20)
+                });
             }
 
             // P0.4: Await the overload check — do NOT fire-and-forget with a scoped DbContext,
@@ -317,11 +332,12 @@ namespace AutoWashPro.BLL.Services
                     await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
                     {
                         BranchId = booking.BranchId,
-                        Type = "Processing",
+                        Type = "processing",
                         BookingId = booking.BookingId,
                         LicensePlate = vehicle?.LicensePlate,
                         LaneId = lane.LaneId,
-                        LaneName = lane.Name
+                        LaneName = lane.Name,
+                        DisplayUntil = DateTime.UtcNow.AddSeconds(15)
                     });
                 }
             }
