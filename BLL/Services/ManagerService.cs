@@ -597,10 +597,6 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<List<VoucherProposalDTO>> GetPendingProposalsAsync(int managerUserId)
         {
-            if (managerUserId == 0)
-            {
-                return await _branchRevenueAnalyticsService.GetPendingProposalsAsync(1); // Default to branch 1 for unauthenticated testing
-            }
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.GetPendingProposalsAsync(managerProfile.BranchId!.Value);
         }
