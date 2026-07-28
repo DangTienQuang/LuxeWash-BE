@@ -158,9 +158,6 @@ namespace AutoWashPro.BLL.DTOs
     public class WalkInBookingResponseDTO : BookingResponseDTO
     {
         public string? PaymentUrl { get; set; }
-        public int? ProcessingLaneId { get; set; }
-        public string? ProcessingLaneName { get; set; }
-        public bool IsWaitingForLane { get; set; }
     }
 
     public class BookingResponseDTO
@@ -177,6 +174,10 @@ namespace AutoWashPro.BLL.DTOs
         public DateTime? ProcessingStartTime { get; set; }
         public DateTime? CompletedTime { get; set; }
         public int? ActualDurationMinutes { get; set; }
+        
+        public int? ProcessingLaneId { get; set; }
+        public string? ProcessingLaneName { get; set; }
+        public bool IsWaitingForLane { get; set; }
         
         public bool HasPendingRelocation { get; set; } = false;
         public RelocationProposalCustomerDTO? Relocation { get; set; }

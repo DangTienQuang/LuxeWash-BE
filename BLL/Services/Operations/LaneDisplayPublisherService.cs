@@ -104,5 +104,18 @@ namespace AutoWashPro.BLL.Services.Operations
 
             return reconstructedDict.Values.ToList();
         }
+
+        public async Task PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName)
+        {
+            var evt = new
+            {
+                Type = "BarrierOpenCommand",
+                LicensePlate = licensePlate,
+                LaneName = laneName,
+                Timestamp = DateTime.UtcNow
+            };
+            await _hubContext.Clients.Group($"branch:{branchId}:lane-display")
+                .SendAsync("ReceiveBarrierCommand", evt);
+        }
     }
 }

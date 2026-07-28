@@ -37,6 +37,10 @@ namespace AutoWashPro.BLL.Hubs
                 {
                     int branchId = employeeProfile.BranchId.Value;
                     await Groups.AddToGroupAsync(Context.ConnectionId, $"branch:{branchId}:lane-display");
+                    
+                    var publisher = scope.ServiceProvider.GetRequiredService<AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService>();
+                    var initialState = await publisher.GetLatestStateAsync(branchId);
+                    await Clients.Caller.SendAsync("ReceiveInitialState", initialState);
                 }
                 else
                 {

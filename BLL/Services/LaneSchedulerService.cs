@@ -236,6 +236,12 @@ namespace BLL.Services
                             LaneName = lane.Name
                         });
 
+                        // Fire event to check-in barrier so it opens for the waiting vehicle
+                        if (!string.IsNullOrEmpty(nextBooking.Vehicle?.LicensePlate))
+                        {
+                            await _laneDisplayPublisher.PublishBarrierCommandAsync(nextBooking.BranchId, nextBooking.Vehicle.LicensePlate, lane.Name);
+                        }
+
                         return true;
                     }
                     

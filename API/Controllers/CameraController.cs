@@ -23,7 +23,11 @@ namespace API.Controllers.AI
             try
             {
                 var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(plate, "CheckedIn");
-                return Ok(new { statusCode = 200, message = "Vehicle is valid, opening barrier!", data = result });
+                if (result.IsWaitingForLane)
+                {
+                    return Ok(new { statusCode = 200, message = "Check-in successful! All bays are currently busy. Please wait before the barrier.", isWaiting = true, data = result });
+                }
+                return Ok(new { statusCode = 200, message = "Vehicle is valid, opening barrier!", isWaiting = false, data = result });
             }
             catch (System.Exception ex)
             {

@@ -11,5 +11,6 @@ namespace AutoWashPro.BLL.Services.Operations
         Task PublishEventAsync(LaneDisplayEventDTO eventDto);
         Task PublishClearAsync(int branchId, int laneId, string laneName);
         Task<List<LaneDisplayLatestStateDTO>> GetLatestStateAsync(int branchId);
+        Task PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName);
     }
 }

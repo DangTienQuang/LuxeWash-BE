@@ -24,6 +24,7 @@ namespace AutoWashPro.BLL.Services
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
         private readonly IOccupancyService _occupancyService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
 
         public BookingService(
             AutoWashDbContext context,
@@ -35,7 +36,8 @@ namespace AutoWashPro.BLL.Services
             IPayOsService payOsService,
             IBookingMaterialUsageService bookingMaterialUsageService,
             IOccupancyService occupancyService,
-            global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService)
+            global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService,
+            AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
         {
             _context = context;
             _walletService = walletService;
@@ -47,6 +49,7 @@ namespace AutoWashPro.BLL.Services
             _bookingMaterialUsageService = bookingMaterialUsageService;
             _occupancyService = occupancyService;
             _laneSchedulerService = laneSchedulerService;
+            _laneDisplayPublisher = laneDisplayPublisher;
         }
 
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
@@ -632,6 +635,7 @@ namespace AutoWashPro.BLL.Services
             var query = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
+                .Include(b => b.ProcessingLane)
                 .Where(b => b.ScheduledTime >= startTime && b.ScheduledTime <= endTime)
                 .ToListAsync();
 
@@ -700,7 +704,10 @@ namespace AutoWashPro.BLL.Services
                 FinalAmount = booking.FinalAmount,
                 ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
                 CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
-                ActualDurationMinutes = booking.ActualDurationMinutes
+                ActualDurationMinutes = booking.ActualDurationMinutes,
+                ProcessingLaneId = booking.ProcessingLaneId,
+                ProcessingLaneName = booking.ProcessingLane?.Name,
+                IsWaitingForLane = booking.ProcessingLaneId == null && newStatus == "CheckedIn"
             };
         }
 
@@ -714,6 +721,7 @@ namespace AutoWashPro.BLL.Services
             var activeBooking = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
+                .Include(b => b.ProcessingLane)
                 .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
                 .OrderByDescending(b => b.BookingId)
@@ -762,6 +770,7 @@ namespace AutoWashPro.BLL.Services
                 var updatedBooking = await _context.Bookings
                     .Include(b => b.BookingDetails)
                         .ThenInclude(bd => bd.Service)
+                    .Include(b => b.ProcessingLane)
                     .FirstOrDefaultAsync(b => b.BookingId == targetBooking.BookingId) ?? targetBooking;
 
                 return new BookingResponseDTO
@@ -777,7 +786,10 @@ namespace AutoWashPro.BLL.Services
                     FinalAmount = updatedBooking.FinalAmount,
                     ProcessingStartTime = updatedBooking.ProcessingStartTime.HasValue ? updatedBooking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
                     CompletedTime = updatedBooking.CompletedTime.HasValue ? updatedBooking.CompletedTime.Value.ToVnTime() : DateTime.UtcNow.ToVnTime(),
-                    ActualDurationMinutes = updatedBooking.ActualDurationMinutes
+                    ActualDurationMinutes = updatedBooking.ActualDurationMinutes,
+                    ProcessingLaneId = updatedBooking.ProcessingLaneId,
+                    ProcessingLaneName = updatedBooking.ProcessingLane?.Name,
+                    IsWaitingForLane = false
                 };
             }
             else if (activeFleetLog != null)
@@ -804,7 +816,10 @@ namespace AutoWashPro.BLL.Services
                     FinalAmount = activeFleetLog.WashCost,
                     ProcessingStartTime = activeFleetLog.CheckInTime.ToVnTime(),
                     CompletedTime = activeFleetLog.CompletedTime.Value.ToVnTime(),
-                    ActualDurationMinutes = (int)Math.Max(1, Math.Round((activeFleetLog.CompletedTime.Value - activeFleetLog.CheckInTime).TotalMinutes))
+                    ActualDurationMinutes = (int)Math.Max(1, Math.Round((activeFleetLog.CompletedTime.Value - activeFleetLog.CheckInTime).TotalMinutes)),
+                    ProcessingLaneId = activeFleetLog.LaneId,
+                    ProcessingLaneName = null, // Fleet log does not include lane name directly here
+                    IsWaitingForLane = false
                 };
             }
 
@@ -882,6 +897,48 @@ namespace AutoWashPro.BLL.Services
             if (isCompletingNow && booking.UserId.HasValue)
             {
                 await _voucherCampaignService.ProcessMilestoneCampaignsAsync(booking.UserId.Value);
+            }
+            
+            // Publish realtime events to LaneDisplayHub
+            if (newStatus == "CheckedIn" || newStatus == "Processing")
+            {
+                if (booking.ProcessingLaneId != null)
+                {
+                    string? laneName = booking.ProcessingLane?.Name;
+                    if (laneName == null)
+                    {
+                        var lane = await _context.Lanes.FindAsync(booking.ProcessingLaneId);
+                        laneName = lane?.Name;
+                    }
+                    if (laneName != null)
+                    {
+                        await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                        {
+                            BranchId = booking.BranchId,
+                            Type = newStatus == "CheckedIn" ? "Assigned" : "Processing",
+                            BookingId = booking.BookingId,
+                            LicensePlate = booking.LicensePlate,
+                            LaneId = booking.ProcessingLaneId.Value,
+                            LaneName = laneName
+                        });
+                    }
+                }
+            }
+            else if (isCompletingNow || newStatus == "Cancelled" || newStatus == "CancelledBySystem" || newStatus == "Delayed")
+            {
+                if (booking.ProcessingLaneId != null)
+                {
+                    string? laneName = booking.ProcessingLane?.Name;
+                    if (laneName == null)
+                    {
+                        var lane = await _context.Lanes.FindAsync(booking.ProcessingLaneId);
+                        laneName = lane?.Name;
+                    }
+                    if (laneName != null)
+                    {
+                        await _laneDisplayPublisher.PublishClearAsync(booking.BranchId, booking.ProcessingLaneId.Value, laneName);
+                    }
+                }
             }
 
             if (isCompletingNow && booking.ProcessingLaneId.HasValue)
