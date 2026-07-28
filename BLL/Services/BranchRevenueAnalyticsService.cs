@@ -186,7 +186,7 @@ namespace BLL.Services
             if (branch == null) throw new NotFoundException($"Branch with ID {branchId} not found.");
 
             var proposals = await _context.Vouchers
-                .Where(v => v.BranchId == branchId && v.ApprovalStatus == "Proposed" && v.CampaignType == VoucherCampaignType.Winback)
+                .Where(v => v.BranchId == branchId && v.ApprovalStatus == "Proposed" && (v.CampaignType == VoucherCampaignType.Winback || v.CampaignType == VoucherCampaignType.Manual))
                 .OrderByDescending(v => v.CreatedAt)
                 .ToListAsync();
 
