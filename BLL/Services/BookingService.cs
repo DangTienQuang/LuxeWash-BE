@@ -24,7 +24,7 @@ namespace AutoWashPro.BLL.Services
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
         private readonly IOccupancyService _occupancyService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
-        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator _laneCoordinator;
 
         public BookingService(
             AutoWashDbContext context,
@@ -37,7 +37,7 @@ namespace AutoWashPro.BLL.Services
             IBookingMaterialUsageService bookingMaterialUsageService,
             IOccupancyService occupancyService,
             global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService,
-            AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
+            AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator laneCoordinator)
         {
             _context = context;
             _walletService = walletService;
@@ -49,7 +49,7 @@ namespace AutoWashPro.BLL.Services
             _bookingMaterialUsageService = bookingMaterialUsageService;
             _occupancyService = occupancyService;
             _laneSchedulerService = laneSchedulerService;
-            _laneDisplayPublisher = laneDisplayPublisher;
+            _laneCoordinator = laneCoordinator;
         }
 
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
@@ -892,14 +892,7 @@ namespace AutoWashPro.BLL.Services
                 }
             }
 
-            await _context.SaveChangesAsync();
-
-            if (isCompletingNow && booking.UserId.HasValue)
-            {
-                await _voucherCampaignService.ProcessMilestoneCampaignsAsync(booking.UserId.Value);
-            }
-            
-            // Publish realtime events to LaneDisplayHub
+            // Publish realtime events to LaneDisplayHub using Coordinator Outbox
             if (newStatus == "CheckedIn" || newStatus == "Processing")
             {
                 if (booking.ProcessingLaneId != null)
@@ -911,29 +904,18 @@ namespace AutoWashPro.BLL.Services
                         laneName = lane?.Name;
                     }
                     
-                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                    if (newStatus == "CheckedIn")
                     {
-                        BranchId = booking.BranchId,
-                        Type = newStatus == "CheckedIn" ? "assigned" : "processing",
-                        BookingId = booking.BookingId,
-                        LicensePlate = booking.LicensePlate,
-                        LaneId = booking.ProcessingLaneId,
-                        LaneName = laneName,
-                        DisplayUntil = DateTime.UtcNow.AddSeconds(15)
-                    });
+                        await _laneCoordinator.PublishAssignedAsync(booking.BranchId, booking.BookingId, booking.LicensePlate, booking.ProcessingLaneId.Value, laneName ?? "");
+                    }
+                    else
+                    {
+                        await _laneCoordinator.PublishProcessingAsync(booking.BranchId, booking.BookingId, booking.LicensePlate, booking.ProcessingLaneId.Value, laneName ?? "");
+                    }
                 }
                 else if (newStatus == "CheckedIn")
                 {
-                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
-                    {
-                        BranchId = booking.BranchId,
-                        Type = "waiting",
-                        BookingId = booking.BookingId,
-                        LicensePlate = booking.LicensePlate,
-                        ReasonCode = "NO_AVAILABLE_LANE",
-                        Message = "Chưa có làn trống. Vui lòng giữ nguyên vị trí trước barie.",
-                        DisplayUntil = DateTime.UtcNow.AddSeconds(20)
-                    });
+                    await _laneCoordinator.PublishWaitingAsync(booking.BranchId, booking.BookingId, booking.LicensePlate);
                 }
             }
             else if (isCompletingNow || newStatus == "Cancelled" || newStatus == "CancelledBySystem" || newStatus == "Delayed")
@@ -948,9 +930,16 @@ namespace AutoWashPro.BLL.Services
                     }
                     if (laneName != null)
                     {
-                        await _laneDisplayPublisher.PublishClearAsync(booking.BranchId, booking.ProcessingLaneId.Value, laneName);
+                        await _laneCoordinator.PublishClearedAsync(booking.BranchId, booking.ProcessingLaneId.Value, laneName);
                     }
                 }
+            }
+
+            await _context.SaveChangesAsync();
+
+            if (isCompletingNow && booking.UserId.HasValue)
+            {
+                await _voucherCampaignService.ProcessMilestoneCampaignsAsync(booking.UserId.Value);
             }
 
             if (isCompletingNow && booking.ProcessingLaneId.HasValue)
@@ -2506,6 +2495,25 @@ namespace AutoWashPro.BLL.Services
 
                 booking.Status = "CheckedIn";
                 booking.UpdatedAt = DateTime.UtcNow;
+
+                if (booking.ProcessingLaneId == null)
+                {
+                    int laneIdToAssign = await _laneSchedulerService.AssignBestAvailableLaneAtomicAsync(booking.BookingId);
+                    if (laneIdToAssign > 0)
+                    {
+                        booking.ProcessingLaneId = laneIdToAssign;
+                    }
+                }
+
+                if (booking.ProcessingLaneId != null)
+                {
+                    string laneName = await _context.Lanes.Where(l => l.LaneId == booking.ProcessingLaneId).Select(l => l.Name).FirstOrDefaultAsync() ?? "";
+                    await _laneCoordinator.PublishAssignedAsync(booking.BranchId, booking.BookingId, booking.LicensePlate, booking.ProcessingLaneId.Value, laneName);
+                }
+                else
+                {
+                    await _laneCoordinator.PublishWaitingAsync(booking.BranchId, booking.BookingId, booking.LicensePlate);
+                }
             }
 
             if (autoStart && (booking.Status == "CheckedIn" || booking.Status == "Pending" || booking.Status == "Confirmed"))
@@ -2520,6 +2528,9 @@ namespace AutoWashPro.BLL.Services
                 booking.CompletedTime = null;
                 booking.ActualDurationMinutes = null;
                 booking.UpdatedAt = DateTime.UtcNow;
+
+                string laneName = await _context.Lanes.Where(l => l.LaneId == booking.ProcessingLaneId).Select(l => l.Name).FirstOrDefaultAsync() ?? "";
+                await _laneCoordinator.PublishProcessingAsync(booking.BranchId, booking.BookingId, booking.LicensePlate, booking.ProcessingLaneId.Value, laneName);
             }
 
             await _context.SaveChangesAsync();

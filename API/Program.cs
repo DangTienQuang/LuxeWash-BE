@@ -200,6 +200,7 @@ builder.Services.AddScoped<ICarModelService, CarModelService>();
 builder.Services.AddScoped<IServiceService, AutoWashPro.BLL.Services.ServiceService>();
 builder.Services.AddScoped<IPayOsService, PayOsService>();
 builder.Services.AddScoped<IBookingService, AutoWashPro.BLL.Services.BookingService>();
+builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator, AutoWashPro.BLL.Services.Operations.LaneAssignmentCoordinator>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IVoucherService, VoucherService>();
 builder.Services.AddScoped<IVoucherCampaignService, VoucherCampaignService>();

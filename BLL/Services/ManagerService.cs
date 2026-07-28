@@ -18,18 +18,18 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashDbContext _context;
         private readonly IBranchRevenueAnalyticsService _branchRevenueAnalyticsService;
         private readonly IOverloadSuggestionService _overloadSuggestionService;
-        private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator _laneCoordinator;
 
         public ManagerService(
             AutoWashDbContext context,
             IBranchRevenueAnalyticsService branchRevenueAnalyticsService,
             IOverloadSuggestionService overloadSuggestionService,
-            AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
+            AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator laneCoordinator)
         {
             _context = context;
             _branchRevenueAnalyticsService = branchRevenueAnalyticsService;
             _overloadSuggestionService = overloadSuggestionService;
-            _laneDisplayPublisher = laneDisplayPublisher;
+            _laneCoordinator = laneCoordinator;
         }
 
         private async Task<EmployeeProfile> GetManagerProfileAsync(int managerUserId)
@@ -424,20 +424,17 @@ namespace AutoWashPro.BLL.Services
                     booking.Status = "CheckedIn";
                     booking.UpdatedAt = DateTime.UtcNow;
 
+                    var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                    await _laneCoordinator.PublishAssignedAsync(
+                        managerProfile.BranchId.Value, 
+                        booking.BookingId, 
+                        vehicle?.LicensePlate, 
+                        validLane.LaneId, 
+                        validLane.Name
+                    );
+
                     await _context.SaveChangesAsync();
                     await dbTransaction.CommitAsync();
-
-                    var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
-                    await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
-                    {
-                        BranchId = managerProfile.BranchId.Value,
-                        Type = "assigned",
-                        BookingId = booking.BookingId,
-                        LicensePlate = vehicle?.LicensePlate,
-                        LaneId = validLane.LaneId,
-                        LaneName = validLane.Name,
-                        DisplayUntil = DateTime.UtcNow.AddSeconds(15)
-                    });
 
                     return true;
                 }

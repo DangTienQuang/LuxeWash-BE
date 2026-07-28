@@ -15,11 +15,13 @@ namespace BLL.Services
         // Grace window past slot end before we reject the booking.
         // Absorbs real-world arrival variance without cascading into the next slot.
         private const int SlotGraceMinutes = 15;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator _laneCoordinator;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _laneDisplayPublisher;
 
-        public LaneSchedulerService(AutoWashDbContext context, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
+        public LaneSchedulerService(AutoWashDbContext context, AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator laneCoordinator, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService laneDisplayPublisher)
         {
             _context = context;
+            _laneCoordinator = laneCoordinator;
             _laneDisplayPublisher = laneDisplayPublisher;
         }
 
@@ -222,20 +224,16 @@ namespace BLL.Services
                         nextBooking.ProcessingStaffId = null; // Can be assigned later by staff
                         nextBooking.UpdatedAt = DateTime.UtcNow;
 
+                        await _laneCoordinator.PublishAssignedAsync(
+                            nextBooking.BranchId, 
+                            nextBooking.BookingId, 
+                            nextBooking.Vehicle?.LicensePlate, 
+                            laneId, 
+                            lane.Name
+                        );
+
                         await _context.SaveChangesAsync();
                         await dbTransaction.CommitAsync();
-
-                        // Fire event to UI
-                        await _laneDisplayPublisher.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
-                        {
-                            BranchId = nextBooking.BranchId,
-                            Type = "assigned",
-                            BookingId = nextBooking.BookingId,
-                            LicensePlate = nextBooking.Vehicle?.LicensePlate,
-                            LaneId = laneId,
-                            LaneName = lane.Name,
-                            DisplayUntil = DateTime.UtcNow.AddSeconds(15)
-                        });
 
                         // Fire event to check-in barrier so it opens for the waiting vehicle
                         if (!string.IsNullOrEmpty(nextBooking.Vehicle?.LicensePlate))

@@ -21,6 +21,7 @@ namespace AutoWashPro.DAL.Data
         public DbSet<BookingDetail> BookingDetails { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Voucher> Vouchers { get; set; }
+        public DbSet<OutboxMessage> OutboxMessages { get; set; }
         public DbSet<UserVoucher> UserVouchers { get; set; }
         public DbSet<TimeSlot> TimeSlots { get; set; }
         public DbSet<DailySlotCapacity> DailySlotCapacities { get; set; }
