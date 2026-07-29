@@ -16,7 +16,7 @@ namespace AutoWashPro.DAL.Entities
 
         [Required]
         [MaxLength(50)]
-        public string Code { get; set; }
+        public string Code { get; set; } = null!;
 
         public decimal DiscountAmount { get; set; }
         public int MaxUsages { get; set; }

@@ -6,16 +6,16 @@ namespace AutoWashPro.BLL.DTOs
     public class ServiceDTO
     {
         public int ServiceId { get; set; }
-        public string ServiceName { get; set; }
+        public string ServiceName { get; set; } = null!;
         public string? Description { get; set; }
         public bool IsActive { get; set; }
-        public List<ServicePriceDTO> Prices { get; set; }
+        public List<ServicePriceDTO> Prices { get; set; } = null!;
     }
 
     public class ServicePriceDTO
     {
         public int VehicleTypeId { get; set; }
-        public string VehicleTypeName { get; set; }
+        public string VehicleTypeName { get; set; } = null!;
         public int BranchId { get; set; }
         public decimal Price { get; set; }
         public int EstimatedDurationMinutes { get; set; }
@@ -23,13 +23,13 @@ namespace AutoWashPro.BLL.DTOs
     public class CreateOrUpdateServiceDTO
     {
         [Required(ErrorMessage = "Service name is required.")]
-        public string ServiceName { get; set; }
+        public string ServiceName { get; set; } = null!;
 
         public string? Description { get; set; }
 
         [Required(ErrorMessage = "Must configure at least 1 price for the service.")]
         [MinLength(1, ErrorMessage = "Must configure at least 1 price for the service.")]
-        public List<CreateServicePriceDTO> Prices { get; set; }
+        public List<CreateServicePriceDTO> Prices { get; set; } = null!;
     }
 
     public class CreateServicePriceDTO

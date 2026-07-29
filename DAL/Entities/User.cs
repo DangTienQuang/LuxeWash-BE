@@ -16,7 +16,7 @@ namespace AutoWashPro.DAL.Entities
 
         [Required]
         [MaxLength(20)]
-        public string PhoneNumber { get; set; }
+        public string PhoneNumber { get; set; } = null!;
         [MaxLength(100)]
         public string? Email { get; set; }
         [Required]
@@ -43,7 +43,7 @@ namespace AutoWashPro.DAL.Entities
         public EmployeeProfile? EmployeeProfile { get; set; }
         public BusinessProfile? BusinessProfile { get; set; }
         public ICollection<Vehicle> Vehicles { get; set; } = new List<Vehicle>();
-        public ICollection<AIConversationLog> AIConversationLogs { get; set; }
+        public ICollection<AIConversationLog> AIConversationLogs { get; set; } = null!;
         public ICollection<StaffLaneAssignment> LaneAssignments { get; set; } = new List<StaffLaneAssignment>();
         public ICollection<Booking> ProcessedBookings { get; set; } = new List<Booking>();
     }

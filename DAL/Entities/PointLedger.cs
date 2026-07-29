@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -12,12 +12,12 @@ namespace AutoWashPro.DAL.Entities
         [Required]
         public int UserId { get; set; }
         [ForeignKey("UserId")]
-        public User User { get; set; }
+        public User User { get; set; } = null!;
 
         public int PointsAdded { get; set; } = 0;
         public int PointsDeducted { get; set; } = 0;
 
-        public string Reason { get; set; }
+        public string Reason { get; set; } = null!;
 
         public DateTime TransactionDate { get; set; } = DateTime.UtcNow;
 

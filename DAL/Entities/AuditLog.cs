@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,11 +12,11 @@ namespace DAL.Entities
 
         public int UserId { get; set; }
 
-        public string Action { get; set; }
+        public string Action { get; set; } = null!;
 
-        public string EntityName { get; set; }
+        public string EntityName { get; set; } = null!;
 
-        public string EntityId { get; set; }
+        public string EntityId { get; set; } = null!;
 
         public DateTime CreatedAt { get; set; }
     }

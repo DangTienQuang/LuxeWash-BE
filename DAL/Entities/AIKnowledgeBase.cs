@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -14,13 +14,13 @@ namespace DAL.Entities
 
         [Required]
         [MaxLength(200)]
-        public string Title { get; set; }
+        public string Title { get; set; } = null!;
 
         [Required]
-        public string Content { get; set; }
+        public string Content { get; set; } = null!;
 
         [MaxLength(100)]
-        public string Category { get; set; }
+        public string Category { get; set; } = null!;
 
         public bool IsActive { get; set; } = true;
 

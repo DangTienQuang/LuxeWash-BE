@@ -5,7 +5,7 @@ namespace AutoWashPro.BLL.DTOs
     public class TierResponseDTO
     {
         public int TierId { get; set; }
-        public string TierName { get; set; }
+        public string TierName { get; set; } = null!;
         public double PointMultiplier { get; set; }
         public int BookingWindowDays { get; set; }
         public int MinAccumulatedPoints { get; set; }
@@ -15,7 +15,7 @@ namespace AutoWashPro.BLL.DTOs
     {
         [Required(ErrorMessage = "Tier name is required.")]
         [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Tier name cannot consist of only whitespace.")]
-        public string TierName { get; set; }
+        public string TierName { get; set; } = null!;
 
         [Range(1.0, 5.0, ErrorMessage = "Point multiplier must be between 1.0 and 5.0.")]
         public double PointMultiplier { get; set; }

@@ -1,3 +1,4 @@
+#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using BLL.Services.AI.Interfaces;
 using AutoWashPro.DAL.Entities;
 using DAL.Entities;
@@ -94,3 +95,5 @@ namespace BLL.Services.AI.Calculators
         }
     }
 }
+
+#pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

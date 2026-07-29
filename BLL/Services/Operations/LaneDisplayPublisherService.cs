@@ -196,7 +196,7 @@ namespace AutoWashPro.BLL.Services.Operations
             return response;
         }
 
-        public async Task PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName)
+        public async Task<BarrierPublishResult> PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName)
         {
             // Firebase is REQUIRED for barrier commands (controls physical devices)
             if (!TryGetFirebaseApp(out var app))
@@ -204,7 +204,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 _logger.LogWarning(
                     "Firebase is not initialized; barrier command cannot be published for BranchId={BranchId}. " +
                     "If testing locally, ignore this. In production, physical barrier will not open.", branchId);
-                return; // Do NOT throw, otherwise outbox gets stuck.
+                return BarrierPublishResult.SkippedNoFirebase; // Do NOT throw, otherwise outbox gets stuck.
             }
 
             var evt = new
@@ -229,6 +229,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 _logger.LogInformation(
                     "Barrier command published to Firebase for BranchId={BranchId}, Plate={Plate}, Lane={Lane}, MessageId={MessageId}",
                     branchId, licensePlate, laneName, messageId);
+                return BarrierPublishResult.Published;
             }
             catch (FirebaseMessagingException ex)
             {
@@ -239,7 +240,7 @@ namespace AutoWashPro.BLL.Services.Operations
             }
         }
 
-        public async Task PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
+        public async Task<BarrierPublishResult> PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
         {
             // Firebase is REQUIRED for barrier commands (controls physical devices)
             if (!TryGetFirebaseApp(out var app))
@@ -247,7 +248,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 _logger.LogWarning(
                     "Firebase is not initialized; barrier command cannot be published for BranchId={BranchId}. " +
                     "If testing locally, ignore this. In production, physical barrier will not open.", branchId);
-                return; // Do NOT throw, otherwise outbox gets stuck.
+                return BarrierPublishResult.SkippedNoFirebase; // Do NOT throw, otherwise outbox gets stuck.
             }
 
             try
@@ -264,6 +265,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 _logger.LogInformation(
                     "Barrier command raw published to Firebase for BranchId={BranchId}, MessageId={MessageId}",
                     branchId, messageId);
+                return BarrierPublishResult.Published;
             }
             catch (FirebaseMessagingException ex)
             {

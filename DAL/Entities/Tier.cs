@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace AutoWashPro.DAL.Entities
@@ -10,7 +10,7 @@ namespace AutoWashPro.DAL.Entities
 
         [Required]
         [MaxLength(50)]
-        public string TierName { get; set; }
+        public string TierName { get; set; } = null!;
 
         public double PointMultiplier { get; set; }
 
@@ -19,6 +19,6 @@ namespace AutoWashPro.DAL.Entities
         [Required]
         public int MinAccumulatedPoints { get; set; }
 
-        public ICollection<CustomerProfile> CustomerProfiles { get; set; }
+        public ICollection<CustomerProfile> CustomerProfiles { get; set; } = null!;
     }
 }

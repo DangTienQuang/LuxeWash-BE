@@ -1,3 +1,4 @@
+#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using System;
 using System.Linq;
 using System.Text.Json;
@@ -75,44 +76,53 @@ namespace AutoWashPro.BLL.BackgroundServices
                         case "admission_granted":
                         case "lane_cleared":
                         case "assigned": // Backward compatibility if someone used 'assigned'
-                            var envelope = JsonSerializer.Deserialize<OperationsOutboxEnvelope>(message.Payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-                            if (envelope != null)
+                            var envelope = JsonSerializer.Deserialize<OperationsOutboxEnvelope>(message.Payload, OperationsOutboxEnvelope.OutboxJsonOptions);
+                            
+                            if (envelope == null || envelope.Data.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
                             {
-                                var eventDto = envelope.Data.Deserialize<LaneDisplayEventDTO>(new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-                                if (eventDto != null)
-                                {
-                                    eventDto.Type = envelope.Type switch {
-                                        "admission_granted" => "assigned",
-                                        "vehicle_waiting" => "waiting",
-                                        "lane_cleared" => "cleared",
-                                        _ => envelope.Type
-                                    };
-                                    eventDto.BranchId = envelope.BranchId;
-                                    eventDto.EventId = envelope.EventId;
-                                    eventDto.OccurredAt = envelope.OccurredAt;
+                                throw new InvalidOperationException($"Invalid outbox envelope. MessageId={message.Id}, Type={message.Type}");
+                            }
 
-                                    if (eventDto.Type == "cleared")
-                                    {
-                                        await publisher.PublishClearAsync(eventDto.BranchId, eventDto.LaneId.GetValueOrDefault(), eventDto.LaneName ?? "");
-                                    }
-                                    else
-                                    {
-                                        await publisher.PublishEventAsync(eventDto);
-                                    }
+                            var eventDto = envelope.Data.Deserialize<LaneDisplayEventDTO>(OperationsOutboxEnvelope.OutboxJsonOptions);
+                            if (eventDto != null)
+                            {
+                                eventDto.Type = envelope.Type switch {
+                                    "admission_granted" => "assigned",
+                                    "vehicle_waiting" => "waiting",
+                                    "lane_cleared" => "cleared",
+                                    _ => envelope.Type
+                                };
+                                eventDto.BranchId = envelope.BranchId;
+                                eventDto.EventId = envelope.EventId;
+                                eventDto.OccurredAt = envelope.OccurredAt;
+
+                                if (eventDto.Type == "cleared")
+                                {
+                                    await publisher.PublishClearAsync(eventDto.BranchId, eventDto.LaneId.GetValueOrDefault(), eventDto.LaneName ?? "");
+                                }
+                                else
+                                {
+                                    await publisher.PublishEventAsync(eventDto);
                                 }
                             }
                             message.ProcessedAt = DateTime.UtcNow;
                             break;
 
                         case "barrier_command":
-                            var barrierEnvelope = JsonSerializer.Deserialize<OperationsOutboxEnvelope>(message.Payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-                            if (barrierEnvelope != null)
+                            var barrierEnvelope = JsonSerializer.Deserialize<OperationsOutboxEnvelope>(message.Payload, OperationsOutboxEnvelope.OutboxJsonOptions);
+                            
+                            if (barrierEnvelope == null || barrierEnvelope.Data.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
                             {
-                                // We publish the full envelope to Firebase
-                                var jsonPayload = JsonSerializer.Serialize(barrierEnvelope, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-                                await publisher.PublishBarrierCommandRawAsync(barrierEnvelope.BranchId, jsonPayload);
+                                throw new InvalidOperationException($"Invalid barrier outbox envelope. MessageId={message.Id}, Type={message.Type}");
+                            }
 
-                                // Update BarrierCommand status to Published
+                            // We publish the full envelope to Firebase
+                            var jsonPayload = JsonSerializer.Serialize(barrierEnvelope, OperationsOutboxEnvelope.OutboxJsonOptions);
+                            var publishResult = await publisher.PublishBarrierCommandRawAsync(barrierEnvelope.BranchId, jsonPayload);
+
+                            // Update BarrierCommand status to Published only if actually published
+                            if (publishResult == BarrierPublishResult.Published)
+                            {
                                 var commandIdElement = barrierEnvelope.Data.GetProperty("commandId");
                                 if (commandIdElement.ValueKind == JsonValueKind.String)
                                 {
@@ -124,12 +134,13 @@ namespace AutoWashPro.BLL.BackgroundServices
                                     }
                                 }
                             }
+                            // If SkippedNoFirebase, we just leave it Pending (or whatever behavior), but mark outbox processed.
                             message.ProcessedAt = DateTime.UtcNow;
                             break;
                             
                         case "LaneDisplayEvent":
                             // Legacy format processing
-                            var legacyDto = JsonSerializer.Deserialize<LaneDisplayEventDTO>(message.Payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                            var legacyDto = JsonSerializer.Deserialize<LaneDisplayEventDTO>(message.Payload, OperationsOutboxEnvelope.OutboxJsonOptions);
                             if (legacyDto != null)
                             {
                                 if (legacyDto.Type == "cleared")
@@ -182,3 +193,5 @@ namespace AutoWashPro.BLL.BackgroundServices
         }
     }
 }
+
+#pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

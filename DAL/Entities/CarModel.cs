@@ -10,11 +10,11 @@ namespace AutoWashPro.DAL.Entities
 
         [Required]
         [MaxLength(100)]
-        public string Brand { get; set; } // Hãng xe (VD: Toyota, Mazda)
+        public string Brand { get; set; } = null!; // Hãng xe (VD: Toyota, Mazda)
 
         [Required]
         [MaxLength(100)]
-        public string Name { get; set; } // Tên dòng xe (VD: Vios, CX-5)
+        public string Name { get; set; } = null!; // Tên dòng xe (VD: Vios, CX-5)
 
         public bool IsActive { get; set; } = true;
 
@@ -25,11 +25,11 @@ namespace AutoWashPro.DAL.Entities
         public int? RequestedByUserId { get; set; }
 
         [ForeignKey("RequestedByUserId")]
-        public User RequestedByUser { get; set; }
+        public User RequestedByUser { get; set; } = null!;
 
         public int? VehicleTypeId { get; set; }
 
         [ForeignKey("VehicleTypeId")]
-        public VehicleType VehicleType { get; set; }
+        public VehicleType VehicleType { get; set; } = null!;
     }
 }

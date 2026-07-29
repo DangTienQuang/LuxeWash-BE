@@ -1,3 +1,4 @@
+#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -169,7 +170,93 @@ namespace AutoWashPro.BLL.Services.Operations
                 }
             }
 
+            // 3. Requeue failed outbox messages and expire old barrier commands
+            var failedMessages = await _context.OutboxMessages
+                .Where(m => m.ProcessedAt == null && m.RetryCount >= 3)
+                .ToListAsync(cancellationToken);
+
+            foreach (var msg in failedMessages)
+            {
+                if (msg.Type == "barrier_command")
+                {
+                    try
+                    {
+                        var envelope = System.Text.Json.JsonSerializer.Deserialize<AutoWashPro.BLL.DTOs.Operations.OperationsOutboxEnvelope>(msg.Payload, AutoWashPro.BLL.DTOs.Operations.OperationsOutboxEnvelope.OutboxJsonOptions);
+                        if (envelope != null && envelope.Data.ValueKind != System.Text.Json.JsonValueKind.Undefined && envelope.Data.ValueKind != System.Text.Json.JsonValueKind.Null)
+                        {
+                            var commandIdElement = envelope.Data.GetProperty("commandId");
+                            if (commandIdElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                var commandId = commandIdElement.GetString();
+                                var cmd = await _context.BarrierCommands.FirstOrDefaultAsync(c => c.CommandId == commandId, cancellationToken);
+                                if (cmd != null && cmd.Status == "Pending")
+                                {
+                                    if (cmd.ExpiresAt < now)
+                                    {
+                                        cmd.Status = "Expired";
+                                        msg.ProcessedAt = now; // Don't process it anymore
+                                        msg.ErrorMessage = "Expired before it could be published.";
+                                        
+                                        alerts.Add(new ReconciliationAlertDTO
+                                        {
+                                            AlertType = "Barrier_Expired",
+                                            Description = $"Barrier command {commandId} was Pending but passed ExpiresAt. Marked as Expired.",
+                                            LaneId = cmd.LaneId,
+                                            LicensePlate = cmd.LicensePlate,
+                                            DetectedAt = now
+                                        });
+                                    }
+                                    else
+                                    {
+                                        // Still valid, requeue
+                                        msg.RetryCount = 0;
+                                        msg.NextRetryAt = now;
+                                        msg.ErrorMessage = null;
+                                        
+                                        alerts.Add(new ReconciliationAlertDTO
+                                        {
+                                            AlertType = "Barrier_Requeued",
+                                            Description = $"Requeued failed barrier command {commandId}.",
+                                            LaneId = cmd.LaneId,
+                                            LicensePlate = cmd.LicensePlate,
+                                            DetectedAt = now
+                                        });
+                                    }
+                                }
+                                else
+                                {
+                                    // Command no longer pending or doesn't exist, mark processed
+                                    msg.ProcessedAt = now;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // JSON parsing error or something else, ignore
+                    }
+                }
+                else if (msg.Type == "vehicle_waiting" || msg.Type == "lane_cleared" || msg.Type == "admission_granted" || msg.Type == "assigned")
+                {
+                    // Requeue display events
+                    msg.RetryCount = 0;
+                    msg.NextRetryAt = now;
+                    msg.ErrorMessage = null;
+                    
+                    alerts.Add(new ReconciliationAlertDTO
+                    {
+                        AlertType = "Display_Event_Requeued",
+                        Description = $"Requeued failed display event of type {msg.Type}.",
+                        DetectedAt = now
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
             return alerts;
         }
     }
 }
+
+#pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

@@ -1,4 +1,4 @@
-﻿using AutoWashPro.DAL.Entities;
+using AutoWashPro.DAL.Entities;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -16,11 +16,11 @@ namespace DAL.Entities
         [Required]
         public int UserId { get; set; }
         [ForeignKey("UserId")]
-        public User User { get; set; }
+        public User User { get; set; } = null!;
         [MaxLength(300)]
-        public string Message { get; set; }
+        public string Message { get; set; } = null!;
         [MaxLength(2000)]
-        public string Response { get; set; }
+        public string Response { get; set; } = null!;
 
         public bool Blocked { get; set; }
 

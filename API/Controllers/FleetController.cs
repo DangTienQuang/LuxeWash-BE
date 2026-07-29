@@ -98,7 +98,7 @@ namespace API.Controllers
         [HttpPost("staff/reject/{id}")]
         public async Task<IActionResult> RejectVehicle(int id, [FromBody] ReviewFleetImportDTO dto)
         {
-            await _fleetService.RejectFleetVehicleAsync(id, dto.RejectionReason);
+            await _fleetService.RejectFleetVehicleAsync(id, dto.RejectionReason ?? "No reason provided");
 
             return Ok(new
             {

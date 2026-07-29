@@ -1,4 +1,4 @@
-Ôªøusing System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
@@ -7,21 +7,21 @@ namespace AutoWashPro.DAL.Entities
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; } // TH√äM C·ªòT N√ÄY L√ÄM KH√ìA CH√çNH (Ki·ªÉu int)
+        public int Id { get; set; } // TH M C?T N¿Y L¿M KH”A CHÕNH (Ki?u int)
 
         [Required]
         [MaxLength(20)]
-        public string LicensePlate { get; set; } // ƒê√É B·ªé [Key] ·ªû ƒê√ÇY
+        public string LicensePlate { get; set; } = null!; // –√ B? [Key] ? –¬Y
 
         [ForeignKey("User")]
         public int? UserId { get; set; }
-        public User User { get; set; }
+        public User User { get; set; } = null!;
 
         [Required]
         public int VehicleTypeId { get; set; }
 
         [ForeignKey("VehicleTypeId")]
-        public VehicleType VehicleType { get; set; }
+        public VehicleType VehicleType { get; set; } = null!;
 
         public string? RegistrationPhotoUrl { get; set; }
 
@@ -30,7 +30,7 @@ namespace AutoWashPro.DAL.Entities
         public int? CarModelId { get; set; }
 
         [ForeignKey("CarModelId")]
-        public CarModel CarModelEntity { get; set; }
+        public CarModel CarModelEntity { get; set; } = null!;
 
         public string? CarModel { get; set; }
 

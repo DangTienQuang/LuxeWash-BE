@@ -23,7 +23,9 @@ namespace API.Controllers.Manager
 
         private int GetUserId()
         {
-            return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdStr)) throw new UnauthorizedAccessException("User ID not found in token.");
+            return int.Parse(userIdStr);
         }
 
         [HttpGet("staff")]

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,11 +16,11 @@ namespace AutoWashPro.DAL.Entities
 
         [ForeignKey("User")]
         public int UserId { get; set; }
-        public User User { get; set; }
+        public User User { get; set; } = null!;
 
         [ForeignKey("Voucher")]
         public int VoucherId { get; set; }
-        public Voucher Voucher { get; set; }
+        public Voucher Voucher { get; set; } = null!;
 
         public bool IsUsed { get; set; }
         public DateTime? UsedDate { get; set; }

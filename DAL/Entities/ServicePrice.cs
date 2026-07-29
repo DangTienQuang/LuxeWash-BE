@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
@@ -11,17 +11,17 @@ namespace AutoWashPro.DAL.Entities
         [Required]
         public int ServiceId { get; set; }
         [ForeignKey("ServiceId")]
-        public Service Service { get; set; }
+        public Service Service { get; set; } = null!;
 
         [Required]
         public int VehicleTypeId { get; set; }
         [ForeignKey("VehicleTypeId")]
-        public VehicleType VehicleType { get; set; }
+        public VehicleType VehicleType { get; set; } = null!;
 
         [Required]
         public int BranchId { get; set; }
         [ForeignKey("BranchId")]
-        public Branch Branch { get; set; }
+        public Branch Branch { get; set; } = null!;
 
         [Required]
         public decimal Price { get; set; }

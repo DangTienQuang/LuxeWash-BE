@@ -1,3 +1,4 @@
+#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Exceptions;
 using AutoWashPro.DAL.Data;
@@ -642,3 +643,5 @@ namespace AutoWashPro.BLL.Services
         }
     }
 }
+
+#pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

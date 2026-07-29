@@ -79,7 +79,8 @@ builder.Services.AddDatabaseInfrastructure(builder.Configuration);
 // ==============================================================================
 // 4. AUTHENTICATION & SECURITY (JWT)
 // ==============================================================================
-var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"]);
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "default_jwt_secret_key_needs_replacement";
+var key = Encoding.ASCII.GetBytes(jwtKey);
 builder.Services.AddAuthentication(x =>
 {
     x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -157,6 +158,7 @@ builder.Services.AddSingleton<PaddleOcrService>(sp =>
 QuestPDF.Settings.License = LicenseType.Community;
 
 // 5.3 Firebase Cloud Messaging Integration
+#pragma warning disable CS0618 // Disable obsolete warning for Firebase credentials
 try
 {
     var credentialEnv = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
@@ -187,6 +189,7 @@ catch (Exception ex)
 {
     Console.WriteLine($"[ERROR] Failed to initialize Firebase: {ex.Message}");
 }
+#pragma warning restore CS0618
 
 // ==============================================================================
 // 6. DEPENDENCY INJECTION (BLL Services)
