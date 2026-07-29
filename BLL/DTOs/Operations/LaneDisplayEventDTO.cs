@@ -14,5 +14,7 @@ namespace AutoWashPro.BLL.DTOs.Operations
         public string? Message { get; set; }
         public string? ReasonCode { get; set; }
         public DateTime? DisplayUntil { get; set; }
+        public string? BarrierCommandId { get; set; }
+        public string? BarrierStatus { get; set; }
     }
 }

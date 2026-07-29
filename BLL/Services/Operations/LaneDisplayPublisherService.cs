@@ -92,7 +92,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     Topic = $"branch-{eventDto.BranchId}-lane-display",
                     Data = new Dictionary<string, string>()
                     {
-                        { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                        { "event", JsonSerializer.Serialize(eventDto, OperationsOutboxEnvelope.OutboxJsonOptions) }
                     }
                 };
                 var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
@@ -117,18 +117,6 @@ namespace AutoWashPro.BLL.Services.Operations
             }
         }
 
-        public async Task PublishClearAsync(int branchId, int? laneId, string? laneName)
-        {
-            var clearEvent = new LaneDisplayEventDTO
-            {
-                BranchId = branchId,
-                Type = "cleared",
-                LaneId = laneId,
-                LaneName = laneName
-            };
-
-            await PublishEventAsync(clearEvent);
-        }
 
         public async Task<LaneDisplayLatestResponseDTO> GetLatestStateAsync(int branchId)
         {
@@ -222,7 +210,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     Topic = $"branch-{branchId}-lane-display",
                     Data = new Dictionary<string, string>()
                     {
-                        { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                        { "event", JsonSerializer.Serialize(evt, OperationsOutboxEnvelope.OutboxJsonOptions) }
                     }
                 };
                 var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);

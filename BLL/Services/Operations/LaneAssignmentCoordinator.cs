@@ -23,7 +23,7 @@ namespace AutoWashPro.BLL.Services.Operations
             var msg = new OutboxMessage
             {
                 Type = "LaneDisplayEvent",
-                Payload = JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
+                Payload = JsonSerializer.Serialize(eventDto, OperationsOutboxEnvelope.OutboxJsonOptions),
                 CreatedAt = DateTime.UtcNow
             };
             _context.OutboxMessages.Add(msg);

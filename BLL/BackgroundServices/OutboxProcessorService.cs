@@ -96,9 +96,24 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 eventDto.EventId = envelope.EventId;
                                 eventDto.OccurredAt = envelope.OccurredAt;
 
+                                if (!string.IsNullOrEmpty(eventDto.BarrierCommandId))
+                                {
+                                    var barrierCmd = await context.BarrierCommands.FirstOrDefaultAsync(c => c.CommandId == eventDto.BarrierCommandId);
+                                    if (barrierCmd != null)
+                                    {
+                                        if (barrierCmd.Status == "Pending")
+                                        {
+                                            // Delay display event until barrier is published
+                                            break;
+                                        }
+                                        eventDto.BarrierStatus = barrierCmd.Status;
+                                    }
+                                }
+
                                 if (eventDto.Type == "cleared")
                                 {
-                                    await publisher.PublishClearAsync(eventDto.BranchId, eventDto.LaneId.GetValueOrDefault(), eventDto.LaneName ?? "");
+                                    // Use PublishEventAsync instead of PublishClearAsync
+                                    await publisher.PublishEventAsync(eventDto);
                                 }
                                 else
                                 {
@@ -120,6 +135,14 @@ namespace AutoWashPro.BLL.BackgroundServices
                             var jsonPayload = JsonSerializer.Serialize(barrierEnvelope, OperationsOutboxEnvelope.OutboxJsonOptions);
                             var publishResult = await publisher.PublishBarrierCommandRawAsync(barrierEnvelope.BranchId, jsonPayload);
 
+                            if (publishResult == BarrierPublishResult.SkippedNoFirebase)
+                            {
+                                message.ProcessedAt = null;
+                                message.NextRetryAt = DateTime.UtcNow.AddSeconds(30);
+                                message.ErrorMessage = "Firebase is not available.";
+                                break;
+                            }
+
                             // Update BarrierCommand status to Published only if actually published
                             if (publishResult == BarrierPublishResult.Published)
                             {
@@ -134,8 +157,11 @@ namespace AutoWashPro.BLL.BackgroundServices
                                     }
                                 }
                             }
-                            // If SkippedNoFirebase, we just leave it Pending (or whatever behavior), but mark outbox processed.
+                            
                             message.ProcessedAt = DateTime.UtcNow;
+                            message.RetryCount = 0;
+                            message.NextRetryAt = null;
+                            message.ErrorMessage = null;
                             break;
                             
                         case "LaneDisplayEvent":
@@ -143,9 +169,22 @@ namespace AutoWashPro.BLL.BackgroundServices
                             var legacyDto = JsonSerializer.Deserialize<LaneDisplayEventDTO>(message.Payload, OperationsOutboxEnvelope.OutboxJsonOptions);
                             if (legacyDto != null)
                             {
+                                if (!string.IsNullOrEmpty(legacyDto.BarrierCommandId))
+                                {
+                                    var barrierCmd = await context.BarrierCommands.FirstOrDefaultAsync(c => c.CommandId == legacyDto.BarrierCommandId);
+                                    if (barrierCmd != null)
+                                    {
+                                        if (barrierCmd.Status == "Pending")
+                                        {
+                                            // Delay display event until barrier is published
+                                            break;
+                                        }
+                                        legacyDto.BarrierStatus = barrierCmd.Status;
+                                    }
+                                }
                                 if (legacyDto.Type == "cleared")
                                 {
-                                    await publisher.PublishClearAsync(legacyDto.BranchId, legacyDto.LaneId.GetValueOrDefault(), legacyDto.LaneName ?? "");
+                                    await publisher.PublishEventAsync(legacyDto);
                                 }
                                 else
                                 {

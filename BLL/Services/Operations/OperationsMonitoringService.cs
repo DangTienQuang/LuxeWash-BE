@@ -95,6 +95,18 @@ namespace AutoWashPro.BLL.Services.Operations
             var alerts = new List<ReconciliationAlertDTO>();
             var now = DateTime.UtcNow;
 
+            var expiredCommands = await _context.BarrierCommands
+                .Where(x => x.BranchId == branchId
+                    && x.Status == "Pending"
+                    && x.ExpiresAt <= now)
+                .ToListAsync(cancellationToken);
+
+            foreach (var command in expiredCommands)
+            {
+                command.Status = "Expired";
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+
             // 1. Fix stale ProcessingLaneId assignments (Booking has ProcessingLaneId but no LaneOccupancy)
             var bookingsWithLane = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.ProcessingLaneId != null)
@@ -124,9 +136,12 @@ namespace AutoWashPro.BLL.Services.Operations
                     {
                         booking.Status = "CheckedIn";
                     }
-                    booking.ProcessingStartTime = null;
-                    booking.CompletedTime = null;
-                    booking.ActualDurationMinutes = null;
+                    if (booking.Status != "Completed")
+                    {
+                        booking.ProcessingStartTime = null;
+                        booking.CompletedTime = null;
+                        booking.ActualDurationMinutes = null;
+                    }
                 }
             }
             await _context.SaveChangesAsync(cancellationToken);
@@ -238,15 +253,14 @@ namespace AutoWashPro.BLL.Services.Operations
                 }
                 else if (msg.Type == "vehicle_waiting" || msg.Type == "lane_cleared" || msg.Type == "admission_granted" || msg.Type == "assigned")
                 {
-                    // Requeue display events
-                    msg.RetryCount = 0;
-                    msg.NextRetryAt = now;
-                    msg.ErrorMessage = null;
+                    // Do not requeue stale display events, just drop them
+                    msg.ProcessedAt = now;
+                    msg.ErrorMessage = "Dropped stale display event after 3 retries.";
                     
                     alerts.Add(new ReconciliationAlertDTO
                     {
-                        AlertType = "Display_Event_Requeued",
-                        Description = $"Requeued failed display event of type {msg.Type}.",
+                        AlertType = "Display_Event_Dropped",
+                        Description = $"Dropped stale display event of type {msg.Type}.",
                         DetectedAt = now
                     });
                 }

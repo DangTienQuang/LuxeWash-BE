@@ -120,14 +120,12 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<List<StaffBookingDTO>> GetAssignedBookingsAsync(int staffUserId, DateTime? date = null)
         {
-            var targetDate = date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
-
             var staffBranchId = await _context.EmployeeProfiles
                 .Where(e => e.EmployeeId == staffUserId)
                 .Select(e => e.BranchId)
                 .FirstOrDefaultAsync();
 
-            var bookings = await _context.Bookings
+            var query = _context.Bookings
                 .Include(b => b.BookingDetails)
                 .ThenInclude(d => d.Service)
                 .Include(b => b.ActualVehicleType)
@@ -136,8 +134,14 @@ namespace AutoWashPro.BLL.Services
                 .ThenInclude(p => p!.Tier)
                 .Include(b => b.ProcessingLane)
                 .Where(b => b.BranchId == staffBranchId
-                         && (b.Status == "CheckedIn" || b.Status == "Processing")
-                         && (b.ScheduledTime.Date == targetDate || b.ProcessingStartTime.HasValue))
+                         && (b.Status == "CheckedIn" || b.Status == "Processing"));
+
+            if (date.HasValue)
+            {
+                query = query.Where(b => b.ScheduledTime.Date == date.Value.Date);
+            }
+
+            var bookings = await query
                 .OrderByDescending(b => b.User != null && b.User.CustomerProfile != null && b.User.CustomerProfile.Tier != null
                                          ? b.User.CustomerProfile.Tier.MinAccumulatedPoints
                                          : -1)

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +8,7 @@ namespace AutoWashPro.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "Manager,Staff")]
     public class OperationsMonitoringController : ControllerBase
     {
         private readonly IOperationsMonitoringService _monitoringService;

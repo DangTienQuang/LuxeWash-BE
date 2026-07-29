@@ -162,8 +162,8 @@ namespace AutoWashPro.BLL.Services.Operations
                                 LaneName = selectedLane.Name,
                                 BarrierCommandId = commandId,
                                 BookingId = bookingId
-                            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-                        }),
+                            }, OperationsOutboxEnvelope.OutboxJsonOptions)
+                        }, OperationsOutboxEnvelope.OutboxJsonOptions),
                         CreatedAt = now
                     };
                     _context.OutboxMessages.Add(outboxMsg);
@@ -189,8 +189,8 @@ namespace AutoWashPro.BLL.Services.Operations
                                 laneId = selectedLane.LaneId,
                                 createdAt = barrierCmd.CreatedAt,
                                 expiresAt = barrierCmd.ExpiresAt
-                            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-                        }),
+                            }, OperationsOutboxEnvelope.OutboxJsonOptions)
+                        }, OperationsOutboxEnvelope.OutboxJsonOptions),
                         CreatedAt = now
                     };
                     _context.OutboxMessages.Add(barrierOutboxMsg);
@@ -234,8 +234,8 @@ namespace AutoWashPro.BLL.Services.Operations
                                 BookingId = bookingId,
                                 ReasonCode = "NO_AVAILABLE_LANE",
                                 Message = "Vui lòng giữ nguyên vị trí trước barie."
-                            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-                        }),
+                            }, OperationsOutboxEnvelope.OutboxJsonOptions)
+                        }, OperationsOutboxEnvelope.OutboxJsonOptions),
                         CreatedAt = now
                     };
                     _context.OutboxMessages.Add(outboxMsg);
@@ -326,10 +326,14 @@ namespace AutoWashPro.BLL.Services.Operations
                     var booking = await _context.Bookings.FindAsync(new object[] { occupancy.BookingId.Value }, cancellationToken);
                     if (booking != null)
                     {
+                        booking.ProcessingLaneId = null;
                         if (mode == LaneReleaseMode.PhysicalCheckout)
                         {
                             booking.Status = "Completed";
                             booking.CompletedTime = now;
+                            booking.ActualDurationMinutes = booking.ProcessingStartTime.HasValue
+                                ? Math.Max(1, (int)Math.Round((now - booking.ProcessingStartTime.Value).TotalMinutes))
+                                : null;
                         }
                         else
                         {
@@ -345,6 +349,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     var fleetLog = await _context.FleetWashLogs.FindAsync(new object[] { occupancy.FleetWashLogId.Value }, cancellationToken);
                     if (fleetLog != null)
                     {
+                        fleetLog.LaneId = null;
                         if (mode == LaneReleaseMode.PhysicalCheckout)
                         {
                             fleetLog.Status = "Completed";
@@ -402,8 +407,8 @@ namespace AutoWashPro.BLL.Services.Operations
                                 laneId = occupancy.LaneId,
                                 createdAt = exitBarrierCmd.CreatedAt,
                                 expiresAt = exitBarrierCmd.ExpiresAt
-                            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-                        }),
+                            }, OperationsOutboxEnvelope.OutboxJsonOptions)
+                        }, OperationsOutboxEnvelope.OutboxJsonOptions),
                         CreatedAt = now
                     };
                     _context.OutboxMessages.Add(barrierOutboxMsg);
@@ -423,8 +428,8 @@ namespace AutoWashPro.BLL.Services.Operations
                             LaneId = occupancy.LaneId,
                             LicensePlate = occupancy.LicensePlate,
                             BarrierCommandId = exitCmdId
-                        }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-                    }),
+                        }, OperationsOutboxEnvelope.OutboxJsonOptions)
+                    }, OperationsOutboxEnvelope.OutboxJsonOptions),
                     CreatedAt = now
                 };
                 _context.OutboxMessages.Add(outboxClear);
@@ -602,8 +607,8 @@ namespace AutoWashPro.BLL.Services.Operations
                         LaneName = lane?.Name,
                         BarrierCommandId = cmdId,
                         BookingId = bookingId
-                    }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-                }),
+                    }, OperationsOutboxEnvelope.OutboxJsonOptions)
+                }, OperationsOutboxEnvelope.OutboxJsonOptions),
                 CreatedAt = now
             };
             _context.OutboxMessages.Add(outboxAdmit);
@@ -629,8 +634,8 @@ namespace AutoWashPro.BLL.Services.Operations
                         laneId = laneId,
                         createdAt = entryCmd.CreatedAt,
                         expiresAt = entryCmd.ExpiresAt
-                    }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
-                }),
+                    }, OperationsOutboxEnvelope.OutboxJsonOptions)
+                }, OperationsOutboxEnvelope.OutboxJsonOptions),
                 CreatedAt = now
             };
             _context.OutboxMessages.Add(barrierOutboxMsg);
