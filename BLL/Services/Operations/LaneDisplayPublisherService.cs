@@ -8,6 +8,7 @@ using FirebaseAdmin.Messaging;
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using AutoWashPro.BLL.Hubs;
+using Microsoft.Extensions.Logging;
 
 namespace AutoWashPro.BLL.Services.Operations
 {
@@ -23,11 +24,16 @@ namespace AutoWashPro.BLL.Services.Operations
 
         private readonly System.IServiceProvider _serviceProvider;
         private readonly IHubContext<LaneDisplayHub> _hubContext;
+        private readonly ILogger<LaneDisplayPublisherService> _logger;
 
-        public LaneDisplayPublisherService(System.IServiceProvider serviceProvider, IHubContext<LaneDisplayHub> hubContext)
+        public LaneDisplayPublisherService(
+            System.IServiceProvider serviceProvider,
+            IHubContext<LaneDisplayHub> hubContext,
+            ILogger<LaneDisplayPublisherService> logger)
         {
             _serviceProvider = serviceProvider;
             _hubContext = hubContext;
+            _logger = logger;
         }
 
         public async Task PublishEventAsync(LaneDisplayEventDTO eventDto)
@@ -53,25 +59,47 @@ namespace AutoWashPro.BLL.Services.Operations
                 .Group($"branch:{eventDto.BranchId}:lane-display")
                 .SendAsync("ReceiveLaneUpdate", eventDto);
 
+            _logger.LogDebug("SignalR ReceiveLaneUpdate published for BranchId={BranchId}, Type={Type}",
+                eventDto.BranchId, eventDto.Type);
+
             // Firebase Update (Secondary for Mobile/Devices) - best-effort, never blocks SignalR
             try
             {
-                if (FirebaseAdmin.FirebaseApp.DefaultInstance != null)
+                if (FirebaseAdmin.FirebaseApp.DefaultInstance == null)
                 {
-                    var message = new Message()
+                    _logger.LogWarning(
+                        "Firebase is not initialized. Skipping Firebase lane display event for BranchId={BranchId}, Type={Type}.",
+                        eventDto.BranchId, eventDto.Type);
+                    return;
+                }
+
+                var message = new Message()
+                {
+                    Topic = $"branch-{eventDto.BranchId}-lane-display",
+                    Data = new Dictionary<string, string>()
                     {
-                        Topic = $"branch-{eventDto.BranchId}-lane-display",
-                        Data = new Dictionary<string, string>()
-                        {
-                            { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
-                        }
-                    };
-                    await FirebaseMessaging.DefaultInstance.SendAsync(message);
+                        { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                    }
+                };
+                var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
+                if (string.IsNullOrWhiteSpace(messageId))
+                {
+                    _logger.LogWarning(
+                        "Firebase returned empty messageId for BranchId={BranchId}, Type={Type}.",
+                        eventDto.BranchId, eventDto.Type);
                 }
             }
-            catch
+            catch (FirebaseMessagingException ex)
             {
-                // Firebase is optional secondary channel. Swallow silently.
+                _logger.LogWarning(ex,
+                    "Firebase lane display publish failed for BranchId={BranchId}, Type={Type}. SignalR was already sent successfully.",
+                    eventDto.BranchId, eventDto.Type);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Unexpected error in Firebase publish for BranchId={BranchId}. SignalR was already sent successfully.",
+                    eventDto.BranchId);
             }
         }
 
@@ -156,6 +184,14 @@ namespace AutoWashPro.BLL.Services.Operations
 
         public async Task PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName)
         {
+            // Firebase is REQUIRED for barrier commands (controls physical devices)
+            if (FirebaseAdmin.FirebaseApp.DefaultInstance == null)
+            {
+                throw new InvalidOperationException(
+                    "Firebase is not initialized; barrier command cannot be published. " +
+                    "The outbox will retry this command once Firebase is available.");
+            }
+
             var evt = new
             {
                 Type = "BarrierOpenCommand",
@@ -164,49 +200,61 @@ namespace AutoWashPro.BLL.Services.Operations
                 Timestamp = DateTime.UtcNow
             };
 
-            // Firebase (Secondary for Edge devices) - best-effort
             try
             {
-                if (FirebaseAdmin.FirebaseApp.DefaultInstance != null)
+                var message = new Message()
                 {
-                    var message = new Message()
+                    Topic = $"branch-{branchId}-lane-display",
+                    Data = new Dictionary<string, string>()
                     {
-                        Topic = $"branch-{branchId}-lane-display",
-                        Data = new Dictionary<string, string>()
-                        {
-                            { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
-                        }
-                    };
-                    await FirebaseMessaging.DefaultInstance.SendAsync(message);
-                }
+                        { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                    }
+                };
+                var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
+                _logger.LogInformation(
+                    "Barrier command published to Firebase for BranchId={BranchId}, Plate={Plate}, Lane={Lane}, MessageId={MessageId}",
+                    branchId, licensePlate, laneName, messageId);
             }
-            catch
+            catch (FirebaseMessagingException ex)
             {
-                // Firebase is optional secondary channel. Swallow silently.
+                _logger.LogError(ex,
+                    "Firebase barrier command publish FAILED for BranchId={BranchId}, Plate={Plate}. Outbox will retry.",
+                    branchId, licensePlate);
+                throw; // Re-throw so outbox marks it for retry
             }
         }
 
         public async Task PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
         {
-            // Firebase (Secondary for Edge devices) - best-effort
+            // Firebase is REQUIRED for barrier commands (controls physical devices)
+            if (FirebaseAdmin.FirebaseApp.DefaultInstance == null)
+            {
+                throw new InvalidOperationException(
+                    "Firebase is not initialized; barrier command cannot be published. " +
+                    "The outbox will retry this command once Firebase is available.");
+            }
+
             try
             {
-                if (FirebaseAdmin.FirebaseApp.DefaultInstance != null)
+                var message = new Message()
                 {
-                    var message = new Message()
+                    Topic = $"branch-{branchId}-lane-display",
+                    Data = new Dictionary<string, string>()
                     {
-                        Topic = $"branch-{branchId}-lane-display",
-                        Data = new Dictionary<string, string>()
-                        {
-                            { "event", jsonPayload }
-                        }
-                    };
-                    await FirebaseMessaging.DefaultInstance.SendAsync(message);
-                }
+                        { "event", jsonPayload }
+                    }
+                };
+                var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
+                _logger.LogInformation(
+                    "Barrier command raw published to Firebase for BranchId={BranchId}, MessageId={MessageId}",
+                    branchId, messageId);
             }
-            catch
+            catch (FirebaseMessagingException ex)
             {
-                // Firebase is optional secondary channel. Swallow silently.
+                _logger.LogError(ex,
+                    "Firebase barrier command raw publish FAILED for BranchId={BranchId}. Outbox will retry.",
+                    branchId);
+                throw; // Re-throw so outbox marks it for retry
             }
         }
     }

@@ -2,6 +2,7 @@ using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Linq;
 using System;
@@ -16,12 +17,18 @@ namespace API.Controllers.AI
         private readonly IBookingService _bookingService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _publisherService;
         private readonly AutoWashPro.DAL.Data.AutoWashDbContext _context;
+        private readonly ILogger<CameraController> _logger;
 
-        public CameraController(IBookingService bookingService, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService publisherService, AutoWashPro.DAL.Data.AutoWashDbContext context)
+        public CameraController(
+            IBookingService bookingService,
+            AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService publisherService,
+            AutoWashPro.DAL.Data.AutoWashDbContext context,
+            ILogger<CameraController> logger)
         {
             _bookingService = bookingService;
             _publisherService = publisherService;
             _context = context;
+            _logger = logger;
         }
 
         [HttpPost("check-in")]
@@ -49,13 +56,24 @@ namespace API.Controllers.AI
                     var employeeProfile = await _context.EmployeeProfiles.FindAsync(userId);
                     if (employeeProfile != null && employeeProfile.BranchId.HasValue)
                     {
-                        await _publisherService.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                        // Wrap reading event separately - failure must NOT block booking update (Section 6.5)
+                        try
                         {
-                            Type = "reading",
-                            BranchId = employeeProfile.BranchId.Value,
-                            LicensePlate = normalizedPlate,
-                            DisplayUntil = System.DateTime.UtcNow.AddSeconds(12)
-                        });
+                            await _publisherService.PublishEventAsync(new AutoWashPro.BLL.DTOs.Operations.LaneDisplayEventDTO
+                            {
+                                Type = "reading",
+                                BranchId = employeeProfile.BranchId.Value,
+                                LicensePlate = normalizedPlate,
+                                DisplayUntil = System.DateTime.UtcNow.AddSeconds(12)
+                            });
+                        }
+                        catch (Exception readingEx)
+                        {
+                            // 'reading' event is display-only. Never block check-in for this.
+                            _logger.LogWarning(readingEx,
+                                "Unable to publish camera reading event for plate {Plate}. Check-in will continue.",
+                                normalizedPlate);
+                        }
                     }
                 }
 
