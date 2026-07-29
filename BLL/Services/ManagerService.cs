@@ -18,13 +18,13 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashDbContext _context;
         private readonly IBranchRevenueAnalyticsService _branchRevenueAnalyticsService;
         private readonly IOverloadSuggestionService _overloadSuggestionService;
-        private readonly AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator _laneCoordinator;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
 
         public ManagerService(
             AutoWashDbContext context,
             IBranchRevenueAnalyticsService branchRevenueAnalyticsService,
             IOverloadSuggestionService overloadSuggestionService,
-            AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator laneCoordinator)
+            AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator)
         {
             _context = context;
             _branchRevenueAnalyticsService = branchRevenueAnalyticsService;
@@ -420,18 +420,25 @@ namespace AutoWashPro.BLL.Services
                         throw new BadRequestException("LANE_UNAVAILABLE");
                     }
 
-                    booking.ProcessingLaneId = assignment.LaneId;
+                    var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                    var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                        vehicle?.LicensePlate ?? "UNKNOWN",
+                        managerProfile.BranchId.Value,
+                        bookingId: booking.BookingId,
+                        fleetWashLogId: null,
+                        forcedLaneId: assignment.LaneId);
+
+                    if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
+                    {
+                        booking.ProcessingLaneId = checkInResult.LaneId;
+                    }
+                    else
+                    {
+                        throw new BadRequestException("LANE_UNAVAILABLE");
+                    }
+
                     booking.Status = "CheckedIn";
                     booking.UpdatedAt = DateTime.UtcNow;
-
-                    var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
-                    await _laneCoordinator.PublishAssignedAsync(
-                        managerProfile.BranchId.Value, 
-                        booking.BookingId, 
-                        vehicle?.LicensePlate, 
-                        validLane.LaneId, 
-                        validLane.Name
-                    );
 
                     await _context.SaveChangesAsync();
                     await dbTransaction.CommitAsync();

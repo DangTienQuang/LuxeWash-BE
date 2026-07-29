@@ -201,6 +201,7 @@ builder.Services.AddScoped<IServiceService, AutoWashPro.BLL.Services.ServiceServ
 builder.Services.AddScoped<IPayOsService, PayOsService>();
 builder.Services.AddScoped<IBookingService, AutoWashPro.BLL.Services.BookingService>();
 builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator, AutoWashPro.BLL.Services.Operations.LaneAssignmentCoordinator>();
+builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator, AutoWashPro.BLL.Services.Operations.LaneAdmissionCoordinator>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IVoucherService, VoucherService>();
 builder.Services.AddScoped<IVoucherCampaignService, VoucherCampaignService>();
@@ -221,6 +222,8 @@ builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IManagerService, ManagerService>();
 builder.Services.AddScoped<IOperationStaffService, OperationStaffService>();
 builder.Services.AddScoped<IBusinessBookingService, BusinessBookingService>();
+builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.IOperationsMonitoringService, AutoWashPro.BLL.Services.Operations.OperationsMonitoringService>();
+builder.Services.AddHostedService<AutoWashPro.BLL.BackgroundServices.OperationsReconciliationBackgroundService>();
 builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 builder.Services.AddScoped<ILaneSchedulerService, LaneSchedulerService>();
 builder.Services.AddSingleton<AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService, AutoWashPro.BLL.Services.Operations.LaneDisplayPublisherService>();

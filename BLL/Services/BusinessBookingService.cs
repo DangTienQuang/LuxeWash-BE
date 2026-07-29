@@ -20,17 +20,20 @@ namespace BLL.Services
     public class BusinessBookingService : IBusinessBookingService
     {
         private readonly AutoWashDbContext _context;
-        private readonly ILaneSchedulerService _laneSchedulerService;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
+        private readonly ILaneSchedulerService _laneSchedulerService;
 
         public BusinessBookingService(
             AutoWashDbContext context,
-            ILaneSchedulerService laneSchedulerService,
-            IBookingMaterialUsageService bookingMaterialUsageService)
+            AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator,
+            IBookingMaterialUsageService bookingMaterialUsageService,
+            ILaneSchedulerService laneSchedulerService)
         {
             _context = context;
-            _laneSchedulerService = laneSchedulerService;
+            _laneCoordinator = laneCoordinator;
             _bookingMaterialUsageService = bookingMaterialUsageService;
+            _laneSchedulerService = laneSchedulerService;
         }
 
         public async Task<List<DTOs.Business.TimeSlotResponseDTO>> GetAvailableSlotsForBusinessAsync(int businessUserId, CheckBusinessSlotsRequestDTO request)
@@ -308,8 +311,7 @@ namespace BLL.Services
                         FinalAmount = vehicleTotal,
                         CapacityWeight = vehicle.VehicleType.BaseWeight,
                         ActualVehicleTypeId = vehicle.VehicleTypeId,
-                        FallbackQrCode = Guid.NewGuid().ToString("N")[..8].ToUpper(),
-                        ProcessingLaneId = assignment.LaneId
+                        FallbackQrCode = Guid.NewGuid().ToString("N")[..8].ToUpper()
                     };
 
                     _context.Bookings.Add(booking);
@@ -517,7 +519,6 @@ namespace BLL.Services
                 DateTime oldScheduledTime = booking.ScheduledTime;
 
                 booking.ScheduledTime = newScheduledTime;
-                booking.ProcessingLaneId = newAssignment.LaneId;  // re-reserve new lane
                 booking.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
@@ -709,8 +710,21 @@ namespace BLL.Services
             };
 
             _context.FleetWashLogs.Add(washLog);
+            await _context.SaveChangesAsync(); // Save to generate FleetWashLogId
 
             booking.Status = "CheckedIn";
+
+            var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                booking.LicensePlate ?? "UNKNOWN",
+                booking.BranchId,
+                bookingId: booking.BookingId,
+                fleetWashLogId: washLog.FleetWashLogId);
+
+            if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
+            {
+                booking.ProcessingLaneId = checkInResult.LaneId.Value;
+                washLog.LaneId = checkInResult.LaneId.Value;
+            }
 
             await _context.SaveChangesAsync();
 
@@ -766,8 +780,19 @@ namespace BLL.Services
             };
 
             _context.FleetWashLogs.Add(washLog);
-
             await _context.SaveChangesAsync();
+
+            var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                vehicle.LicensePlate ?? "UNKNOWN",
+                dto.BranchId,
+                bookingId: null,
+                fleetWashLogId: washLog.FleetWashLogId);
+
+            if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
+            {
+                washLog.LaneId = checkInResult.LaneId.Value;
+                await _context.SaveChangesAsync();
+            }
 
             return new FleetCheckInResponseDTO
             {
@@ -797,6 +822,12 @@ namespace BLL.Services
 
             washLog.Status = "Completed";
             washLog.CompletedTime = DateTime.UtcNow;
+
+            var vehicle = await _context.FleetVehicles.FindAsync(washLog.FleetVehicleId);
+            if (vehicle != null)
+            {
+                await _laneCoordinator.CheckOutAtExitGateAsync(vehicle.LicensePlate ?? "", washLog.BranchId);
+            }
 
             await _context.SaveChangesAsync();
         }
@@ -830,7 +861,6 @@ namespace BLL.Services
 
             if (washLog.Booking != null)
             {
-                washLog.Booking.ProcessingLaneId = dto.LaneId;
                 washLog.Booking.ProcessingStaffId = staffUserId;
             }
 
@@ -1154,6 +1184,10 @@ namespace BLL.Services
             {
                 throw new NotFoundException("Wash lane not found.");
             }
+            if (washLog.LaneId != null)
+            {
+                throw new BadRequestException("Vehicle already has a lane assigned.");
+            }
 
             var staff = await _context.Users.FirstOrDefaultAsync(x => x.UserId == dto.StaffUserId);
 
@@ -1162,7 +1196,24 @@ namespace BLL.Services
                 throw new NotFoundException("Employee not found.");
             }
 
-            washLog.LaneId = dto.LaneId;
+            var vehicle = await _context.FleetVehicles.FirstOrDefaultAsync(v => v.FleetVehicleId == washLog.FleetVehicleId);
+
+            var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                vehicle?.LicensePlate ?? "UNKNOWN",
+                washLog.BranchId,
+                bookingId: washLog.BookingId,
+                fleetWashLogId: washLog.FleetWashLogId,
+                forcedLaneId: dto.LaneId);
+
+            if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
+            {
+                washLog.LaneId = checkInResult.LaneId.Value;
+            }
+            else
+            {
+                throw new BadRequestException("LANE_UNAVAILABLE");
+            }
+
             washLog.StaffUserId = dto.StaffUserId;
             washLog.Status = "Assigned";
 

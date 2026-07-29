@@ -22,6 +22,8 @@ namespace AutoWashPro.DAL.Data
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Voucher> Vouchers { get; set; }
         public DbSet<OutboxMessage> OutboxMessages { get; set; }
+        public DbSet<LaneOccupancy> LaneOccupancies { get; set; }
+        public DbSet<BarrierCommand> BarrierCommands { get; set; }
         public DbSet<UserVoucher> UserVouchers { get; set; }
         public DbSet<TimeSlot> TimeSlots { get; set; }
         public DbSet<DailySlotCapacity> DailySlotCapacities { get; set; }
@@ -74,7 +76,7 @@ namespace AutoWashPro.DAL.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
+            base.OnModelCreating(modelBuilder); modelBuilder.Entity<LaneOccupancy>().HasIndex(lo => lo.LaneId).IsUnique();
 
             modelBuilder.Entity<UserFcmToken>()
                 .HasIndex(t => t.Token)

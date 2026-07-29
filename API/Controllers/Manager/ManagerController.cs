@@ -23,7 +23,7 @@ namespace API.Controllers.Manager
 
         private int GetUserId()
         {
-            return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
         }
 
         [HttpGet("staff")]

@@ -24,9 +24,9 @@ namespace AutoWashPro.BLL.Services
         private readonly ITierService _tierService;
         private readonly IEmailService _emailService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
-        private readonly AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator _laneCoordinator;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
 
-        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator laneCoordinator)
+        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator)
         {
             _context = context;
             _payOSClient = payOSClient;
@@ -433,28 +433,14 @@ namespace AutoWashPro.BLL.Services
 
                         if (transaction.TransactionType == "WalkInPayment" && booking.ProcessingLaneId == null && booking.Status == "CheckedIn")
                         {
-                            var bestLaneId = await _laneSchedulerService.GetBestAvailableLaneAsync(booking.BranchId, booking.BookingType == "Business");
-                            if (bestLaneId > 0)
+                            var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                                booking.LicensePlate ?? "UNKNOWN",
+                                booking.BranchId,
+                                bookingId: booking.BookingId);
+
+                            if (!checkInResult.IsWaiting && checkInResult.LaneId.HasValue)
                             {
-                                booking.ProcessingLaneId = bestLaneId;
-                                var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == bestLaneId);
-                                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
-                                await _laneCoordinator.PublishAssignedAsync(
-                                    booking.BranchId,
-                                    booking.BookingId,
-                                    vehicle?.LicensePlate,
-                                    bestLaneId,
-                                    lane?.Name ?? ""
-                                );
-                            }
-                            else
-                            {
-                                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
-                                await _laneCoordinator.PublishWaitingAsync(
-                                    booking.BranchId,
-                                    booking.BookingId,
-                                    vehicle?.LicensePlate
-                                );
+                                booking.ProcessingLaneId = checkInResult.LaneId.Value;
                             }
                         }
                     }

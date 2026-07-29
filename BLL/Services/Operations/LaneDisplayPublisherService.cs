@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.SignalR;
 using AutoWashPro.BLL.DTOs.Operations;
-using AutoWashPro.BLL.Hubs;
+using FirebaseAdmin.Messaging;
+using System.Text.Json;
 
 namespace AutoWashPro.BLL.Services.Operations
 {
@@ -19,13 +19,10 @@ namespace AutoWashPro.BLL.Services.Operations
         private readonly ConcurrentDictionary<int, LaneDisplayEventDTO> _latestBranchEvent
             = new ConcurrentDictionary<int, LaneDisplayEventDTO>();
 
-        private readonly IHubContext<LaneDisplayHub> _hubContext;
-
         private readonly System.IServiceProvider _serviceProvider;
 
-        public LaneDisplayPublisherService(IHubContext<LaneDisplayHub> hubContext, System.IServiceProvider serviceProvider)
+        public LaneDisplayPublisherService(System.IServiceProvider serviceProvider)
         {
-            _hubContext = hubContext;
             _serviceProvider = serviceProvider;
         }
 
@@ -47,8 +44,23 @@ namespace AutoWashPro.BLL.Services.Operations
                 branchDict.AddOrUpdate(eventDto.LaneId.Value, latestState, (_, __) => latestState);
             }
 
-            await _hubContext.Clients.Group($"branch:{eventDto.BranchId}:lane-display")
-                .SendAsync("ReceiveLaneUpdate", eventDto);
+            try
+            {
+                var message = new Message()
+                {
+                    Topic = $"branch-{eventDto.BranchId}-lane-display",
+                    Data = new Dictionary<string, string>()
+                    {
+                        { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                    }
+                };
+                
+                await FirebaseMessaging.DefaultInstance.SendAsync(message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error publishing to Firebase: {ex.Message}");
+            }
         }
 
         public async Task PublishClearAsync(int branchId, int? laneId, string? laneName)
@@ -139,8 +151,23 @@ namespace AutoWashPro.BLL.Services.Operations
                 LaneName = laneName,
                 Timestamp = DateTime.UtcNow
             };
-            await _hubContext.Clients.Group($"branch:{branchId}:lane-display")
-                .SendAsync("ReceiveBarrierCommand", evt);
+            try
+            {
+                var message = new Message()
+                {
+                    Topic = $"branch-{branchId}-lane-display",
+                    Data = new Dictionary<string, string>()
+                    {
+                        { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                    }
+                };
+                
+                await FirebaseMessaging.DefaultInstance.SendAsync(message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error publishing barrier command to Firebase: {ex.Message}");
+            }
         }
     }
 }

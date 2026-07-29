@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Lane Display Test</title>
+</head>
+<body>
+    <h1>Firebase Lane Display Test</h1>
+    <div>
+        <label for="branchId">Branch ID:</label>
+        <input type="number" id="branchId" value="1">
+        <button id="subscribeBtn">Subscribe</button>
+    </div>
+    <div style="margin-top: 20px;">
+        <h3>Events Received:</h3>
+        <ul id="eventList"></ul>
+    </div>
+
+    <!-- Firebase JS SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
+
+        // Replace with your actual Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const messaging = getMessaging(app);
+
+        document.getElementById("subscribeBtn").addEventListener("click", async () => {
+            try {
+                // Request permission
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    console.log('Notification permission granted.');
+                    
+                    // Get token
+                    const currentToken = await getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY_HERE' });
+                    if (currentToken) {
+                        console.log('FCM Token:', currentToken);
+                        
+                        // NOTE: In a real app, you would send this token to your backend
+                        // to subscribe it to the topic `branch-{branchId}-lane-display`.
+                        // Since client-side JS cannot subscribe to topics directly using the web SDK,
+                        // you need a simple backend endpoint to do it, OR you can test locally using curl:
+                        // curl -X POST -H "Authorization: key=YOUR_SERVER_KEY" -H "Content-Type: application/json" -d '{ "to": "/topics/branch-1-lane-display", "registration_tokens": ["' + currentToken + '"] }' https://iid.googleapis.com/iid/v1:batchAdd
+                        
+                        const li = document.createElement("li");
+                        li.textContent = "Obtained Token. See Console. Subscribe this token to branch-" + document.getElementById("branchId").value + "-lane-display to receive events here.";
+                        document.getElementById("eventList").appendChild(li);
+                    } else {
+                        console.log('No registration token available. Request permission to generate one.');
+                    }
+                }
+            } catch (err) {
+                console.log('An error occurred while retrieving token. ', err);
+            }
+        });
+
+        onMessage(messaging, (payload) => {
+            console.log('Message received. ', payload);
+            const li = document.createElement("li");
+            li.textContent = JSON.stringify(payload.data);
+            document.getElementById("eventList").appendChild(li);
+        });
+    </script>
+</body>
+</html>

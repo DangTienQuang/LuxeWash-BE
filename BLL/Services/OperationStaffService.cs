@@ -19,9 +19,9 @@ namespace AutoWashPro.BLL.Services
         private readonly IBookingMaterialUsageService _bookingMaterialUsageService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
         private readonly global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService _overloadSuggestionService;
-        private readonly AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator _laneCoordinator;
+        private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
 
-        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService, AutoWashPro.BLL.Services.Operations.ILaneAssignmentCoordinator laneCoordinator)
+        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator)
         {
             _context = context;
             _walletService = walletService;
@@ -87,27 +87,20 @@ namespace AutoWashPro.BLL.Services
 
             if (booking.ProcessingLaneId == null)
             {
-                var laneId = await _laneSchedulerService.AssignBestAvailableLaneAtomicAsync(bookingId);
-                if (laneId > 0) booking.ProcessingLaneId = laneId;
+                var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                    booking.LicensePlate ?? "UNKNOWN",
+                    booking.BranchId,
+                    bookingId: booking.BookingId);
+
+                if (!checkInResult.IsWaiting && checkInResult.LaneId.HasValue)
+                {
+                    booking.ProcessingLaneId = checkInResult.LaneId.Value;
+                }
             }
 
             booking.ProcessingStaffId = staffUserId;
+            // Note: Coordinator handles Outbox events for LaneDisplay
             booking.Status = "CheckedIn";
-
-            if (booking.ProcessingLaneId.HasValue)
-            {
-                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
-                var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == booking.ProcessingLaneId.Value);
-                if (lane != null)
-                {
-                    await _laneCoordinator.PublishAssignedAsync(booking.BranchId, booking.BookingId, vehicle?.LicensePlate, lane.LaneId, lane.Name);
-                }
-            }
-            else
-            {
-                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
-                await _laneCoordinator.PublishWaitingAsync(booking.BranchId, booking.BookingId, vehicle?.LicensePlate);
-            }
 
             await _context.SaveChangesAsync();
 
@@ -288,39 +281,10 @@ namespace AutoWashPro.BLL.Services
 
             if (isCompletingNow || newStatus == "Cancelled" || newStatus == "Delayed")
             {
-                if (booking.ProcessingLaneId.HasValue)
-                {
-                    string laneName = await _context.Lanes
-                        .Where(l => l.LaneId == booking.ProcessingLaneId.Value)
-                        .Select(l => l.Name)
-                        .FirstOrDefaultAsync() ?? $"Lane {booking.ProcessingLaneId.Value}";
-
-                    await _laneCoordinator.PublishClearedAsync(
-                        booking.BranchId,
-                        booking.ProcessingLaneId.Value,
-                        laneName
-                    );
-                }
-            }
-            else if (newStatus == "Processing" && booking.ProcessingLaneId.HasValue)
-            {
-                var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
-                var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == booking.ProcessingLaneId.Value);
-                if (lane != null)
-                {
-
-                }
+                await _laneCoordinator.ManualCheckOutAsync(booking.BookingId, staffUserId);
             }
 
             await _context.SaveChangesAsync();
-
-            if (isCompletingNow || newStatus == "Cancelled" || newStatus == "Delayed")
-            {
-                if (booking.ProcessingLaneId.HasValue)
-                {
-                    await _laneSchedulerService.AssignNextVehicleInQueueAsync(booking.ProcessingLaneId.Value);
-                }
-            }
 
             return true;
         }
