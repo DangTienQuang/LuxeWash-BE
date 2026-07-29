@@ -59,14 +59,8 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
-        public async Task<bool> CheckInBookingAsync(int staffUserId, int bookingId)
+        public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId)
         {
-            var today = System.DateTime.UtcNow.ToVnTime().Date;
-            var assignment = await _context.StaffLaneAssignments
-                .Where(a => a.StaffId == staffUserId && a.AssignedDate == today)
-                .OrderByDescending(a => a.AssignmentId)
-                .FirstOrDefaultAsync();
-
             var booking = await _context.Bookings
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
 
@@ -85,29 +79,39 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
             }
 
-            if (booking.ProcessingLaneId == null)
+            // Detect stale operational state: booking is Pending but still has a ProcessingLaneId
+            // from a previous (cancelled/failed) session without a valid LaneOccupancy.
+            // Per requirement 6.1: clear stale fields so coordinator runs a clean admission.
+            if (booking.ProcessingLaneId != null)
             {
-                var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
-                    booking.LicensePlate ?? "UNKNOWN",
-                    booking.BranchId,
-                    bookingId: booking.BookingId);
+                var hasValidOccupancy = await _context.LaneOccupancies
+                    .AnyAsync(o => o.BookingId == booking.BookingId);
 
-                if (!checkInResult.IsWaiting && checkInResult.LaneId.HasValue)
+                if (!hasValidOccupancy)
                 {
-                    booking.ProcessingLaneId = checkInResult.LaneId.Value;
+                    // Stale assignment — reset all operational fields before re-admission
+                    booking.ProcessingLaneId = null;
+                    booking.ProcessingStartTime = null;
+                    booking.CompletedTime = null;
+                    booking.ActualDurationMinutes = null;
                 }
             }
 
-            booking.ProcessingStaffId = staffUserId;
-            // Note: Coordinator handles Outbox events for LaneDisplay
+            // Always run through the coordinator — it owns: lane selection, LaneOccupancy creation,
+            // status transition (Processing/CheckedIn), BarrierCommand, and Outbox events.
+            var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                booking.LicensePlate ?? "UNKNOWN",
+                booking.BranchId,
+                bookingId: booking.BookingId);
 
+            // Set staff assignment (coordinator does not know the staffId)
+            booking.ProcessingStaffId = staffUserId;
             await _context.SaveChangesAsync();
 
-            // P0.4: Await the overload check — do NOT fire-and-forget with a scoped DbContext,
-            // as the scope may be disposed before the async task completes (ObjectDisposedException).
+            // Await the overload check — do NOT fire-and-forget with a scoped DbContext
             await _overloadSuggestionService.CheckAndTriggerOverloadAsync(booking.BranchId);
 
-            return true;
+            return checkInResult;
         }
 
         public async Task<List<StaffBookingDTO>> GetAssignedBookingsAsync(int staffUserId, DateTime? date = null)

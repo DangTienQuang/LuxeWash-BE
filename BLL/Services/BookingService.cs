@@ -306,7 +306,9 @@ namespace AutoWashPro.BLL.Services
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime,
                     CompletedTime = b.CompletedTime,
-                    ActualDurationMinutes = b.ActualDurationMinutes
+                    ActualDurationMinutes = b.ActualDurationMinutes,
+                    ProcessingLaneId = b.ProcessingLaneId,
+                    ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null
                 })
                 .ToListAsync();
 
@@ -388,7 +390,9 @@ namespace AutoWashPro.BLL.Services
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime,
                     CompletedTime = b.CompletedTime,
-                    ActualDurationMinutes = b.ActualDurationMinutes
+                    ActualDurationMinutes = b.ActualDurationMinutes,
+                    ProcessingLaneId = b.ProcessingLaneId,
+                    ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null
                 })
                 .AsNoTracking()
                 .FirstOrDefaultAsync();

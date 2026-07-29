@@ -52,8 +52,29 @@ namespace API.Controllers.Staff
         [HttpPost("bookings/{bookingId}/checkin")]
         public async Task<IActionResult> StaffCheckin(int bookingId)
         {
-            await _staffService.CheckInBookingAsync(GetUserId(), bookingId);
-            return Ok(new { Message = "Vehicle checked in and assigned to your lane successfully." });
+            var result = await _staffService.CheckInBookingAsync(GetUserId(), bookingId);
+
+            var message = result.IsWaiting
+                ? "Check-in successful. All bays are currently busy — please wait before the barrier."
+                : $"Vehicle admitted and assigned to {result.LaneName ?? "lane"}.";
+
+            return Ok(new
+            {
+                statusCode = 200,
+                message,
+                data = new
+                {
+                    bookingId = result.BookingId,
+                    licensePlate = result.LicensePlate,
+                    status = result.Status,
+                    admissionStatus = result.AdmissionStatus,
+                    isWaiting = result.IsWaiting,
+                    laneId = result.LaneId,
+                    laneName = result.LaneName,
+                    barrierCommandId = result.BarrierCommandId,
+                    barrierCommandCreated = result.BarrierCommandCreated
+                }
+            });
         }
         [HttpPut("bookings/{bookingId}/status")]
         public async Task<IActionResult> UpdateBookingStatus(int bookingId, [FromBody] UpdateBookingStatusDTO dto)

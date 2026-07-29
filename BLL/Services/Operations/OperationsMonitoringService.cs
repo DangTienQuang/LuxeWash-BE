@@ -11,10 +11,12 @@ namespace AutoWashPro.BLL.Services.Operations
     public class OperationsMonitoringService : IOperationsMonitoringService
     {
         private readonly AutoWashDbContext _context;
+        private readonly ILaneAdmissionCoordinator _laneCoordinator;
 
-        public OperationsMonitoringService(AutoWashDbContext context)
+        public OperationsMonitoringService(AutoWashDbContext context, ILaneAdmissionCoordinator laneCoordinator)
         {
             _context = context;
+            _laneCoordinator = laneCoordinator;
         }
 
         public async Task<QueueMonitoringDashboardDTO> GetQueueMonitoringAsync(int branchId, CancellationToken cancellationToken = default)
@@ -92,48 +94,77 @@ namespace AutoWashPro.BLL.Services.Operations
             var alerts = new List<ReconciliationAlertDTO>();
             var now = DateTime.UtcNow;
 
-            // 1. Alert when Booking Processing but no LaneOccupancy
-            var processingBookings = await _context.Bookings
-                .Where(b => b.BranchId == branchId && b.Status == "Processing")
+            // 1. Fix stale ProcessingLaneId assignments (Booking has ProcessingLaneId but no LaneOccupancy)
+            var bookingsWithLane = await _context.Bookings
+                .Where(b => b.BranchId == branchId && b.ProcessingLaneId != null)
                 .ToListAsync(cancellationToken);
 
             var currentOccupancies = await _context.LaneOccupancies
                 .Where(o => o.BranchId == branchId)
                 .ToListAsync(cancellationToken);
 
-            foreach (var booking in processingBookings)
+            foreach (var booking in bookingsWithLane)
             {
                 if (!currentOccupancies.Any(o => o.BookingId == booking.BookingId))
                 {
                     alerts.Add(new ReconciliationAlertDTO
                     {
-                        AlertType = "Missing_Occupancy",
-                        Description = $"Booking {booking.BookingId} is Processing but has no physical LaneOccupancy.",
+                        AlertType = "Stale_Assignment_Cleared",
+                        Description = $"Booking {booking.BookingId} had ProcessingLaneId {booking.ProcessingLaneId} but no occupancy. Fields cleared.",
                         BookingId = booking.BookingId,
                         LicensePlate = booking.LicensePlate,
                         LaneId = booking.ProcessingLaneId,
                         DetectedAt = now
                     });
+
+                    // Fix it
+                    booking.ProcessingLaneId = null;
+                    if (booking.Status == "Processing") 
+                    {
+                        booking.Status = "CheckedIn";
+                    }
+                    booking.ProcessingStartTime = null;
+                    booking.CompletedTime = null;
+                    booking.ActualDurationMinutes = null;
                 }
             }
+            await _context.SaveChangesAsync(cancellationToken);
 
-            // 2. Alert when LaneOccupancy exists but booking is not Processing/CheckedIn
-            foreach (var occupancy in currentOccupancies)
+            // 2. Admit next waiting vehicle for empty active lanes
+            var activeLanes = await _context.Lanes
+                .Where(l => l.BranchId == branchId && l.IsActive)
+                .ToListAsync(cancellationToken);
+
+            // Re-fetch occupancies in case of concurrent changes
+            var freshOccupancies = await _context.LaneOccupancies
+                .Where(o => o.BranchId == branchId)
+                .Select(o => o.LaneId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var lane in activeLanes)
             {
-                if (occupancy.BookingId.HasValue)
+                if (!freshOccupancies.Contains(lane.LaneId))
                 {
-                    var booking = await _context.Bookings.FindAsync(new object[] { occupancy.BookingId.Value }, cancellationToken);
-                    if (booking != null && booking.Status != "Processing" && booking.Status != "CheckedIn")
+                    // Lane is empty, try to admit
+                    try
                     {
-                        alerts.Add(new ReconciliationAlertDTO
+                        var admission = await _laneCoordinator.AdmitNextWaitingVehicleAsync(lane.LaneId, cancellationToken);
+                        if (admission != null)
                         {
-                            AlertType = "Ghost_Occupancy",
-                            Description = $"Lane {occupancy.LaneId} is occupied by Booking {booking.BookingId} which is in status '{booking.Status}'.",
-                            BookingId = booking.BookingId,
-                            LicensePlate = booking.LicensePlate,
-                            LaneId = occupancy.LaneId,
-                            DetectedAt = now
-                        });
+                            alerts.Add(new ReconciliationAlertDTO
+                            {
+                                AlertType = "Empty_Lane_Admitted",
+                                Description = $"Empty lane {lane.LaneId} automatically admitted waiting vehicle {admission.LicensePlate}.",
+                                BookingId = admission.BookingId,
+                                LicensePlate = admission.LicensePlate,
+                                LaneId = lane.LaneId,
+                                DetectedAt = DateTime.UtcNow
+                            });
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Ignore errors during reconciliation, move to next lane
                     }
                 }
             }
