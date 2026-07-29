@@ -131,6 +131,28 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 throw new InvalidOperationException($"Invalid barrier outbox envelope. MessageId={message.Id}, Type={message.Type}");
                             }
 
+                            var cmdIdElement = barrierEnvelope.Data.GetProperty("commandId");
+                            if (cmdIdElement.ValueKind == JsonValueKind.String)
+                            {
+                                var cmdIdStr = cmdIdElement.GetString();
+                                var bCmd = await context.BarrierCommands.FirstOrDefaultAsync(c => c.CommandId == cmdIdStr);
+                                if (bCmd != null)
+                                {
+                                    if (bCmd.Status != "Pending" || bCmd.ExpiresAt <= DateTime.UtcNow)
+                                    {
+                                        if (bCmd.Status == "Pending" && bCmd.ExpiresAt <= DateTime.UtcNow)
+                                        {
+                                            bCmd.Status = "Expired";
+                                        }
+                                        
+                                        message.ProcessedAt = DateTime.UtcNow;
+                                        message.NextRetryAt = null;
+                                        message.ErrorMessage = null;
+                                        break; // Do not send to Firebase
+                                    }
+                                }
+                            }
+
                             // We publish the full envelope to Firebase
                             var jsonPayload = JsonSerializer.Serialize(barrierEnvelope, OperationsOutboxEnvelope.OutboxJsonOptions);
                             var publishResult = await publisher.PublishBarrierCommandRawAsync(barrierEnvelope.BranchId, jsonPayload);
@@ -146,10 +168,9 @@ namespace AutoWashPro.BLL.BackgroundServices
                             // Update BarrierCommand status to Published only if actually published
                             if (publishResult == BarrierPublishResult.Published)
                             {
-                                var commandIdElement = barrierEnvelope.Data.GetProperty("commandId");
-                                if (commandIdElement.ValueKind == JsonValueKind.String)
+                                if (cmdIdElement.ValueKind == JsonValueKind.String)
                                 {
-                                    var commandId = commandIdElement.GetString();
+                                    var commandId = cmdIdElement.GetString();
                                     var barrierCmd = await context.BarrierCommands.FirstOrDefaultAsync(c => c.CommandId == commandId);
                                     if (barrierCmd != null && barrierCmd.Status == "Pending")
                                     {
