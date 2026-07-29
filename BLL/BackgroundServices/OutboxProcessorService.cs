@@ -56,8 +56,9 @@ namespace AutoWashPro.BLL.BackgroundServices
             var context = scope.ServiceProvider.GetRequiredService<AutoWashDbContext>();
             var publisher = scope.ServiceProvider.GetRequiredService<ILaneDisplayPublisherService>();
 
+            var now = DateTime.UtcNow;
             var messages = await context.OutboxMessages
-                .Where(m => m.ProcessedAt == null && m.ErrorMessage == null)
+                .Where(m => m.ProcessedAt == null && (m.NextRetryAt == null || m.NextRetryAt <= now) && (m.ErrorMessage == null || m.RetryCount < 3))
                 .OrderBy(m => m.CreatedAt)
                 .Take(50)
                 .ToListAsync(stoppingToken);
@@ -80,12 +81,17 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 var eventDto = envelope.Data.Deserialize<LaneDisplayEventDTO>(new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
                                 if (eventDto != null)
                                 {
-                                    eventDto.Type = envelope.Type;
+                                    eventDto.Type = envelope.Type switch {
+                                        "admission_granted" => "assigned",
+                                        "vehicle_waiting" => "waiting",
+                                        "lane_cleared" => "cleared",
+                                        _ => envelope.Type
+                                    };
                                     eventDto.BranchId = envelope.BranchId;
                                     eventDto.EventId = envelope.EventId;
                                     eventDto.OccurredAt = envelope.OccurredAt;
 
-                                    if (eventDto.Type == "lane_cleared" || eventDto.Type == "cleared")
+                                    if (eventDto.Type == "cleared")
                                     {
                                         await publisher.PublishClearAsync(eventDto.BranchId, eventDto.LaneId.GetValueOrDefault(), eventDto.LaneName ?? "");
                                     }
@@ -148,7 +154,25 @@ namespace AutoWashPro.BLL.BackgroundServices
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, $"Failed to process outbox message {message.Id}");
+                    
+                    message.RetryCount++;
                     message.ErrorMessage = ex.Message;
+
+                    if (message.RetryCount >= 3)
+                    {
+                        message.ErrorMessage = $"Failed permanently after 3 retries. Last error: {ex.Message}";
+                    }
+                    else
+                    {
+                        // Retry backoff: 1s, 3s, 10s
+                        var delaySeconds = message.RetryCount switch
+                        {
+                            1 => 1,
+                            2 => 3,
+                            _ => 10
+                        };
+                        message.NextRetryAt = DateTime.UtcNow.AddSeconds(delaySeconds);
+                    }
                 }
             }
 

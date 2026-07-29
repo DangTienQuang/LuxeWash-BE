@@ -4,6 +4,12 @@ using System.Threading.Tasks;
 
 namespace AutoWashPro.BLL.Services.Operations
 {
+    public enum LaneReleaseMode
+    {
+        PhysicalCheckout,
+        AdministrativeRelease
+    }
+
     public interface ILaneAdmissionCoordinator
     {
         Task<GateCheckInResult> CheckInAtEntryGateAsync(

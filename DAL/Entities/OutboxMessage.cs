@@ -22,5 +22,9 @@ namespace AutoWashPro.DAL.Entities
         public DateTime? ProcessedAt { get; set; }
         
         public string? ErrorMessage { get; set; }
+
+        public int RetryCount { get; set; } = 0;
+
+        public DateTime? NextRetryAt { get; set; }
     }
 }

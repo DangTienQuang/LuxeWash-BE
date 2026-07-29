@@ -28,16 +28,17 @@ namespace API.Controllers.AI
         public async Task<IActionResult> AutoCheckInByCamera([FromQuery] string plate)
         {
             if (string.IsNullOrWhiteSpace(plate)) return BadRequest("Plate is required");
+            var normalizedPlate = plate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper();
 
             // DB-based Deduplication logic (Replaces MemoryCache to support multi-server)
             var isAlreadyCheckedIn = await _context.Bookings.AnyAsync(b => 
-                (b.LicensePlate == plate || (b.Vehicle != null && b.Vehicle.LicensePlate == plate))
+                (b.LicensePlate == normalizedPlate || (b.Vehicle != null && b.Vehicle.LicensePlate == normalizedPlate))
                 && b.ScheduledTime >= DateTime.UtcNow.AddHours(-12)
                 && (b.Status == "CheckedIn" || b.Status == "Processing"));
 
             if (isAlreadyCheckedIn)
             {
-                return Ok(new { statusCode = 200, message = "Duplicate check-in skipped (already processing)." });
+                return Ok(new { statusCode = 200, message = "Duplicate check-in skipped (already processing).", isDuplicate = true });
             }
 
             try
@@ -52,13 +53,13 @@ namespace API.Controllers.AI
                         {
                             Type = "reading",
                             BranchId = employeeProfile.BranchId.Value,
-                            LicensePlate = plate,
+                            LicensePlate = normalizedPlate,
                             DisplayUntil = System.DateTime.UtcNow.AddSeconds(12)
                         });
                     }
                 }
 
-                var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(plate, "CheckedIn");
+                var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(normalizedPlate, "CheckedIn");
                 if (result.IsWaitingForLane)
                 {
                     return Ok(new { statusCode = 200, message = "Check-in successful! All bays are currently busy. Please wait before the barrier.", isWaiting = true, data = result });
@@ -75,22 +76,23 @@ namespace API.Controllers.AI
         public async Task<IActionResult> AutoCheckOutByCamera([FromQuery] string plate)
         {
             if (string.IsNullOrWhiteSpace(plate)) return BadRequest("Plate is required");
+            var normalizedPlate = plate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper();
 
             // DB-based Deduplication logic
             var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
             var isAlreadyCompleted = await _context.Bookings.AnyAsync(b => 
-                (b.LicensePlate == plate || (b.Vehicle != null && b.Vehicle.LicensePlate == plate))
+                (b.LicensePlate == normalizedPlate || (b.Vehicle != null && b.Vehicle.LicensePlate == normalizedPlate))
                 && b.Status == "Completed" 
                 && b.CompletedTime >= fiveMinutesAgo);
 
             if (isAlreadyCompleted)
             {
-                return Ok(new { statusCode = 200, message = "Duplicate check-out skipped (recently completed)." });
+                return Ok(new { statusCode = 200, message = "Duplicate check-out skipped (recently completed).", isDuplicate = true });
             }
 
             try
             {
-                var result = await _bookingService.AutoCheckOutByLicensePlateAsync(plate);
+                var result = await _bookingService.AutoCheckOutByLicensePlateAsync(normalizedPlate);
                 return Ok(new { statusCode = 200, message = "Vehicle check-out completed, barrier opening!", data = result });
             }
             catch (System.Exception ex)

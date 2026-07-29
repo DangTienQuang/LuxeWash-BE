@@ -100,7 +100,6 @@ namespace AutoWashPro.BLL.Services
 
             booking.ProcessingStaffId = staffUserId;
             // Note: Coordinator handles Outbox events for LaneDisplay
-            booking.Status = "CheckedIn";
 
             await _context.SaveChangesAsync();
 

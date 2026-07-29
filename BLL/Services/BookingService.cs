@@ -842,6 +842,7 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking does not have an assigned lane; cannot start processing.");
             }
 
+            var isCompletingNow = false;
             if (newStatus == "CheckedIn" && booking.ProcessingLaneId == null)
             {
                 var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
@@ -849,24 +850,23 @@ namespace AutoWashPro.BLL.Services
                     booking.BranchId,
                     bookingId: booking.BookingId);
 
-                if (!checkInResult.IsWaiting && checkInResult.LaneId.HasValue)
+                // Coordinator handles updating Booking status and lane assignment
+                await _context.Entry(booking).ReloadAsync();
+            }
+            else
+            {
+                isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
+
+                booking.Status = newStatus;
+                booking.UpdatedAt = DateTime.UtcNow;
+
+                if (newStatus == "Completed")
                 {
-                    booking.ProcessingLaneId = checkInResult.LaneId.Value;
+                    await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(booking.BookingId);
                 }
-            }
 
-            var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
-
-            booking.Status = newStatus;
-            booking.UpdatedAt = DateTime.UtcNow;
-
-            if (newStatus == "Completed")
-            {
-                await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(booking.BookingId);
-            }
-
-            if (isCompletingNow)
-            {
+                if (isCompletingNow)
+                {
                 booking.CompletedTime = DateTime.UtcNow;
                 if (booking.ProcessingStartTime.HasValue)
                 {
@@ -894,7 +894,8 @@ namespace AutoWashPro.BLL.Services
                     if (userProfile != null)
                         userProfile.LastVisitDate = DateTime.UtcNow;
                 }
-            }
+            } // end of if (isCompletingNow)
+            } // end of else
 
             // Remove all old Publish and AssignNextVehicle logic. Coordinator handles it!
             if (isCompletingNow)

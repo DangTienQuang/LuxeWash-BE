@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using AutoWashPro.BLL.DTOs.Operations;
 using FirebaseAdmin.Messaging;
 using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
+using AutoWashPro.BLL.Hubs;
 
 namespace AutoWashPro.BLL.Services.Operations
 {
@@ -20,10 +22,12 @@ namespace AutoWashPro.BLL.Services.Operations
             = new ConcurrentDictionary<int, LaneDisplayEventDTO>();
 
         private readonly System.IServiceProvider _serviceProvider;
+        private readonly IHubContext<LaneDisplayHub> _hubContext;
 
-        public LaneDisplayPublisherService(System.IServiceProvider serviceProvider)
+        public LaneDisplayPublisherService(System.IServiceProvider serviceProvider, IHubContext<LaneDisplayHub> hubContext)
         {
             _serviceProvider = serviceProvider;
+            _hubContext = hubContext;
         }
 
         public async Task PublishEventAsync(LaneDisplayEventDTO eventDto)
@@ -44,22 +48,25 @@ namespace AutoWashPro.BLL.Services.Operations
                 branchDict.AddOrUpdate(eventDto.LaneId.Value, latestState, (_, __) => latestState);
             }
 
-            try
+            // SignalR Update (Primary for Web Display)
+            await _hubContext.Clients
+                .Group($"branch:{eventDto.BranchId}:lane-display")
+                .SendAsync("ReceiveLaneUpdate", eventDto);
+
+            // Firebase Update (Secondary for Mobile/Devices)
+            var message = new Message()
             {
-                var message = new Message()
+                Topic = $"branch-{eventDto.BranchId}-lane-display",
+                Data = new Dictionary<string, string>()
                 {
-                    Topic = $"branch-{eventDto.BranchId}-lane-display",
-                    Data = new Dictionary<string, string>()
-                    {
-                        { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
-                    }
-                };
-                
-                await FirebaseMessaging.DefaultInstance.SendAsync(message);
-            }
-            catch (Exception ex)
+                    { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                }
+            };
+            
+            var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
+            if (string.IsNullOrWhiteSpace(messageId))
             {
-                Console.WriteLine($"Error publishing to Firebase: {ex.Message}");
+                throw new InvalidOperationException("Firebase did not return a message id.");
             }
         }
 
@@ -151,43 +158,38 @@ namespace AutoWashPro.BLL.Services.Operations
                 LaneName = laneName,
                 Timestamp = DateTime.UtcNow
             };
-            try
+            
+            var message = new Message()
             {
-                var message = new Message()
+                Topic = $"branch-{branchId}-lane-display",
+                Data = new Dictionary<string, string>()
                 {
-                    Topic = $"branch-{branchId}-lane-display",
-                    Data = new Dictionary<string, string>()
-                    {
-                        { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
-                    }
-                };
-                
-                await FirebaseMessaging.DefaultInstance.SendAsync(message);
-            }
-            catch (Exception ex)
+                    { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                }
+            };
+            
+            var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
+            if (string.IsNullOrWhiteSpace(messageId))
             {
-                Console.WriteLine($"Error publishing barrier command to Firebase: {ex.Message}");
+                throw new InvalidOperationException("Firebase did not return a message id.");
             }
         }
 
         public async Task PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
         {
-            try
+            var message = new Message()
             {
-                var message = new Message()
+                Topic = $"branch-{branchId}-lane-display",
+                Data = new Dictionary<string, string>()
                 {
-                    Topic = $"branch-{branchId}-lane-display",
-                    Data = new Dictionary<string, string>()
-                    {
-                        { "event", jsonPayload }
-                    }
-                };
-                
-                await FirebaseMessaging.DefaultInstance.SendAsync(message);
-            }
-            catch (Exception ex)
+                    { "event", jsonPayload }
+                }
+            };
+            
+            var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
+            if (string.IsNullOrWhiteSpace(messageId))
             {
-                Console.WriteLine($"Error publishing raw barrier command to Firebase: {ex.Message}");
+                throw new InvalidOperationException("Firebase did not return a message id.");
             }
         }
     }

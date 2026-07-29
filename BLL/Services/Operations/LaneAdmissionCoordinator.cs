@@ -269,7 +269,7 @@ namespace AutoWashPro.BLL.Services.Operations
             int branchId,
             CancellationToken cancellationToken = default)
         {
-            return await ExecuteCheckOutAsync(null, licensePlate, branchId, true, cancellationToken);
+            return await ExecuteLaneReleaseAsync(null, licensePlate, branchId, LaneReleaseMode.PhysicalCheckout, null, cancellationToken);
         }
 
         public async Task<CheckOutResult> CompletePhysicalCheckoutAsync(
@@ -278,23 +278,24 @@ namespace AutoWashPro.BLL.Services.Operations
             CancellationToken cancellationToken = default)
         {
             var booking = await _context.Bookings.FindAsync(new object[] { bookingId }, cancellationToken);
-            return await ExecuteCheckOutAsync(bookingId, booking?.LicensePlate ?? "", booking?.BranchId ?? 0, true, cancellationToken);
+            return await ExecuteLaneReleaseAsync(bookingId, booking?.LicensePlate ?? "", booking?.BranchId ?? 0, LaneReleaseMode.PhysicalCheckout, null, cancellationToken);
         }
 
         public async Task<CheckOutResult> ReleaseLaneAsync(
             int bookingId,
-            string reason,
+            string targetStatus,
             CancellationToken cancellationToken = default)
         {
             var booking = await _context.Bookings.FindAsync(new object[] { bookingId }, cancellationToken);
-            return await ExecuteCheckOutAsync(bookingId, booking?.LicensePlate ?? "", booking?.BranchId ?? 0, false, cancellationToken);
+            return await ExecuteLaneReleaseAsync(bookingId, booking?.LicensePlate ?? "", booking?.BranchId ?? 0, LaneReleaseMode.AdministrativeRelease, targetStatus, cancellationToken);
         }
 
-        private async Task<CheckOutResult> ExecuteCheckOutAsync(
+        private async Task<CheckOutResult> ExecuteLaneReleaseAsync(
             int? bookingId,
             string licensePlate,
             int branchId,
-            bool openExitBarrier,
+            LaneReleaseMode mode,
+            string? targetStatus,
             CancellationToken cancellationToken)
         {
             var ownsTransaction = _context.Database.CurrentTransaction == null;
@@ -324,8 +325,16 @@ namespace AutoWashPro.BLL.Services.Operations
                     var booking = await _context.Bookings.FindAsync(new object[] { occupancy.BookingId.Value }, cancellationToken);
                     if (booking != null)
                     {
-                        booking.Status = "Completed";
-                        booking.CompletedTime = now;
+                        if (mode == LaneReleaseMode.PhysicalCheckout)
+                        {
+                            booking.Status = "Completed";
+                            booking.CompletedTime = now;
+                        }
+                        else
+                        {
+                            booking.Status = targetStatus ?? booking.Status;
+                            booking.CompletedTime = null;
+                        }
                         booking.UpdatedAt = now;
                     }
                 }
@@ -335,8 +344,16 @@ namespace AutoWashPro.BLL.Services.Operations
                     var fleetLog = await _context.FleetWashLogs.FindAsync(new object[] { occupancy.FleetWashLogId.Value }, cancellationToken);
                     if (fleetLog != null)
                     {
-                        fleetLog.Status = "Completed";
-                        fleetLog.CompletedTime = now;
+                        if (mode == LaneReleaseMode.PhysicalCheckout)
+                        {
+                            fleetLog.Status = "Completed";
+                            fleetLog.CompletedTime = now;
+                        }
+                        else
+                        {
+                            fleetLog.Status = targetStatus ?? fleetLog.Status;
+                            fleetLog.CompletedTime = null;
+                        }
                     }
                 }
 
@@ -344,7 +361,7 @@ namespace AutoWashPro.BLL.Services.Operations
 
                 string? exitCmdId = null;
 
-                if (openExitBarrier)
+                if (mode == LaneReleaseMode.PhysicalCheckout)
                 {
                     exitCmdId = Guid.NewGuid().ToString();
                     var exitBarrierCmd = new BarrierCommand

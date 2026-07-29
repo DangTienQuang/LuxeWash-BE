@@ -436,8 +436,6 @@ namespace AutoWashPro.BLL.Services
                     {
                         throw new BadRequestException("LANE_UNAVAILABLE");
                     }
-
-                    booking.Status = "CheckedIn";
                     booking.UpdatedAt = DateTime.UtcNow;
 
                     await _context.SaveChangesAsync();
