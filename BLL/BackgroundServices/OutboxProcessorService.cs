@@ -153,14 +153,15 @@ namespace AutoWashPro.BLL.BackgroundServices
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to process outbox message {message.Id}");
+                    _logger.LogError(ex, $"Failed to process outbox message {message.Id} (Type={message.Type})");
                     
                     message.RetryCount++;
-                    message.ErrorMessage = ex.Message;
+                    // Log the full exception including stack trace to the DB for debugging
+                    message.ErrorMessage = ex.ToString();
 
                     if (message.RetryCount >= 3)
                     {
-                        message.ErrorMessage = $"Failed permanently after 3 retries. Last error: {ex.Message}";
+                        message.ErrorMessage = $"Failed permanently after 3 retries. Last error:\n{ex}";
                     }
                     else
                     {

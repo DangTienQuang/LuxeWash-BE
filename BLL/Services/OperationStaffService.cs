@@ -95,6 +95,10 @@ namespace AutoWashPro.BLL.Services
                     booking.CompletedTime = null;
                     booking.ActualDurationMinutes = null;
                 }
+                else
+                {
+                    throw new BadRequestException("INVALID_STATE: Booking is in Pending status but already has a valid LaneOccupancy. Cannot check in again.");
+                }
             }
 
             // Always run through the coordinator — it owns: lane selection, LaneOccupancy creation,

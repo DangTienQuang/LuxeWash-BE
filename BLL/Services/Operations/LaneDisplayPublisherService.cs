@@ -36,6 +36,20 @@ namespace AutoWashPro.BLL.Services.Operations
             _logger = logger;
         }
 
+        private bool TryGetFirebaseApp(out FirebaseAdmin.FirebaseApp? app)
+        {
+            try
+            {
+                app = FirebaseAdmin.FirebaseApp.DefaultInstance;
+                return app != null;
+            }
+            catch (InvalidOperationException)
+            {
+                app = null;
+                return false;
+            }
+        }
+
         public async Task PublishEventAsync(LaneDisplayEventDTO eventDto)
         {
             _latestBranchEvent[eventDto.BranchId] = eventDto;
@@ -65,7 +79,7 @@ namespace AutoWashPro.BLL.Services.Operations
             // Firebase Update (Secondary for Mobile/Devices) - best-effort, never blocks SignalR
             try
             {
-                if (FirebaseAdmin.FirebaseApp.DefaultInstance == null)
+                if (!TryGetFirebaseApp(out var app))
                 {
                     _logger.LogWarning(
                         "Firebase is not initialized. Skipping Firebase lane display event for BranchId={BranchId}, Type={Type}.",
@@ -185,11 +199,12 @@ namespace AutoWashPro.BLL.Services.Operations
         public async Task PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName)
         {
             // Firebase is REQUIRED for barrier commands (controls physical devices)
-            if (FirebaseAdmin.FirebaseApp.DefaultInstance == null)
+            if (!TryGetFirebaseApp(out var app))
             {
-                throw new InvalidOperationException(
-                    "Firebase is not initialized; barrier command cannot be published. " +
-                    "The outbox will retry this command once Firebase is available.");
+                _logger.LogWarning(
+                    "Firebase is not initialized; barrier command cannot be published for BranchId={BranchId}. " +
+                    "If testing locally, ignore this. In production, physical barrier will not open.", branchId);
+                return; // Do NOT throw, otherwise outbox gets stuck.
             }
 
             var evt = new
@@ -227,11 +242,12 @@ namespace AutoWashPro.BLL.Services.Operations
         public async Task PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
         {
             // Firebase is REQUIRED for barrier commands (controls physical devices)
-            if (FirebaseAdmin.FirebaseApp.DefaultInstance == null)
+            if (!TryGetFirebaseApp(out var app))
             {
-                throw new InvalidOperationException(
-                    "Firebase is not initialized; barrier command cannot be published. " +
-                    "The outbox will retry this command once Firebase is available.");
+                _logger.LogWarning(
+                    "Firebase is not initialized; barrier command cannot be published for BranchId={BranchId}. " +
+                    "If testing locally, ignore this. In production, physical barrier will not open.", branchId);
+                return; // Do NOT throw, otherwise outbox gets stuck.
             }
 
             try

@@ -501,7 +501,7 @@ namespace AutoWashPro.BLL.Services.Operations
             var waitingBookingObj = await _context.Bookings
                 .Include(b => b.Vehicle)
                 .Where(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null && (lane.IsBusinessLane ? (b.BookingType == "Business" || b.BookingType == "Fleet") : (b.BookingType != "Business" && b.BookingType != "Fleet")))
-                .OrderBy(b => b.UpdatedAt ?? b.CreatedAt)
+                .OrderBy(b => b.ScheduledTime)
                 .Select(b => new
                 {
                     Booking = b,
