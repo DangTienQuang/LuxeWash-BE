@@ -334,8 +334,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
-app.UseHttpsRedirection();
+else
+{
+    // Only redirect to HTTPS in Production/Staging to avoid stripping Authorization headers in local dev
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("AllowAll");
 

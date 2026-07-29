@@ -48,25 +48,30 @@ namespace AutoWashPro.BLL.Services.Operations
                 branchDict.AddOrUpdate(eventDto.LaneId.Value, latestState, (_, __) => latestState);
             }
 
-            // SignalR Update (Primary for Web Display)
+            // SignalR Update (Primary for Web Display) - must always succeed
             await _hubContext.Clients
                 .Group($"branch:{eventDto.BranchId}:lane-display")
                 .SendAsync("ReceiveLaneUpdate", eventDto);
 
-            // Firebase Update (Secondary for Mobile/Devices)
-            var message = new Message()
+            // Firebase Update (Secondary for Mobile/Devices) - best-effort, never blocks SignalR
+            try
             {
-                Topic = $"branch-{eventDto.BranchId}-lane-display",
-                Data = new Dictionary<string, string>()
+                if (FirebaseAdmin.FirebaseApp.DefaultInstance != null)
                 {
-                    { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                    var message = new Message()
+                    {
+                        Topic = $"branch-{eventDto.BranchId}-lane-display",
+                        Data = new Dictionary<string, string>()
+                        {
+                            { "event", JsonSerializer.Serialize(eventDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                        }
+                    };
+                    await FirebaseMessaging.DefaultInstance.SendAsync(message);
                 }
-            };
-            
-            var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
-            if (string.IsNullOrWhiteSpace(messageId))
+            }
+            catch
             {
-                throw new InvalidOperationException("Firebase did not return a message id.");
+                // Firebase is optional secondary channel. Swallow silently.
             }
         }
 
@@ -158,38 +163,50 @@ namespace AutoWashPro.BLL.Services.Operations
                 LaneName = laneName,
                 Timestamp = DateTime.UtcNow
             };
-            
-            var message = new Message()
+
+            // Firebase (Secondary for Edge devices) - best-effort
+            try
             {
-                Topic = $"branch-{branchId}-lane-display",
-                Data = new Dictionary<string, string>()
+                if (FirebaseAdmin.FirebaseApp.DefaultInstance != null)
                 {
-                    { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                    var message = new Message()
+                    {
+                        Topic = $"branch-{branchId}-lane-display",
+                        Data = new Dictionary<string, string>()
+                        {
+                            { "event", JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) }
+                        }
+                    };
+                    await FirebaseMessaging.DefaultInstance.SendAsync(message);
                 }
-            };
-            
-            var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
-            if (string.IsNullOrWhiteSpace(messageId))
+            }
+            catch
             {
-                throw new InvalidOperationException("Firebase did not return a message id.");
+                // Firebase is optional secondary channel. Swallow silently.
             }
         }
 
         public async Task PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
         {
-            var message = new Message()
+            // Firebase (Secondary for Edge devices) - best-effort
+            try
             {
-                Topic = $"branch-{branchId}-lane-display",
-                Data = new Dictionary<string, string>()
+                if (FirebaseAdmin.FirebaseApp.DefaultInstance != null)
                 {
-                    { "event", jsonPayload }
+                    var message = new Message()
+                    {
+                        Topic = $"branch-{branchId}-lane-display",
+                        Data = new Dictionary<string, string>()
+                        {
+                            { "event", jsonPayload }
+                        }
+                    };
+                    await FirebaseMessaging.DefaultInstance.SendAsync(message);
                 }
-            };
-            
-            var messageId = await FirebaseMessaging.DefaultInstance.SendAsync(message);
-            if (string.IsNullOrWhiteSpace(messageId))
+            }
+            catch
             {
-                throw new InvalidOperationException("Firebase did not return a message id.");
+                // Firebase is optional secondary channel. Swallow silently.
             }
         }
     }
