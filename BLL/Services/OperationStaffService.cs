@@ -308,13 +308,7 @@ namespace AutoWashPro.BLL.Services
                 var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == booking.ProcessingLaneId.Value);
                 if (lane != null)
                 {
-                    await _laneCoordinator.PublishProcessingAsync(
-                        booking.BranchId,
-                        booking.BookingId,
-                        vehicle?.LicensePlate,
-                        lane.LaneId,
-                        lane.Name
-                    );
+
                 }
             }
 

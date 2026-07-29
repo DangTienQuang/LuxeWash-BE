@@ -262,6 +262,7 @@ builder.Services.AddScoped<IScenarioExecutionLogger, ScenarioExecutionLogger>();
 builder.Services.AddHostedService<AutoWashPro.API.Workers.AnnualTierResetWorker>();
 builder.Services.AddHostedService<AutoWashPro.API.Workers.CRMCampaignWorker>();
 builder.Services.AddHostedService<AutoWashPro.API.Workers.AutoWashCompletionWorker>();
+builder.Services.AddHostedService<AutoWashPro.BLL.BackgroundServices.OutboxProcessorService>();
 
 // ==============================================================================
 // 8. SIGNALR & SWAGGER CONFIGURATION

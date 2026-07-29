@@ -71,21 +71,6 @@ namespace AutoWashPro.BLL.Services.Operations
             return Task.CompletedTask;
         }
 
-        public Task PublishProcessingAsync(int branchId, int bookingId, string? licensePlate, int laneId, string laneName)
-        {
-            EnqueueOutboxEvent(new LaneDisplayEventDTO
-            {
-                BranchId = branchId,
-                Type = "processing",
-                BookingId = bookingId,
-                LicensePlate = licensePlate,
-                LaneId = laneId,
-                LaneName = laneName,
-                DisplayUntil = DateTime.UtcNow.AddSeconds(15)
-            });
-            return Task.CompletedTask;
-        }
-
         public Task PublishClearedAsync(int branchId, int laneId, string laneName)
         {
             EnqueueOutboxEvent(new LaneDisplayEventDTO

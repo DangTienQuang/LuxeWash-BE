@@ -910,7 +910,7 @@ namespace AutoWashPro.BLL.Services
                     }
                     else
                     {
-                        await _laneCoordinator.PublishProcessingAsync(booking.BranchId, booking.BookingId, booking.LicensePlate, booking.ProcessingLaneId.Value, laneName ?? "");
+                        
                     }
                 }
                 else if (newStatus == "CheckedIn")
@@ -2530,7 +2530,7 @@ namespace AutoWashPro.BLL.Services
                 booking.UpdatedAt = DateTime.UtcNow;
 
                 string laneName = await _context.Lanes.Where(l => l.LaneId == booking.ProcessingLaneId).Select(l => l.Name).FirstOrDefaultAsync() ?? "";
-                await _laneCoordinator.PublishProcessingAsync(booking.BranchId, booking.BookingId, booking.LicensePlate, booking.ProcessingLaneId.Value, laneName);
+                
             }
 
             await _context.SaveChangesAsync();
