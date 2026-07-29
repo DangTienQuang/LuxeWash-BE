@@ -169,5 +169,26 @@ namespace AutoWashPro.BLL.Services.Operations
                 Console.WriteLine($"Error publishing barrier command to Firebase: {ex.Message}");
             }
         }
+
+        public async Task PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
+        {
+            try
+            {
+                var message = new Message()
+                {
+                    Topic = $"branch-{branchId}-lane-display",
+                    Data = new Dictionary<string, string>()
+                    {
+                        { "event", jsonPayload }
+                    }
+                };
+                
+                await FirebaseMessaging.DefaultInstance.SendAsync(message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error publishing raw barrier command to Firebase: {ex.Message}");
+            }
+        }
     }
 }

@@ -19,9 +19,14 @@ namespace AutoWashPro.BLL.Services.Operations
             int branchId,
             CancellationToken cancellationToken = default);
 
-        Task<CheckOutResult> ManualCheckOutAsync(
+        Task<CheckOutResult> CompletePhysicalCheckoutAsync(
             int bookingId,
             int employeeId,
+            CancellationToken cancellationToken = default);
+            
+        Task<CheckOutResult> ReleaseLaneAsync(
+            int bookingId,
+            string reason,
             CancellationToken cancellationToken = default);
 
         Task<AdmissionResult?> AdmitNextWaitingVehicleAsync(

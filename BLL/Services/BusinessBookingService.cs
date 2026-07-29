@@ -712,21 +712,11 @@ namespace BLL.Services
             _context.FleetWashLogs.Add(washLog);
             await _context.SaveChangesAsync(); // Save to generate FleetWashLogId
 
-            booking.Status = "CheckedIn";
-
             var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
                 booking.LicensePlate ?? "UNKNOWN",
                 booking.BranchId,
                 bookingId: booking.BookingId,
                 fleetWashLogId: washLog.FleetWashLogId);
-
-            if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
-            {
-                booking.ProcessingLaneId = checkInResult.LaneId.Value;
-                washLog.LaneId = checkInResult.LaneId.Value;
-            }
-
-            await _context.SaveChangesAsync();
 
             return new FleetWashLogDTO
             {
@@ -787,12 +777,6 @@ namespace BLL.Services
                 dto.BranchId,
                 bookingId: null,
                 fleetWashLogId: washLog.FleetWashLogId);
-
-            if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
-            {
-                washLog.LaneId = checkInResult.LaneId.Value;
-                await _context.SaveChangesAsync();
-            }
 
             return new FleetCheckInResponseDTO
             {
@@ -1205,11 +1189,7 @@ namespace BLL.Services
                 fleetWashLogId: washLog.FleetWashLogId,
                 forcedLaneId: dto.LaneId);
 
-            if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
-            {
-                washLog.LaneId = checkInResult.LaneId.Value;
-            }
-            else
+            if (checkInResult.IsWaiting || !checkInResult.LaneId.HasValue)
             {
                 throw new BadRequestException("LANE_UNAVAILABLE");
             }

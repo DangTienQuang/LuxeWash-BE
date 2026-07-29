@@ -279,9 +279,13 @@ namespace AutoWashPro.BLL.Services
                  }
             }
 
-            if (isCompletingNow || newStatus == "Cancelled" || newStatus == "Delayed")
+            if (isCompletingNow)
             {
-                await _laneCoordinator.ManualCheckOutAsync(booking.BookingId, staffUserId);
+                await _laneCoordinator.CompletePhysicalCheckoutAsync(booking.BookingId, staffUserId);
+            }
+            else if (newStatus == "Cancelled" || newStatus == "Delayed")
+            {
+                await _laneCoordinator.ReleaseLaneAsync(booking.BookingId, newStatus);
             }
 
             await _context.SaveChangesAsync();

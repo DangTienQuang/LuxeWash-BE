@@ -1,8 +1,9 @@
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Memory;
+using System.Linq;
 using System;
 
 namespace API.Controllers.AI
@@ -15,14 +16,12 @@ namespace API.Controllers.AI
         private readonly IBookingService _bookingService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService _publisherService;
         private readonly AutoWashPro.DAL.Data.AutoWashDbContext _context;
-        private readonly IMemoryCache _cache;
 
-        public CameraController(IBookingService bookingService, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService publisherService, AutoWashPro.DAL.Data.AutoWashDbContext context, IMemoryCache cache)
+        public CameraController(IBookingService bookingService, AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService publisherService, AutoWashPro.DAL.Data.AutoWashDbContext context)
         {
             _bookingService = bookingService;
             _publisherService = publisherService;
             _context = context;
-            _cache = cache;
         }
 
         [HttpPost("check-in")]
@@ -30,13 +29,16 @@ namespace API.Controllers.AI
         {
             if (string.IsNullOrWhiteSpace(plate)) return BadRequest("Plate is required");
 
-            // Deduplication logic
-            var cacheKey = $"camera_checkin_{plate}";
-            if (_cache.TryGetValue(cacheKey, out _))
+            // DB-based Deduplication logic (Replaces MemoryCache to support multi-server)
+            var isAlreadyCheckedIn = await _context.Bookings.AnyAsync(b => 
+                (b.LicensePlate == plate || (b.Vehicle != null && b.Vehicle.LicensePlate == plate))
+                && b.ScheduledTime >= DateTime.UtcNow.AddHours(-12)
+                && (b.Status == "CheckedIn" || b.Status == "Processing"));
+
+            if (isAlreadyCheckedIn)
             {
-                return Ok(new { statusCode = 200, message = "Duplicate check-in skipped." });
+                return Ok(new { statusCode = 200, message = "Duplicate check-in skipped (already processing)." });
             }
-            _cache.Set(cacheKey, true, TimeSpan.FromSeconds(15)); // block duplicates for 15s
 
             try
             {
@@ -74,13 +76,17 @@ namespace API.Controllers.AI
         {
             if (string.IsNullOrWhiteSpace(plate)) return BadRequest("Plate is required");
 
-            // Deduplication logic
-            var cacheKey = $"camera_checkout_{plate}";
-            if (_cache.TryGetValue(cacheKey, out _))
+            // DB-based Deduplication logic
+            var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
+            var isAlreadyCompleted = await _context.Bookings.AnyAsync(b => 
+                (b.LicensePlate == plate || (b.Vehicle != null && b.Vehicle.LicensePlate == plate))
+                && b.Status == "Completed" 
+                && b.CompletedTime >= fiveMinutesAgo);
+
+            if (isAlreadyCompleted)
             {
-                return Ok(new { statusCode = 200, message = "Duplicate check-out skipped." });
+                return Ok(new { statusCode = 200, message = "Duplicate check-out skipped (recently completed)." });
             }
-            _cache.Set(cacheKey, true, TimeSpan.FromSeconds(15)); // block duplicates for 15s
 
             try
             {

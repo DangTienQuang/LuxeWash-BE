@@ -897,9 +897,13 @@ namespace AutoWashPro.BLL.Services
             }
 
             // Remove all old Publish and AssignNextVehicle logic. Coordinator handles it!
-            if (isCompletingNow || newStatus == "Cancelled" || newStatus == "CancelledBySystem" || newStatus == "Delayed")
+            if (isCompletingNow)
             {
-                await _laneCoordinator.ManualCheckOutAsync(booking.BookingId, 0); // Frees lane, publishes cleared, admits next
+                await _laneCoordinator.CompletePhysicalCheckoutAsync(booking.BookingId, 0); 
+            }
+            else if (newStatus == "Cancelled" || newStatus == "CancelledBySystem" || newStatus == "Delayed")
+            {
+                await _laneCoordinator.ReleaseLaneAsync(booking.BookingId, newStatus); 
             }
 
             await _context.SaveChangesAsync();
