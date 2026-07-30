@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoWashPro.BLL.DTOs;
 
@@ -15,5 +15,7 @@ namespace AutoWashPro.BLL.Services
         Task<bool> UpdateVehicleTypeByAdminAsync(string licensePlate, int newVehicleTypeId);
         Task<bool> ApproveNewVehicleTypeAsync(string licensePlate, ApproveVehicleTypeRequestDTO request);
         Task<bool> RejectNewVehicleTypeAsync(string licensePlate);
+        /// <summary>Returns the vehicle type name for a given plate from Customer or Fleet records. Returns null if not found.</summary>
+        Task<string?> GetVehicleTypeNameByPlateAsync(string normalizedPlate);
     }
 }

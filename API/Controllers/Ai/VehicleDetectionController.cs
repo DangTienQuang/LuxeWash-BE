@@ -1,9 +1,9 @@
 using AutoWashPro.BLL.Exceptions;
+using AutoWashPro.BLL.Services;
 using BLL.Services;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers.Ai
 {
@@ -14,21 +14,24 @@ namespace API.Controllers.Ai
         private readonly ILicensePlateService _plateService;
         private readonly ICarRecognitionService _carRecognitionService;
         private readonly ICarDetectionService _detectionService;
-        private readonly AutoWashPro.DAL.Data.AutoWashDbContext _context;
+        private readonly IVehicleService _vehicleService;
         private readonly ICloudinaryService _cloudinaryService;
+        private readonly IVisionFeedbackService _visionFeedbackService;
 
         public VehicleDetectionController(
             ILicensePlateService plateService,
             ICarRecognitionService carRecognitionService,
             ICarDetectionService detectionService,
-            AutoWashPro.DAL.Data.AutoWashDbContext context,
-            ICloudinaryService cloudinaryService)
+            IVehicleService vehicleService,
+            ICloudinaryService cloudinaryService,
+            IVisionFeedbackService visionFeedbackService)
         {
             _plateService = plateService;
             _carRecognitionService = carRecognitionService;
             _detectionService = detectionService;
-            _context = context;
+            _vehicleService = vehicleService;
             _cloudinaryService = cloudinaryService;
+            _visionFeedbackService = visionFeedbackService;
         }
 
         [HttpPost("detect-plate")]
@@ -131,32 +134,8 @@ namespace API.Controllers.Ai
             if (!string.IsNullOrWhiteSpace(licensePlate))
             {
                 var normalizedPlate = licensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper();
-
-                var customerVehicle = await _context.Vehicles
-                    .Include(v => v.VehicleType)
-                    .Where(v => v.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate && !v.IsDeleted)
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync();
-
-                if (customerVehicle != null)
-                {
-                    historicalVehicleTypeName = customerVehicle.VehicleType?.Name;
-                    isOverriddenByHistory = true;
-                }
-                else
-                {
-                    var fleetVehicle = await _context.FleetVehicles
-                        .Include(fv => fv.VehicleType)
-                        .Where(fv => fv.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate && fv.Status == "Active")
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync();
-
-                    if (fleetVehicle != null)
-                    {
-                        historicalVehicleTypeName = fleetVehicle.VehicleType?.Name;
-                        isOverriddenByHistory = true;
-                    }
-                }
+                historicalVehicleTypeName = await _vehicleService.GetVehicleTypeNameByPlateAsync(normalizedPlate);
+                isOverriddenByHistory = historicalVehicleTypeName != null;
             }
 
             return Ok(new
@@ -184,58 +163,43 @@ namespace API.Controllers.Ai
         [HttpPost("feedback")]
         [RequestSizeLimit(10 * 1024 * 1024)]
         public async Task<IActionResult> SubmitFeedback(
-            IFormFile image, 
-            [FromForm] string licensePlate, 
-            [FromForm] int? predictedVehicleTypeId, 
+            IFormFile image,
+            [FromForm] string licensePlate,
+            [FromForm] int? predictedVehicleTypeId,
             [FromForm] int actualVehicleTypeId,
             [FromForm] string? actualBrand = null,
             [FromForm] string? actualModel = null)
         {
             if (image == null || image.Length == 0)
                 throw new BadRequestException("Please provide an image.");
-            
+
             if (string.IsNullOrWhiteSpace(licensePlate))
                 throw new BadRequestException("License plate is required.");
 
-            // Upload image to Cloudinary
             string imageUrl = await _cloudinaryService.UploadFileAsync(image, "ai-vision-feedback");
 
-            // Save feedback log
-            var feedback = new AutoWashPro.DAL.Entities.VehicleVisionFeedback
-            {
-                LicensePlate = licensePlate,
-                ImageUrl = imageUrl,
-                PredictedVehicleTypeId = predictedVehicleTypeId,
-                ActualVehicleTypeId = actualVehicleTypeId,
-                ActualBrand = actualBrand,
-                ActualModel = actualModel,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.VehicleVisionFeedbacks.Add(feedback);
-            await _context.SaveChangesAsync();
+            var feedbackId = await _visionFeedbackService.SaveFeedbackAsync(
+                licensePlate, imageUrl,
+                predictedVehicleTypeId ?? 0, actualVehicleTypeId,
+                actualBrand, actualModel);
 
             return Ok(new
             {
                 statusCode = 200,
                 message = "Feedback submitted successfully for AI training.",
-                data = new { feedbackId = feedback.FeedbackId, imageUrl = imageUrl }
+                data = new { feedbackId, imageUrl }
             });
         }
-
 
         [HttpPost("check-has-car")]
         public async Task<IActionResult> CheckHasCar(IFormFile imageFile)
         {
             if (imageFile == null || imageFile.Length == 0)
-            {
                 return BadRequest(new { statusCode = 400, message = "Please upload an image." });
-            }
 
             using var memoryStream = new MemoryStream();
             await imageFile.CopyToAsync(memoryStream);
             byte[] imageBytes = memoryStream.ToArray();
-
 
             var boundingBoxes = _detectionService.DetectCars(imageBytes, 0.25f);
 

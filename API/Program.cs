@@ -252,6 +252,7 @@ builder.Services.AddSingleton<ICarDetectionService, CarDetectionService>();
 builder.Services.AddSingleton<ICarClassificationService, CarClassificationService>();
 builder.Services.AddScoped<ICarModelMatchingService, CarModelMatchingService>();
 builder.Services.AddScoped<ICarRecognitionService, CarRecognitionService>();
+builder.Services.AddScoped<IVisionFeedbackService, VisionFeedbackService>();
 
 builder.Services.AddScoped<IVisitFeatureCalculator, VisitFeatureCalculator>();
 builder.Services.AddScoped<IVehicleFeatureCalculator, VehicleFeatureCalculator>();
