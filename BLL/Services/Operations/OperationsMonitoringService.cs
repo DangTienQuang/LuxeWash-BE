@@ -107,6 +107,94 @@ namespace AutoWashPro.BLL.Services.Operations
             }
             await _context.SaveChangesAsync(cancellationToken);
 
+            // 0. Dọn stale LaneOccupancy: xóa occupancy không còn hợp lệ
+            var occupanciesToCheck = await _context.LaneOccupancies
+                .Where(o => o.BranchId == branchId)
+                .ToListAsync(cancellationToken);
+
+            var staleOccupancyLaneIds = new List<int>();
+
+            foreach (var occupancy in occupanciesToCheck)
+            {
+                bool shouldDelete = false;
+                string reason = string.Empty;
+
+                if (occupancy.BookingId == null)
+                {
+                    // Occupancy không gắn booking nào → stale
+                    shouldDelete = true;
+                    reason = "No BookingId";
+                }
+                else
+                {
+                    var booking = await _context.Bookings
+                        .FirstOrDefaultAsync(b => b.BookingId == occupancy.BookingId, cancellationToken);
+
+                    if (booking == null)
+                    {
+                        shouldDelete = true;
+                        reason = $"Booking {occupancy.BookingId} does not exist";
+                    }
+                    else if (booking.Status == "Completed" || booking.Status == "Cancelled" || booking.Status == "NoShow")
+                    {
+                        shouldDelete = true;
+                        reason = $"Booking {occupancy.BookingId} is in terminal status '{booking.Status}'";
+                    }
+                    else if (booking.Status != "Processing")
+                    {
+                        shouldDelete = true;
+                        reason = $"Booking {occupancy.BookingId} status '{booking.Status}' is not Processing";
+                    }
+                    else if (booking.ProcessingLaneId.HasValue && booking.ProcessingLaneId.Value != occupancy.LaneId)
+                    {
+                        shouldDelete = true;
+                        reason = $"Booking {occupancy.BookingId} ProcessingLaneId={booking.ProcessingLaneId} differs from occupancy LaneId={occupancy.LaneId}";
+                    }
+                }
+
+                if (shouldDelete)
+                {
+                    alerts.Add(new ReconciliationAlertDTO
+                    {
+                        AlertType = "Stale_Occupancy_Cleared",
+                        Description = $"Removed stale LaneOccupancy for lane {occupancy.LaneId}. Reason: {reason}",
+                        BookingId = occupancy.BookingId,
+                        LicensePlate = occupancy.LicensePlate,
+                        LaneId = occupancy.LaneId,
+                        DetectedAt = now
+                    });
+                    staleOccupancyLaneIds.Add(occupancy.LaneId);
+                    _context.LaneOccupancies.Remove(occupancy);
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // Sau khi dọn occupancy → thử nhận xe tiếp theo vào làn vừa giải phóng
+            foreach (var laneId in staleOccupancyLaneIds.Distinct())
+            {
+                try
+                {
+                    var admission = await _laneCoordinator.AdmitNextWaitingVehicleAsync(laneId, cancellationToken);
+                    if (admission != null)
+                    {
+                        alerts.Add(new ReconciliationAlertDTO
+                        {
+                            AlertType = "Empty_Lane_Admitted",
+                            Description = $"After clearing stale occupancy, lane {laneId} admitted waiting vehicle {admission.LicensePlate}.",
+                            BookingId = admission.BookingId,
+                            LicensePlate = admission.LicensePlate,
+                            LaneId = laneId,
+                            DetectedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+                catch (Exception)
+                {
+                    // Ignore errors during admission, continue to next lane
+                }
+            }
+
             // 1. Fix stale ProcessingLaneId assignments (Booking has ProcessingLaneId but no LaneOccupancy)
             var bookingsWithLane = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.ProcessingLaneId != null)

@@ -1,9 +1,11 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using AutoWashPro.BLL.Services.Operations;
 
 namespace AutoWashPro.BLL.BackgroundServices
@@ -31,19 +33,31 @@ namespace AutoWashPro.BLL.BackgroundServices
                 {
                     using var scope = _serviceProvider.CreateScope();
                     var monitoringService = scope.ServiceProvider.GetRequiredService<IOperationsMonitoringService>();
+                    var context = scope.ServiceProvider.GetRequiredService<AutoWashPro.DAL.Data.AutoWashDbContext>();
 
-                    // In a real application, we would loop over all active branches.
-                    // Assuming branch 1 is the primary branch for this check.
-                    int primaryBranchId = 1; 
+                    // Chạy reconciliation cho tất cả branch đang active
+                    var activeBranchIds = await context.Branches
+                        .Where(b => b.IsActive)
+                        .Select(b => b.BranchId)
+                        .ToListAsync(stoppingToken);
 
-                    var alerts = await monitoringService.RunReconciliationCheckAsync(primaryBranchId, stoppingToken);
-
-                    if (alerts.Count > 0)
+                    foreach (var branchId in activeBranchIds)
                     {
-                        _logger.LogWarning("Reconciliation check found {AlertCount} inconsistencies for Branch {BranchId}", alerts.Count, primaryBranchId);
-                        foreach (var alert in alerts)
+                        try
                         {
-                            _logger.LogWarning("ALERT: {Type} - {Description}", alert.AlertType, alert.Description);
+                            var alerts = await monitoringService.RunReconciliationCheckAsync(branchId, stoppingToken);
+                            if (alerts.Count > 0)
+                            {
+                                _logger.LogWarning("Reconciliation check found {AlertCount} inconsistencies for Branch {BranchId}", alerts.Count, branchId);
+                                foreach (var alert in alerts)
+                                {
+                                    _logger.LogWarning("ALERT [{Branch}]: {Type} - {Description}", branchId, alert.AlertType, alert.Description);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error during reconciliation for Branch {BranchId}.", branchId);
                         }
                     }
                 }
@@ -52,8 +66,8 @@ namespace AutoWashPro.BLL.BackgroundServices
                     _logger.LogError(ex, "Error occurred executing OperationsReconciliationBackgroundService.");
                 }
 
-                // Run check every 5 minutes
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                // Chạy mỗi 60 giây
+                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
             }
         }
     }

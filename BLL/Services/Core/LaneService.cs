@@ -36,6 +36,7 @@ namespace AutoWashPro.BLL.Services
                 BranchId = l.BranchId,
                 IsActive = l.IsActive,
                 IsBusinessLane = l.IsBusinessLane,
+                IsVipLane = l.IsVipLane,
             }).ToList();
         }
 
@@ -50,7 +51,8 @@ namespace AutoWashPro.BLL.Services
                 Name = lane.Name,
                 BranchId = lane.BranchId,
                 IsActive = lane.IsActive,
-                IsBusinessLane = lane.IsBusinessLane
+                IsBusinessLane = lane.IsBusinessLane,
+                IsVipLane = lane.IsVipLane
             };
         }
 
@@ -64,7 +66,8 @@ namespace AutoWashPro.BLL.Services
                 Name = createDto.Name,
                 BranchId = createDto.BranchId,
                 IsActive = true,
-                IsBusinessLane = false
+                IsBusinessLane = createDto.IsBusinessLane,
+                IsVipLane = createDto.IsVipLane
             };
 
             _context.Lanes.Add(lane);
@@ -76,7 +79,8 @@ namespace AutoWashPro.BLL.Services
                 Name = lane.Name,
                 BranchId = lane.BranchId,
                 IsActive = lane.IsActive,
-                IsBusinessLane = lane.IsBusinessLane
+                IsBusinessLane = lane.IsBusinessLane,
+                IsVipLane = lane.IsVipLane
             };
         }
 
@@ -94,6 +98,8 @@ namespace AutoWashPro.BLL.Services
             lane.Name = updateDto.Name;
             lane.BranchId = updateDto.BranchId;
             lane.IsActive = updateDto.IsActive;
+            lane.IsBusinessLane = updateDto.IsBusinessLane;
+            lane.IsVipLane = updateDto.IsVipLane;
 
             await _context.SaveChangesAsync();
 
@@ -102,7 +108,9 @@ namespace AutoWashPro.BLL.Services
                 LaneId = lane.LaneId,
                 Name = lane.Name,
                 BranchId = lane.BranchId,
-                IsActive = lane.IsActive
+                IsActive = lane.IsActive,
+                IsBusinessLane = lane.IsBusinessLane,
+                IsVipLane = lane.IsVipLane
             };
         }
     }

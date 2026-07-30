@@ -371,7 +371,54 @@ namespace AutoWashPro.BLL.Services
 
             var todayInVN = DateTime.UtcNow.ToVnTime().Date;
 
-            // Step 1: Query Bookings for today at the specific branch
+            // Step 1a: Ưu tiên booking đang active (CheckedIn hoặc Processing) trong ngày hôm nay
+            var activeBooking = await _context.Bookings
+                .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
+                         && b.BranchId == branchId
+                         && b.ScheduledTime.Date == todayInVN
+                         && (b.Status == "CheckedIn" || b.Status == "Processing"))
+                .OrderByDescending(b => b.ScheduledTime)
+                .Select(b => new AdminBookingResponseDTO
+                {
+                    BookingId = b.BookingId,
+                    LicensePlate = b.LicensePlate ?? "",
+                    ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
+                    ScheduledTime = b.ScheduledTime,
+                    Status = b.Status ?? "",
+                    OriginalPrice = b.OriginalPrice,
+                    PointDiscountAmount = b.PointDiscountAmount,
+                    VoucherDiscountAmount = b.VoucherDiscountAmount,
+                    FinalAmount = b.FinalAmount,
+                    ProcessingStartTime = b.ProcessingStartTime,
+                    CompletedTime = b.CompletedTime,
+                    ActualDurationMinutes = b.ActualDurationMinutes,
+                    ProcessingLaneId = b.ProcessingLaneId,
+                    ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null
+                })
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+
+            if (activeBooking != null)
+            {
+                var paymentStatuses = await GetPaymentStatusesByBookingIdsAsync(new List<int> { activeBooking.BookingId });
+                activeBooking.PaymentStatus = GetPaymentStatus(paymentStatuses, activeBooking.BookingId);
+                if (activeBooking.ProcessingStartTime.HasValue)
+                    activeBooking.ProcessingStartTime = activeBooking.ProcessingStartTime.Value.ToVnTime();
+                if (activeBooking.CompletedTime.HasValue)
+                    activeBooking.CompletedTime = activeBooking.CompletedTime.Value.ToVnTime();
+
+                var vipInfo = await GetVipInfoByBookingIdAsync(activeBooking.BookingId);
+                return new SmartLicensePlateResponseDTO
+                {
+                    CustomerType = "PreBooked",
+                    Data = activeBooking,
+                    CustomerTierName = vipInfo.TierName,
+                    CustomerTierPoints = vipInfo.TotalPoint,
+                    IsVip = vipInfo.IsVip
+                };
+            }
+
+            // Step 1b: Booking hôm nay trạng thái Pending hoặc Confirmed
             var preBooked = await _context.Bookings
                 .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
                          && b.BranchId == branchId
@@ -403,18 +450,18 @@ namespace AutoWashPro.BLL.Services
                 var paymentStatuses = await GetPaymentStatusesByBookingIdsAsync(new List<int> { preBooked.BookingId });
                 preBooked.PaymentStatus = GetPaymentStatus(paymentStatuses, preBooked.BookingId);
                 if (preBooked.ProcessingStartTime.HasValue)
-                {
                     preBooked.ProcessingStartTime = preBooked.ProcessingStartTime.Value.ToVnTime();
-                }
                 if (preBooked.CompletedTime.HasValue)
-                {
                     preBooked.CompletedTime = preBooked.CompletedTime.Value.ToVnTime();
-                }
 
+                var vipInfo = await GetVipInfoByBookingIdAsync(preBooked.BookingId);
                 return new SmartLicensePlateResponseDTO
                 {
                     CustomerType = "PreBooked",
-                    Data = preBooked
+                    Data = preBooked,
+                    CustomerTierName = vipInfo.TierName,
+                    CustomerTierPoints = vipInfo.TotalPoint,
+                    IsVip = vipInfo.IsVip
                 };
             }
 
@@ -456,22 +503,32 @@ namespace AutoWashPro.BLL.Services
             var registeredVehicle = await _context.Vehicles
                 .Include(v => v.User)
                 .ThenInclude(u => u.CustomerProfile)
+                    .ThenInclude(cp => cp.Tier)
                 .Where(v => v.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate && !v.IsDeleted && v.UserId != null)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
 
             if (registeredVehicle != null && registeredVehicle.User != null)
             {
+                var profile = registeredVehicle.User.CustomerProfile;
+                var tierName = profile?.Tier?.TierName;
+                var totalPoint = profile?.TotalPoint ?? 0;
+                var isVip = totalPoint >= 5000 ||
+                            tierName == "Gold" || tierName == "Platinum" || tierName == "Diamond";
+
                 return new SmartLicensePlateResponseDTO
                 {
                     CustomerType = "WalkIn",
                     Data = new
                     {
                         userId = registeredVehicle.UserId,
-                        customerName = registeredVehicle.User.CustomerProfile?.FullName,
+                        customerName = profile?.FullName,
                         phoneNumber = registeredVehicle.User.PhoneNumber,
                         vehicleId = registeredVehicle.Id
-                    }
+                    },
+                    CustomerTierName = tierName,
+                    CustomerTierPoints = totalPoint,
+                    IsVip = isVip
                 };
             }
 
@@ -480,6 +537,33 @@ namespace AutoWashPro.BLL.Services
                 CustomerType = "WalkIn",
                 Data = null
             };
+        }
+
+        private async Task<(string? TierName, int TotalPoint, bool IsVip)> GetVipInfoByBookingIdAsync(int bookingId)
+        {
+            var booking = await _context.Bookings
+                .Where(b => b.BookingId == bookingId)
+                .Select(b => new { b.UserId })
+                .FirstOrDefaultAsync();
+
+            if (booking?.UserId == null)
+                return (null, 0, false);
+
+            var profile = await _context.CustomerProfiles
+                .Include(cp => cp.Tier)
+                .Where(cp => cp.UserId == booking.UserId)
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+
+            if (profile == null)
+                return (null, 0, false);
+
+            var tierName = profile.Tier?.TierName;
+            var totalPoint = profile.TotalPoint;
+            var isVip = totalPoint >= 5000 ||
+                        tierName == "Gold" || tierName == "Platinum" || tierName == "Diamond";
+
+            return (tierName, totalPoint, isVip);
         }
 
         private async Task<Dictionary<int, string>> GetPaymentStatusesByBookingIdsAsync(IEnumerable<int> bookingIds)

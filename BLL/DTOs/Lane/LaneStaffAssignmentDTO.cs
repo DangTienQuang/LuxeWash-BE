@@ -9,6 +9,7 @@ namespace AutoWashPro.BLL.DTOs
         public int BranchId { get; set; }
         public bool IsActive { get; set; }
         public bool IsBusinessLane { get; set; }
+        public bool IsVipLane { get; set; }
         public List<ManagerStaffDTO> AssignedStaff { get; set; } = new();
     }
 }
