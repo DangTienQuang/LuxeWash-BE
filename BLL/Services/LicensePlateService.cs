@@ -197,7 +197,6 @@ namespace BLL.Services
                                                                           .Where(char.IsLetterOrDigit)
                                                                           .ToArray());
 
-        // ─── Existing Single Image API (unchanged) ──────────────────────────
         public async Task<LicensePlateResult> DetectPlateAsync(byte[] imageBytes)
         {
             var boxes = GetFilteredBoxes(imageBytes);
@@ -210,7 +209,7 @@ namespace BLL.Services
                     return new LicensePlateResult
                     {
                         Detected = true,
-                        PlateText = fallbackText,
+                        PlateTexts = new List<string> { fallbackText },
                         Confidence = 0.75f,
                         Boxes = new List<DetectionBox>()
                     };
@@ -218,18 +217,28 @@ namespace BLL.Services
                 return new LicensePlateResult { Detected = false };
             }
 
-            var bestBox = boxes.OrderByDescending(b => b.Confidence).First();
-            var cropped = CropRegion(imageBytes, bestBox, PlatePosition.Back);
-            var plateType = DetectPlateType(cropped, PlatePosition.Back);
-            var plateText = await _ocr.ExtractTextAsync(cropped, plateType, "Single");
-
-            return new LicensePlateResult
-            {
-                Detected = true,
-                PlateText = plateText,
-                Confidence = bestBox.Confidence,
-                Boxes = boxes
+            var result = new LicensePlateResult 
+            { 
+                Detected = true, 
+                Boxes = boxes,
+                Confidence = boxes.Max(b => b.Confidence)
             };
+
+            var topBoxes = boxes.OrderByDescending(b => b.Confidence).Take(3).ToList();
+
+            foreach (var box in topBoxes)
+            {
+                var cropped = CropRegion(imageBytes, box, PlatePosition.Back);
+                var plateType = DetectPlateType(cropped, PlatePosition.Back);
+                var plateText = await _ocr.ExtractTextAsync(cropped, plateType, "Single");
+                
+                if (!string.IsNullOrEmpty(plateText))
+                {
+                    result.PlateTexts.Add(plateText);
+                }
+            }
+
+            return result;
         }
 
         // ─── Shared Helpers ─────────────────────────────────────────────────

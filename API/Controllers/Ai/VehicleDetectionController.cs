@@ -53,6 +53,7 @@ namespace API.Controllers.Ai
                 data = new
                 {
                     plateText = result.PlateText,
+                    plateTexts = result.PlateTexts,
                     confidence = result.Confidence
                 }
             });
@@ -114,7 +115,7 @@ namespace API.Controllers.Ai
         }
 
         [HttpPost("car-recognize")]
-        public async Task<IActionResult> Recognize([FromForm] IFormFile image, [FromForm] string? licensePlate)
+        public async Task<IActionResult> Recognize(IFormFile image, [FromForm] string? licensePlate)
         {
             if (image == null || image.Length == 0)
                 throw new InvalidOperationException("Please upload a vehicle image");
@@ -183,7 +184,7 @@ namespace API.Controllers.Ai
         [HttpPost("feedback")]
         [RequestSizeLimit(10 * 1024 * 1024)]
         public async Task<IActionResult> SubmitFeedback(
-            [FromForm] IFormFile image, 
+            IFormFile image, 
             [FromForm] string licensePlate, 
             [FromForm] int? predictedVehicleTypeId, 
             [FromForm] int actualVehicleTypeId,

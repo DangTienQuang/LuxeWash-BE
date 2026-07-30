@@ -24,6 +24,7 @@ namespace AutoWashPro.API.Middlewares
             }
             catch (Exception ex)
             {
+                Console.WriteLine(ex.ToString());
                 context.Response.ContentType = "application/json";
 
                 int statusCode = 500;

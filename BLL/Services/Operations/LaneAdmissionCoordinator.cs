@@ -22,11 +22,12 @@ namespace AutoWashPro.BLL.Services.Operations
             _context = context;
         }
 
-        private IQueryable<Lane> BuildCompatibleLaneQuery(int branchId, bool isBusiness)
+        private IQueryable<Lane> BuildCompatibleLaneQuery(int branchId, bool isBusiness, bool isVip)
         {
             return _context.Lanes
                 .Where(l => l.BranchId == branchId && l.IsActive && l.IsBusinessLane == isBusiness)
-                .OrderBy(l => l.Name);
+                .OrderByDescending(l => isVip ? l.IsVipLane : !l.IsVipLane)
+                .ThenBy(l => l.Name);
         }
 
         public async Task<GateCheckInResult> CheckInAtEntryGateAsync(
@@ -45,11 +46,25 @@ namespace AutoWashPro.BLL.Services.Operations
                 Booking? booking = null;
                 FleetWashLog? fleetLog = null;
                 bool isBusiness = false;
+                bool isVip = false;
 
                 if (bookingId.HasValue)
                 {
-                    booking = await _context.Bookings.FindAsync(new object[] { bookingId.Value }, cancellationToken);
-                    if (booking != null) isBusiness = booking.BookingType == "Business" || booking.BookingType == "Fleet";
+                    booking = await _context.Bookings
+                        .Include(b => b.User)
+                            .ThenInclude(u => u.CustomerProfile)
+                                .ThenInclude(cp => cp.Tier)
+                        .FirstOrDefaultAsync(b => b.BookingId == bookingId.Value, cancellationToken);
+                        
+                    if (booking != null) 
+                    {
+                        isBusiness = booking.BookingType == "Business" || booking.BookingType == "Fleet";
+                        var tier = booking.User?.CustomerProfile?.Tier;
+                        if (tier != null && (tier.MinAccumulatedPoints >= 5000 || tier.TierName == "Gold" || tier.TierName == "Platinum" || tier.TierName == "Diamond"))
+                        {
+                            isVip = true;
+                        }
+                    }
                 }
                 
                 if (fleetWashLogId.HasValue)
@@ -77,14 +92,39 @@ namespace AutoWashPro.BLL.Services.Operations
                 }
                 else
                 {
-                    var activeLanes = await BuildCompatibleLaneQuery(branchId, isBusiness).ToListAsync(cancellationToken);
+                    var activeLanes = await BuildCompatibleLaneQuery(branchId, isBusiness, isVip).ToListAsync(cancellationToken);
 
                     foreach (var lane in activeLanes)
                     {
                         var isOccupied = await _context.LaneOccupancies
                             .AnyAsync(o => o.LaneId == lane.LaneId, cancellationToken);
+                        
                         if (!isOccupied)
                         {
+                            if (!isVip && lane.IsVipLane)
+                            {
+                                var thresholdTime = DateTime.UtcNow.AddMinutes(30);
+                                var hasUpcomingVip = await _context.Bookings
+                                    .Include(b => b.User)
+                                        .ThenInclude(u => u.CustomerProfile)
+                                            .ThenInclude(cp => cp.Tier)
+                                    .AnyAsync(b => b.BranchId == branchId 
+                                        && (b.Status == "Pending" || b.Status == "CheckedIn")
+                                        && b.ScheduledTime <= thresholdTime
+                                        && b.User != null 
+                                        && b.User.CustomerProfile != null 
+                                        && b.User.CustomerProfile.Tier != null 
+                                        && (b.User.CustomerProfile.Tier.MinAccumulatedPoints >= 5000 
+                                            || b.User.CustomerProfile.Tier.TierName == "Gold" 
+                                            || b.User.CustomerProfile.Tier.TierName == "Platinum" 
+                                            || b.User.CustomerProfile.Tier.TierName == "Diamond"), cancellationToken);
+                                
+                                if (hasUpcomingVip)
+                                {
+                                    continue;
+                                }
+                            }
+
                             selectedLane = lane;
                             break;
                         }

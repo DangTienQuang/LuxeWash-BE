@@ -1,4 +1,4 @@
-﻿using DAL.DTOs;
+using DAL.DTOs;
 using DAL.Entities;
 using System;
 using System.Collections.Generic;
@@ -22,7 +22,8 @@ namespace BLL.Services
     public class LicensePlateResult
     {
         public bool Detected { get; set; }
-        public string PlateText { get; set; } = string.Empty;
+        public List<string> PlateTexts { get; set; } = new();
+        public string PlateText => PlateTexts.FirstOrDefault() ?? string.Empty;
         public float Confidence { get; set; }
         public List<DAL.Entities.DetectionBox> Boxes { get; set; } = new();
     }
