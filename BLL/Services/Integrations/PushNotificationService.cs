@@ -111,6 +111,47 @@ namespace AutoWashPro.BLL.Services
 
             return allSuccess;
         }
+
+        public async Task RegisterTokenAsync(int userId, string token)
+        {
+            var existing = await _context.UserFcmTokens
+                .FirstOrDefaultAsync(t => t.Token == token);
+
+            if (existing == null)
+            {
+                _context.UserFcmTokens.Add(new UserFcmToken
+                {
+                    UserId = userId,
+                    Token = token,
+                    CreatedAt = System.DateTime.UtcNow,
+                    LastUsedAt = System.DateTime.UtcNow
+                });
+            }
+            else
+            {
+                // Reassign token to current user if it belonged to someone else (e.g. device reuse)
+                if (existing.UserId != userId)
+                    existing.UserId = userId;
+
+                existing.LastUsedAt = System.DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("FCM token registered for User {UserId}", userId);
+        }
+
+        public async Task RemoveTokenAsync(int userId, string token)
+        {
+            var existing = await _context.UserFcmTokens
+                .FirstOrDefaultAsync(t => t.UserId == userId && t.Token == token);
+
+            if (existing != null)
+            {
+                _context.UserFcmTokens.Remove(existing);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("FCM token removed for User {UserId}", userId);
+            }
+        }
     }
 }
 
