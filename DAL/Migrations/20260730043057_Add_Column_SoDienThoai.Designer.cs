@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DAL.Migrations
 {
     [DbContext(typeof(AutoWashDbContext))]
-    [Migration("20260729164804_AddVehicleVisionFeedback")]
-    partial class AddVehicleVisionFeedback
+    [Migration("20260730043057_Add_Column_SoDienThoai")]
+    partial class Add_Column_SoDienThoai
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1244,6 +1244,9 @@ namespace DAL.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("IsBusinessLane")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsVipLane")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<string>("Name")
