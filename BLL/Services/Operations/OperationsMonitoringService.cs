@@ -116,14 +116,13 @@ namespace AutoWashPro.BLL.Services.Operations
 
             if (occupanciesToCheck.Count > 0)
             {
-                // Batch load tất cả bookings liên quan trong 1 query – tránh N+1
+                // Batch load tất cả bookings liên quan
                 var occupancyBookingIds = occupanciesToCheck
                     .Where(o => o.BookingId.HasValue)
                     .Select(o => o.BookingId!.Value)
                     .Distinct()
                     .ToList();
 
-                // Dùng Dictionary<int, (string Status, int? ProcessingLaneId)> để lookup O(1)
                 var bookingLookup = occupancyBookingIds.Count > 0
                     ? (await _context.Bookings
                         .Where(b => occupancyBookingIds.Contains(b.BookingId))
@@ -131,38 +130,81 @@ namespace AutoWashPro.BLL.Services.Operations
                         .ToListAsync(cancellationToken))
                         .ToDictionary(
                             b => b.BookingId,
-                            b => (Status: b.Status, ProcessingLaneId: b.ProcessingLaneId))
+                            b => (Status: b.Status ?? "", ProcessingLaneId: b.ProcessingLaneId))
                     : new Dictionary<int, (string Status, int? ProcessingLaneId)>();
+
+                // Batch load tất cả fleet logs liên quan
+                var occupancyFleetIds = occupanciesToCheck
+                    .Where(o => o.FleetWashLogId.HasValue)
+                    .Select(o => o.FleetWashLogId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var fleetLookup = occupancyFleetIds.Count > 0
+                    ? (await _context.FleetWashLogs
+                        .Where(f => occupancyFleetIds.Contains(f.FleetWashLogId))
+                        .Select(f => new { f.FleetWashLogId, f.Status, f.LaneId })
+                        .ToListAsync(cancellationToken))
+                        .ToDictionary(
+                            f => f.FleetWashLogId,
+                            f => (Status: f.Status ?? "", LaneId: f.LaneId))
+                    : new Dictionary<int, (string Status, int? LaneId)>();
 
                 foreach (var occupancy in occupanciesToCheck)
                 {
                     bool shouldDelete = false;
                     string reason = string.Empty;
 
-                    if (!occupancy.BookingId.HasValue)
+                    if (occupancy.BookingId.HasValue)
                     {
-                        shouldDelete = true;
-                        reason = "No BookingId";
+                        if (!bookingLookup.TryGetValue(occupancy.BookingId.Value, out var bk))
+                        {
+                            shouldDelete = true;
+                            reason = $"Booking {occupancy.BookingId} does not exist";
+                        }
+                        else if (bk.Status == "Completed" || bk.Status == "Cancelled" || bk.Status == "NoShow")
+                        {
+                            shouldDelete = true;
+                            reason = $"Booking {occupancy.BookingId} is in terminal status '{bk.Status}'";
+                        }
+                        else if (bk.Status != "Processing")
+                        {
+                            shouldDelete = true;
+                            reason = $"Booking {occupancy.BookingId} status '{bk.Status}' is not Processing";
+                        }
+                        else if (bk.ProcessingLaneId.HasValue && bk.ProcessingLaneId.Value != occupancy.LaneId)
+                        {
+                            shouldDelete = true;
+                            reason = $"Booking {occupancy.BookingId} ProcessingLaneId={bk.ProcessingLaneId} differs from occupancy LaneId={occupancy.LaneId}";
+                        }
                     }
-                    else if (!bookingLookup.TryGetValue(occupancy.BookingId.Value, out var bk))
+                    else if (occupancy.FleetWashLogId.HasValue)
                     {
-                        shouldDelete = true;
-                        reason = $"Booking {occupancy.BookingId} does not exist";
+                        if (!fleetLookup.TryGetValue(occupancy.FleetWashLogId.Value, out var fl))
+                        {
+                            shouldDelete = true;
+                            reason = $"FleetWashLog {occupancy.FleetWashLogId} does not exist";
+                        }
+                        else if (fl.Status == "Completed" || fl.Status == "Cancelled")
+                        {
+                            shouldDelete = true;
+                            reason = $"FleetWashLog {occupancy.FleetWashLogId} is in terminal status '{fl.Status}'";
+                        }
+                        else if (fl.Status != "Processing")
+                        {
+                            shouldDelete = true;
+                            reason = $"FleetWashLog {occupancy.FleetWashLogId} status '{fl.Status}' is not Processing";
+                        }
+                        else if (fl.LaneId.HasValue && fl.LaneId.Value != occupancy.LaneId)
+                        {
+                            shouldDelete = true;
+                            reason = $"FleetWashLog {occupancy.FleetWashLogId} LaneId={fl.LaneId} differs from occupancy LaneId={occupancy.LaneId}";
+                        }
                     }
-                    else if (bk.Status == "Completed" || bk.Status == "Cancelled" || bk.Status == "NoShow")
+                    else
                     {
                         shouldDelete = true;
-                        reason = $"Booking {occupancy.BookingId} is in terminal status '{bk.Status}'";
-                    }
-                    else if (bk.Status != "Processing")
-                    {
-                        shouldDelete = true;
-                        reason = $"Booking {occupancy.BookingId} status '{bk.Status}' is not Processing";
-                    }
-                    else if (bk.ProcessingLaneId.HasValue && bk.ProcessingLaneId.Value != occupancy.LaneId)
-                    {
-                        shouldDelete = true;
-                        reason = $"Booking {occupancy.BookingId} ProcessingLaneId={bk.ProcessingLaneId} differs from occupancy LaneId={occupancy.LaneId}";
+                        reason = "No BookingId and No FleetWashLogId";
                     }
 
                     if (shouldDelete)

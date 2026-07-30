@@ -24,9 +24,19 @@ namespace AutoWashPro.BLL.Services.Operations
 
         private IQueryable<Lane> BuildCompatibleLaneQuery(int branchId, bool isBusiness, bool isVip)
         {
-            return _context.Lanes
-                .Where(l => l.BranchId == branchId && l.IsActive && l.IsBusinessLane == isBusiness)
-                .OrderBy(l => l.Name);
+            var query = _context.Lanes
+                .Where(l => l.BranchId == branchId && l.IsActive && l.IsBusinessLane == isBusiness);
+
+            if (isVip)
+            {
+                // VIPs prefer VIP lanes, then normal lanes
+                return query.OrderByDescending(l => l.IsVipLane).ThenBy(l => l.Name);
+            }
+            else
+            {
+                // Normal prefer normal lanes, then VIP lanes
+                return query.OrderBy(l => l.IsVipLane).ThenBy(l => l.Name);
+            }
         }
 
         public async Task<GateCheckInResult> CheckInAtEntryGateAsync(
@@ -58,8 +68,11 @@ namespace AutoWashPro.BLL.Services.Operations
                     if (booking != null) 
                     {
                         isBusiness = booking.BookingType == "Business" || booking.BookingType == "Fleet";
-                        var tier = booking.User?.CustomerProfile?.Tier;
-                        if (tier != null && (tier.MinAccumulatedPoints >= 5000 || tier.TierName == "Gold" || tier.TierName == "Platinum" || tier.TierName == "Diamond"))
+                        var profile = booking.User?.CustomerProfile;
+                        if (profile != null && (profile.TotalPoint >= 5000 
+                            || string.Equals(profile.Tier?.TierName, "Gold", StringComparison.OrdinalIgnoreCase) 
+                            || string.Equals(profile.Tier?.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) 
+                            || string.Equals(profile.Tier?.TierName, "Diamond", StringComparison.OrdinalIgnoreCase)))
                         {
                             isVip = true;
                         }
@@ -100,21 +113,21 @@ namespace AutoWashPro.BLL.Services.Operations
                         
                         if (!isOccupied)
                         {
-                            if (!isVip)
+                            if (!isVip && lane.IsVipLane)
                             {
-                                var todayStart = DateTime.UtcNow.Date;
-                                var todayEnd = todayStart.AddDays(1);
+                                var nowTime = DateTime.UtcNow;
+                                var thirtyMinsLater = nowTime.AddMinutes(30);
+
                                 var hasWaitingVip = await _context.Bookings
                                     .Include(b => b.User)
                                         .ThenInclude(u => u.CustomerProfile)
                                             .ThenInclude(cp => cp.Tier)
                                     .AnyAsync(b => b.BranchId == branchId 
-                                        && (b.Status == "CheckedIn" || b.Status == "Waiting")
-                                        && b.ScheduledTime >= todayStart && b.ScheduledTime < todayEnd
+                                        && ((b.Status == "CheckedIn" && b.ProcessingLaneId == null)
+                                            || ((b.Status == "Pending" || b.Status == "Confirmed") && b.ScheduledTime >= nowTime && b.ScheduledTime <= thirtyMinsLater))
                                         && b.User != null 
                                         && b.User.CustomerProfile != null 
-                                        && b.User.CustomerProfile.Tier != null 
-                                        && (b.User.CustomerProfile.Tier.MinAccumulatedPoints >= 5000 
+                                        && (b.User.CustomerProfile.TotalPoint >= 5000 
                                             || b.User.CustomerProfile.Tier.TierName == "Gold" 
                                             || b.User.CustomerProfile.Tier.TierName == "Platinum" 
                                             || b.User.CustomerProfile.Tier.TierName == "Diamond"), cancellationToken);
@@ -544,16 +557,35 @@ namespace AutoWashPro.BLL.Services.Operations
             var lane = await _context.Lanes.FindAsync(new object[] { laneId }, cancellationToken);
             if (lane == null || !lane.IsActive) return null;
 
-            var waitingBookingObj = await _context.Bookings
+            var waitingBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
-                .Where(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null && (lane.IsBusinessLane ? (b.BookingType == "Business" || b.BookingType == "Fleet") : (b.BookingType != "Business" && b.BookingType != "Fleet")))
-                .OrderBy(b => b.ScheduledTime)
-                .Select(b => new
+                .Include(b => b.User)
+                    .ThenInclude(u => u.CustomerProfile)
+                        .ThenInclude(cp => cp.Tier)
+                .Where(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null 
+                         && (lane.IsBusinessLane ? (b.BookingType == "Business" || b.BookingType == "Fleet") : (b.BookingType != "Business" && b.BookingType != "Fleet")))
+                .ToListAsync(cancellationToken);
+
+            var waitingBookingObj = waitingBookings
+                .Select(b => 
                 {
-                    Booking = b,
-                    LicensePlate = b.LicensePlate ?? b.Vehicle.LicensePlate
+                    var profile = b.User?.CustomerProfile;
+                    bool isVip = profile != null && (profile.TotalPoint >= 5000 
+                        || string.Equals(profile.Tier?.TierName, "Gold", StringComparison.OrdinalIgnoreCase) 
+                        || string.Equals(profile.Tier?.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) 
+                        || string.Equals(profile.Tier?.TierName, "Diamond", StringComparison.OrdinalIgnoreCase));
+                    
+                    return new
+                    {
+                        Booking = b,
+                        LicensePlate = b.LicensePlate ?? b.Vehicle?.LicensePlate,
+                        IsVip = isVip,
+                        WaitTime = b.UpdatedAt ?? b.CreatedAt
+                    };
                 })
-                .FirstOrDefaultAsync(cancellationToken);
+                .OrderByDescending(x => x.IsVip)
+                .ThenBy(x => x.WaitTime)
+                .FirstOrDefault();
 
             var waitingFleet = await _context.FleetWashLogs
                 .Include(f => f.FleetVehicle)
@@ -564,7 +596,7 @@ namespace AutoWashPro.BLL.Services.Operations
             AdmissionResult? admission = null;
             var now = DateTime.UtcNow;
 
-            if (waitingBookingObj != null && (waitingFleet == null || (waitingBookingObj.Booking.UpdatedAt ?? waitingBookingObj.Booking.CreatedAt) < waitingFleet.CheckInTime))
+            if (waitingBookingObj != null && (waitingFleet == null || waitingBookingObj.WaitTime < waitingFleet.CheckInTime))
             {
                 if (string.IsNullOrEmpty(waitingBookingObj.LicensePlate) || waitingBookingObj.LicensePlate == "UNKNOWN")
                 {

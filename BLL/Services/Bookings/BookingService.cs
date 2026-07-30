@@ -101,7 +101,7 @@ namespace AutoWashPro.BLL.Services
                 .Where(dc => dc.BranchId == request.BranchId && dc.Date == request.TargetDate.Date)
                 .ToDictionaryAsync(dc => dc.SlotId, dc => dc.BookedWeight);
 
-            bool isVip = userProfile.Tier != null && (userProfile.Tier.MinAccumulatedPoints >= 5000 || string.Equals(userProfile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase));
+            bool isVip = userProfile.TotalPoint >= 5000 || (userProfile.Tier != null && (string.Equals(userProfile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase)));
 
             // 3. VÒNG LẶP KIỂM TRA TỪNG SLOT
             foreach (var slot in allSlots)
@@ -371,13 +371,11 @@ namespace AutoWashPro.BLL.Services
 
             var todayInVN = DateTime.UtcNow.ToVnTime().Date;
 
-            // Step 1a: Ưu tiên booking đang active (CheckedIn hoặc Processing) trong ngày hôm nay
-            var activeBooking = await _context.Bookings
+            // Step 1a: Ưu tiên booking đang active (Processing hoặc CheckedIn)
+            var activeBookings = await _context.Bookings
                 .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
                          && b.BranchId == branchId
-                         && b.ScheduledTime.Date == todayInVN
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
-                .OrderByDescending(b => b.ScheduledTime)
                 .Select(b => new AdminBookingResponseDTO
                 {
                     BookingId = b.BookingId,
@@ -396,7 +394,12 @@ namespace AutoWashPro.BLL.Services
                     ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null
                 })
                 .AsNoTracking()
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+
+            var activeBooking = activeBookings
+                .OrderByDescending(b => b.Status == "Processing")
+                .ThenByDescending(b => b.ScheduledTime)
+                .FirstOrDefault();
 
             if (activeBooking != null)
             {
@@ -1024,7 +1027,7 @@ namespace AutoWashPro.BLL.Services
                 if (profile == null || profile.Tier == null)
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Membership tier information not found.");
 
-                bool isVipTier = profile.Tier.MinAccumulatedPoints >= 5000 || string.Equals(profile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(profile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(profile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase);
+                bool isVipTier = profile.TotalPoint >= 5000 || string.Equals(profile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(profile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(profile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase);
                 if (!isVipTier)
                 {
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("This time slot is exclusive to VIP members (Gold tier or above).");
