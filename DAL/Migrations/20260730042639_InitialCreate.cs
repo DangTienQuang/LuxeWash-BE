@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -2917,6 +2917,54 @@ namespace DAL.Migrations
                 table: "WarehouseStocks",
                 columns: new[] { "WarehouseId", "MaterialId" },
                 unique: true);
+
+            // Add MaterialUnits master data
+            migrationBuilder.Sql(@"
+                INSERT INTO MaterialUnits (Code, DisplayName, MeasurementType, IsActive, CreatedAt)
+                VALUES
+                    ('milliliter', 'Milliliter', 'Volume', TRUE, UTC_TIMESTAMP(6)),
+                    ('liter', 'Liter', 'Volume', TRUE, UTC_TIMESTAMP(6)),
+                    ('gram', 'Gram', 'Weight', TRUE, UTC_TIMESTAMP(6)),
+                    ('kilogram', 'Kilogram', 'Weight', TRUE, UTC_TIMESTAMP(6)),
+                    ('piece', 'Piece', 'Count', TRUE, UTC_TIMESTAMP(6))
+                ON DUPLICATE KEY UPDATE DisplayName = VALUES(DisplayName);
+            ");
+
+            // Cleanup duplicate UserFcmTokens
+            migrationBuilder.Sql(@"
+                DELETE t1 FROM UserFcmTokens t1
+                INNER JOIN UserFcmTokens t2 
+                WHERE t1.Id < t2.Id AND t1.Token = t2.Token;
+            ");
+
+            // Backfill LaneOccupancies from active Bookings
+            migrationBuilder.Sql(@"
+                INSERT INTO LaneOccupancies (LaneId, BranchId, BookingId, FleetWashLogId, LicensePlate, OccupiedAt)
+                SELECT 
+                    b.ProcessingLaneId, 
+                    b.BranchId, 
+                    b.BookingId, 
+                    NULL, 
+                    COALESCE(b.LicensePlate, 'UNKNOWN'), 
+                    COALESCE(b.ProcessingStartTime, b.UpdatedAt, b.CreatedAt)
+                FROM Bookings b
+                WHERE b.Status = 'Processing' AND b.ProcessingLaneId IS NOT NULL;
+            ");
+
+            // Backfill LaneOccupancies from active FleetWashLogs
+            migrationBuilder.Sql(@"
+                INSERT INTO LaneOccupancies (LaneId, BranchId, BookingId, FleetWashLogId, LicensePlate, OccupiedAt)
+                SELECT 
+                    f.LaneId, 
+                    f.BranchId, 
+                    f.BookingId, 
+                    f.FleetWashLogId, 
+                    'UNKNOWN', 
+                    f.CheckInTime
+                FROM FleetWashLogs f
+                WHERE f.Status = 'Processing' AND f.LaneId IS NOT NULL
+                AND NOT EXISTS (SELECT 1 FROM LaneOccupancies o WHERE o.LaneId = f.LaneId);
+            ");
         }
 
         /// <inheritdoc />
