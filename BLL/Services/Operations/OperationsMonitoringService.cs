@@ -270,6 +270,24 @@ namespace AutoWashPro.BLL.Services.Operations
 
             return alerts;
         }
+
+        public async Task<bool> AckBarrierCommandAsync(string commandId, string? status)
+        {
+            var command = await _context.BarrierCommands
+                .FirstOrDefaultAsync(c => c.CommandId == commandId);
+
+            if (command == null) return false;
+
+            command.Status = string.IsNullOrWhiteSpace(status) ? "Completed" : status;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> IsEmployeeInBranchAsync(int userId, int branchId)
+        {
+            var profile = await _context.EmployeeProfiles.FindAsync(userId);
+            return profile != null && profile.BranchId == branchId;
+        }
     }
 }
 
