@@ -73,6 +73,7 @@ namespace AutoWashPro.DAL.Data
         public DbSet<AIAuditLog> AIAuditLogs { get; set; }
         public DbSet<UserFcmToken> UserFcmTokens { get; set; }
         public DbSet<OverloadSuggestion> OverloadSuggestions { get; set; }
+        public DbSet<VehicleVisionFeedback> VehicleVisionFeedbacks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
