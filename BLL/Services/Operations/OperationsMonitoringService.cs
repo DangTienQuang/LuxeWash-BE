@@ -114,61 +114,75 @@ namespace AutoWashPro.BLL.Services.Operations
 
             var staleOccupancyLaneIds = new List<int>();
 
-            foreach (var occupancy in occupanciesToCheck)
+            if (occupanciesToCheck.Count > 0)
             {
-                bool shouldDelete = false;
-                string reason = string.Empty;
+                // Batch load tất cả bookings liên quan trong 1 query – tránh N+1
+                var occupancyBookingIds = occupanciesToCheck
+                    .Where(o => o.BookingId.HasValue)
+                    .Select(o => o.BookingId!.Value)
+                    .Distinct()
+                    .ToList();
 
-                if (occupancy.BookingId == null)
-                {
-                    // Occupancy không gắn booking nào → stale
-                    shouldDelete = true;
-                    reason = "No BookingId";
-                }
-                else
-                {
-                    var booking = await _context.Bookings
-                        .FirstOrDefaultAsync(b => b.BookingId == occupancy.BookingId, cancellationToken);
+                // Dùng Dictionary<int, (string Status, int? ProcessingLaneId)> để lookup O(1)
+                var bookingLookup = occupancyBookingIds.Count > 0
+                    ? (await _context.Bookings
+                        .Where(b => occupancyBookingIds.Contains(b.BookingId))
+                        .Select(b => new { b.BookingId, b.Status, b.ProcessingLaneId })
+                        .ToListAsync(cancellationToken))
+                        .ToDictionary(
+                            b => b.BookingId,
+                            b => (Status: b.Status, ProcessingLaneId: b.ProcessingLaneId))
+                    : new Dictionary<int, (string Status, int? ProcessingLaneId)>();
 
-                    if (booking == null)
+                foreach (var occupancy in occupanciesToCheck)
+                {
+                    bool shouldDelete = false;
+                    string reason = string.Empty;
+
+                    if (!occupancy.BookingId.HasValue)
+                    {
+                        shouldDelete = true;
+                        reason = "No BookingId";
+                    }
+                    else if (!bookingLookup.TryGetValue(occupancy.BookingId.Value, out var bk))
                     {
                         shouldDelete = true;
                         reason = $"Booking {occupancy.BookingId} does not exist";
                     }
-                    else if (booking.Status == "Completed" || booking.Status == "Cancelled" || booking.Status == "NoShow")
+                    else if (bk.Status == "Completed" || bk.Status == "Cancelled" || bk.Status == "NoShow")
                     {
                         shouldDelete = true;
-                        reason = $"Booking {occupancy.BookingId} is in terminal status '{booking.Status}'";
+                        reason = $"Booking {occupancy.BookingId} is in terminal status '{bk.Status}'";
                     }
-                    else if (booking.Status != "Processing")
+                    else if (bk.Status != "Processing")
                     {
                         shouldDelete = true;
-                        reason = $"Booking {occupancy.BookingId} status '{booking.Status}' is not Processing";
+                        reason = $"Booking {occupancy.BookingId} status '{bk.Status}' is not Processing";
                     }
-                    else if (booking.ProcessingLaneId.HasValue && booking.ProcessingLaneId.Value != occupancy.LaneId)
+                    else if (bk.ProcessingLaneId.HasValue && bk.ProcessingLaneId.Value != occupancy.LaneId)
                     {
                         shouldDelete = true;
-                        reason = $"Booking {occupancy.BookingId} ProcessingLaneId={booking.ProcessingLaneId} differs from occupancy LaneId={occupancy.LaneId}";
+                        reason = $"Booking {occupancy.BookingId} ProcessingLaneId={bk.ProcessingLaneId} differs from occupancy LaneId={occupancy.LaneId}";
+                    }
+
+                    if (shouldDelete)
+                    {
+                        alerts.Add(new ReconciliationAlertDTO
+                        {
+                            AlertType = "Stale_Occupancy_Cleared",
+                            Description = $"Removed stale LaneOccupancy for lane {occupancy.LaneId}. Reason: {reason}",
+                            BookingId = occupancy.BookingId,
+                            LicensePlate = occupancy.LicensePlate,
+                            LaneId = occupancy.LaneId,
+                            DetectedAt = now
+                        });
+                        staleOccupancyLaneIds.Add(occupancy.LaneId);
+                        _context.LaneOccupancies.Remove(occupancy);
                     }
                 }
 
-                if (shouldDelete)
-                {
-                    alerts.Add(new ReconciliationAlertDTO
-                    {
-                        AlertType = "Stale_Occupancy_Cleared",
-                        Description = $"Removed stale LaneOccupancy for lane {occupancy.LaneId}. Reason: {reason}",
-                        BookingId = occupancy.BookingId,
-                        LicensePlate = occupancy.LicensePlate,
-                        LaneId = occupancy.LaneId,
-                        DetectedAt = now
-                    });
-                    staleOccupancyLaneIds.Add(occupancy.LaneId);
-                    _context.LaneOccupancies.Remove(occupancy);
-                }
+                await _context.SaveChangesAsync(cancellationToken);
             }
-
-            await _context.SaveChangesAsync(cancellationToken);
 
             // Sau khi dọn occupancy → thử nhận xe tiếp theo vào làn vừa giải phóng
             foreach (var laneId in staleOccupancyLaneIds.Distinct())

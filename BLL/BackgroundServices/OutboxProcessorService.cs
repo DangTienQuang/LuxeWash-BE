@@ -36,19 +36,33 @@ namespace AutoWashPro.BLL.BackgroundServices
                     bool hasMessages = await ProcessOutboxMessagesAsync(stoppingToken);
                     if (hasMessages)
                     {
-                        await Task.Delay(100, stoppingToken); // Fast polling if there are still messages
+                        await Task.Delay(100, stoppingToken);
                     }
                     else
                     {
-                        await Task.Delay(3000, stoppingToken); // Sleep for 3 seconds if no messages
+                        await Task.Delay(3000, stoppingToken);
                     }
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    // App đang shutdown – thoát im lặng
+                    break;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error processing outbox messages");
-                    await Task.Delay(3000, stoppingToken);
+                    try
+                    {
+                        await Task.Delay(3000, stoppingToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
             }
+
+            _logger.LogInformation("Outbox Processor Service stopped.");
         }
 
         private async Task<bool> ProcessOutboxMessagesAsync(CancellationToken stoppingToken)
@@ -222,12 +236,16 @@ namespace AutoWashPro.BLL.BackgroundServices
                             break;
                     }
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    // App đang shutdown – không tăng RetryCount, để message được xử lý lần sau
+                    throw; // Re-throw để vòng lặp ngoài bắt và thoát sạch
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, $"Failed to process outbox message {message.Id} (Type={message.Type})");
                     
                     message.RetryCount++;
-                    // Log the full exception including stack trace to the DB for debugging
                     message.ErrorMessage = ex.ToString();
 
                     if (message.RetryCount >= 3)
@@ -236,7 +254,6 @@ namespace AutoWashPro.BLL.BackgroundServices
                     }
                     else
                     {
-                        // Retry backoff: 1s, 3s, 10s
                         var delaySeconds = message.RetryCount switch
                         {
                             1 => 1,
@@ -248,7 +265,8 @@ namespace AutoWashPro.BLL.BackgroundServices
                 }
             }
 
-            await context.SaveChangesAsync(stoppingToken);
+            // Dùng CancellationToken.None để SaveChanges không bị cancel giữa chừng khi app shutdown
+            await context.SaveChangesAsync(CancellationToken.None);
             return true;
         }
     }

@@ -43,6 +43,9 @@ namespace AutoWashPro.BLL.BackgroundServices
 
                     foreach (var branchId in activeBranchIds)
                     {
+                        // Dừng ngay nếu app đang shutdown
+                        if (stoppingToken.IsCancellationRequested) break;
+
                         try
                         {
                             var alerts = await monitoringService.RunReconciliationCheckAsync(branchId, stoppingToken);
@@ -55,20 +58,40 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 }
                             }
                         }
+                        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                        {
+                            // App đang shutdown – thoát im lặng, không phải lỗi
+                            break;
+                        }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Error during reconciliation for Branch {BranchId}.", branchId);
                         }
                     }
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    // App đang shutdown – thoát vòng lặp chính im lặng
+                    break;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error occurred executing OperationsReconciliationBackgroundService.");
                 }
 
-                // Chạy mỗi 60 giây
-                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+                try
+                {
+                    // Chạy mỗi 2 phút
+                    await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Bình thường khi app shutdown trong lúc đang delay
+                    break;
+                }
             }
+
+            _logger.LogInformation("Operations Reconciliation Background Service stopped.");
         }
     }
 }
