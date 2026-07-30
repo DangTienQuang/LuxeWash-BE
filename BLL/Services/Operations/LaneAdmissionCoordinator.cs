@@ -26,8 +26,7 @@ namespace AutoWashPro.BLL.Services.Operations
         {
             return _context.Lanes
                 .Where(l => l.BranchId == branchId && l.IsActive && l.IsBusinessLane == isBusiness)
-                .OrderByDescending(l => isVip ? l.IsVipLane : !l.IsVipLane)
-                .ThenBy(l => l.Name);
+                .OrderBy(l => l.Name);
         }
 
         public async Task<GateCheckInResult> CheckInAtEntryGateAsync(
@@ -101,16 +100,17 @@ namespace AutoWashPro.BLL.Services.Operations
                         
                         if (!isOccupied)
                         {
-                            if (!isVip && lane.IsVipLane)
+                            if (!isVip)
                             {
-                                var thresholdTime = DateTime.UtcNow.AddMinutes(30);
-                                var hasUpcomingVip = await _context.Bookings
+                                var todayStart = DateTime.UtcNow.Date;
+                                var todayEnd = todayStart.AddDays(1);
+                                var hasWaitingVip = await _context.Bookings
                                     .Include(b => b.User)
                                         .ThenInclude(u => u.CustomerProfile)
                                             .ThenInclude(cp => cp.Tier)
                                     .AnyAsync(b => b.BranchId == branchId 
-                                        && (b.Status == "Pending" || b.Status == "CheckedIn")
-                                        && b.ScheduledTime <= thresholdTime
+                                        && (b.Status == "CheckedIn" || b.Status == "Waiting")
+                                        && b.ScheduledTime >= todayStart && b.ScheduledTime < todayEnd
                                         && b.User != null 
                                         && b.User.CustomerProfile != null 
                                         && b.User.CustomerProfile.Tier != null 
@@ -119,7 +119,7 @@ namespace AutoWashPro.BLL.Services.Operations
                                             || b.User.CustomerProfile.Tier.TierName == "Platinum" 
                                             || b.User.CustomerProfile.Tier.TierName == "Diamond"), cancellationToken);
                                 
-                                if (hasUpcomingVip)
+                                if (hasWaitingVip)
                                 {
                                     continue;
                                 }
