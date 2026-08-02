@@ -1389,12 +1389,19 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId)
         {
+            var nowUtc = DateTime.UtcNow;
+            
             var bookings = await _context.Bookings
+                .Include(b => b.Branch)
                 .Where(b => b.UserId == userId)
                 .OrderByDescending(b => b.ScheduledTime)
                 .Select(b => new BookingResponseDTO
                 {
                     BookingId = b.BookingId,
+                    BranchId = b.BranchId,
+                    BranchName = b.Branch != null ? b.Branch.Name : "",
+                    IsWaitAccepted = b.IsWaitAccepted,
+                    HasPendingOverloadSuggestion = false, // We will update this later
                     LicensePlate = b.LicensePlate ?? "",
                     ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
                     ScheduledTime = b.ScheduledTime,
@@ -1410,6 +1417,12 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
 
             var proposals = await GetRelocationProposalsAsync(userId);
+            
+            var activeSuggestions = await _context.OverloadSuggestions
+                .Where(s => s.Booking.UserId == userId && !s.IsProcessed && s.ExpiresAt > nowUtc)
+                .Select(s => s.BookingId)
+                .Distinct()
+                .ToListAsync();
 
             foreach (var b in bookings)
             {
@@ -1421,6 +1434,10 @@ namespace AutoWashPro.BLL.Services
                 {
                     b.HasPendingRelocation = true;
                     b.Relocation = proposal;
+                }
+                if (activeSuggestions.Contains(b.BookingId))
+                {
+                    b.HasPendingOverloadSuggestion = true;
                 }
             }
 
@@ -2784,14 +2801,17 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<OverloadSuggestionResponseDTO?> GetPendingOverloadSuggestionAsync(int userId, int bookingId)
         {
+            var nowUtc = DateTime.UtcNow;
+            var nowVn = nowUtc.ToVnTime();
+
             var suggestion = await _context.OverloadSuggestions
                 .Include(s => s.Booking)
                 .Where(s => s.BookingId == bookingId 
                          && s.Booking.UserId == userId 
                          && !s.IsProcessed 
-                         && s.ExpiresAt > DateTime.UtcNow 
+                         && s.ExpiresAt > nowUtc 
                          && s.Booking.Status == "Pending" 
-                         && s.Booking.ScheduledTime > DateTime.UtcNow)
+                         && s.Booking.ScheduledTime > nowVn)
                 .OrderByDescending(s => s.CreatedAt)
                 .FirstOrDefaultAsync();
 
@@ -2804,8 +2824,8 @@ namespace AutoWashPro.BLL.Services
                 SuggestedBranchId = suggestion.SuggestedBranchId,
                 SuggestedBranchName = suggestion.SuggestedBranchName,
                 SuggestedSlotId = suggestion.SuggestedSlotId,
-                SuggestedTime = suggestion.SuggestedTime,
-                ExpiresAt = suggestion.ExpiresAt
+                SuggestedTime = new DateTimeOffset(DateTime.SpecifyKind(suggestion.SuggestedTime, DateTimeKind.Unspecified), TimeSpan.FromHours(7)),
+                ExpiresAt = new DateTimeOffset(DateTime.SpecifyKind(suggestion.ExpiresAt, DateTimeKind.Utc))
             };
         }
 
@@ -2840,13 +2860,18 @@ namespace AutoWashPro.BLL.Services
             try
             {
                 var booking = await _context.Bookings
+                    .Include(b => b.Branch)
                     .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
                     .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
 
                 if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found");
-                if (booking.Status != "Pending") throw new AutoWashPro.BLL.Exceptions.ConflictException("Booking is not pending.");
-                if (booking.ScheduledTime <= DateTime.UtcNow) throw new AutoWashPro.BLL.Exceptions.ConflictException("Booking scheduled time has already passed.");
+                if (booking.Status != "Pending") throw new AutoWashPro.BLL.Exceptions.ConflictException("Booking is not pending.", "BOOKING_NOT_PENDING");
+                
+                var nowUtc = DateTime.UtcNow;
+                var nowVn = nowUtc.ToVnTime();
+
+                if (booking.ScheduledTime <= nowVn) throw new AutoWashPro.BLL.Exceptions.ConflictException("Booking scheduled time has already passed.", "BOOKING_TIME_PASSED");
 
                 // Normalise decision — frontend sends exactly "Switch" | "Cancel" | "Keep"
                 var decision = request.Decision?.Trim();
@@ -2859,17 +2884,15 @@ namespace AutoWashPro.BLL.Services
                 // Normalise to title-case
                 decision = char.ToUpper(decision![0]) + decision.Substring(1).ToLower();
 
-                var now = DateTime.UtcNow;
-
                 // P0.1: Look up the active suggestion from DB — FE does NOT send suggestionId
                 var suggestion = await _context.OverloadSuggestions
-                    .Where(s => s.BookingId == bookingId && !s.IsProcessed && s.ExpiresAt > now)
+                    .Where(s => s.BookingId == bookingId)
                     .OrderByDescending(s => s.CreatedAt)
                     .FirstOrDefaultAsync();
 
-                if (suggestion == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("No active overload suggestion found for this booking.");
-                if (suggestion.IsProcessed) throw new AutoWashPro.BLL.Exceptions.ConflictException("The overload suggestion has already been processed.");
-                if (suggestion.ExpiresAt < now) throw new AutoWashPro.BLL.Exceptions.ConflictException("The overload suggestion has expired.");
+                if (suggestion == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("No overload suggestion found for this booking.", "OVERLOAD_SUGGESTION_NOT_FOUND");
+                if (suggestion.IsProcessed) throw new AutoWashPro.BLL.Exceptions.ConflictException("The overload suggestion has already been processed.", "OVERLOAD_SUGGESTION_ALREADY_PROCESSED");
+                if (suggestion.ExpiresAt < nowUtc) throw new AutoWashPro.BLL.Exceptions.ConflictException("The overload suggestion has expired.", "OVERLOAD_SUGGESTION_EXPIRED");
 
                 var response = new HandleOverloadDecisionResponseDTO 
                 { 
@@ -2988,12 +3011,13 @@ namespace AutoWashPro.BLL.Services
                     
                     if (newSlot == null || newSlot.BookedWeight + (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1) > newSlot.TimeSlot.MaxCapacity)
                     {
-                        throw new AutoWashPro.BLL.Exceptions.ConflictException("Target slot is full or unavailable.");
+                        throw new AutoWashPro.BLL.Exceptions.ConflictException("Target slot is full or unavailable.", "TARGET_SLOT_FULL");
                     }
 
                     newSlot.BookedWeight += (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1);
 
                     booking.BranchId = suggestion.SuggestedBranchId;
+                    booking.Branch = destBranch;
                     booking.ScheduledTime = suggestion.SuggestedTime;
                     booking.IsWaitAccepted = true;
                     suggestion.IsProcessed = true;
@@ -3044,6 +3068,10 @@ namespace AutoWashPro.BLL.Services
                 response.UpdatedBooking = new BookingResponseDTO
                 {
                     BookingId = booking.BookingId,
+                    BranchId = booking.BranchId,
+                    BranchName = booking.Branch?.Name ?? "",
+                    IsWaitAccepted = booking.IsWaitAccepted,
+                    HasPendingOverloadSuggestion = false,
                     LicensePlate = booking.LicensePlate ?? "",
                     ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
                     ScheduledTime = booking.ScheduledTime,

@@ -9,7 +9,7 @@ namespace AutoWashPro.BLL.DTOs
         public int SuggestedBranchId { get; set; }
         public string SuggestedBranchName { get; set; } = null!;
         public int SuggestedSlotId { get; set; }
-        public DateTime SuggestedTime { get; set; }
-        public DateTime ExpiresAt { get; set; }
+        public DateTimeOffset SuggestedTime { get; set; }
+        public DateTimeOffset ExpiresAt { get; set; }
     }
 }

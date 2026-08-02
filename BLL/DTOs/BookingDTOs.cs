@@ -163,6 +163,8 @@ namespace AutoWashPro.BLL.DTOs
     public class BookingResponseDTO
     {
         public int BookingId { get; set; }
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = string.Empty;
         public required string LicensePlate { get; set; }
         public required List<string> ServiceNames { get; set; }
         public DateTime ScheduledTime { get; set; }
@@ -181,6 +183,8 @@ namespace AutoWashPro.BLL.DTOs
         
         public bool HasPendingRelocation { get; set; } = false;
         public RelocationProposalCustomerDTO? Relocation { get; set; }
+        public bool IsWaitAccepted { get; set; }
+        public bool HasPendingOverloadSuggestion { get; set; }
     }
 
     public class AdminBookingResponseDTO : BookingResponseDTO

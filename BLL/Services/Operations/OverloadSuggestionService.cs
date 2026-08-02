@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoWashPro.DAL.Entities;
 using Microsoft.Extensions.Logging;
+using BLL.Helpers;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -34,15 +35,14 @@ namespace AutoWashPro.BLL.Services
         {
             var result = new OverloadScanResultDTO();
 
-            var now = DateTime.UtcNow;
-            var windowEnd = now.AddHours(2);
-            var today = now.Date;
-            var timeNow = now.TimeOfDay;
-            var timeEnd = windowEnd.TimeOfDay;
+            var nowUtc = DateTime.UtcNow;
+            var nowVn = nowUtc.ToVnTime();
+            var windowEndVn = nowVn.AddHours(2);
 
             // 1. Check if branch is overloaded
-            var queueLength = await _context.Bookings
-                .CountAsync(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null);
+            var queueWeight = await _context.Bookings
+                .Where(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null)
+                .SumAsync(b => (int?)(b.CapacityWeight > 0 ? b.CapacityWeight : 1)) ?? 0;
 
             var impactedBookings = await _context.Bookings
                 .Include(b => b.User)
@@ -50,8 +50,8 @@ namespace AutoWashPro.BLL.Services
                          && b.Status == "Pending"
                          && !b.IsWaitAccepted
                          && b.UserId != null
-                         && b.ScheduledTime >= now
-                         && b.ScheduledTime <= windowEnd)
+                         && b.ScheduledTime >= nowVn
+                         && b.ScheduledTime <= windowEndVn)
                 .ToListAsync();
 
             result.ScannedBookings = impactedBookings.Count;
@@ -62,9 +62,9 @@ namespace AutoWashPro.BLL.Services
             // Get branch capacity for this window
             var relevantCapacities = await _context.DailySlotCapacities
                 .Include(dsc => dsc.TimeSlot)
-                .Where(dsc => dsc.BranchId == branchId && dsc.Date == today
-                           && dsc.TimeSlot.StartTime < timeEnd
-                           && dsc.TimeSlot.EndTime > timeNow)
+                .Where(dsc => dsc.BranchId == branchId 
+                           && ((dsc.Date == nowVn.Date && dsc.TimeSlot.EndTime > nowVn.TimeOfDay)
+                               || (dsc.Date == windowEndVn.Date && dsc.TimeSlot.StartTime < windowEndVn.TimeOfDay)))
                 .ToListAsync();
 
             var maxCapacity = relevantCapacities.Sum(c => c.TimeSlot.MaxCapacity);
@@ -72,11 +72,11 @@ namespace AutoWashPro.BLL.Services
             // Not overloaded — early exit
             if (maxCapacity > 0)
             {
-                if ((queueLength + totalBookedWeight) < maxCapacity) return result;
+                if ((queueWeight + totalBookedWeight) < maxCapacity) return result;
             }
             else
             {
-                if (queueLength < 5) return result; // Fallback threshold
+                if (queueWeight < 5) return result; // Fallback threshold
             }
 
             if (!impactedBookings.Any()) return result;

@@ -1,9 +1,11 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace AutoWashPro.DAL.Entities
 {
+    [Index(nameof(BookingId), nameof(IsProcessed), nameof(ExpiresAt))]
     public class OverloadSuggestion
     {
         [Key]
