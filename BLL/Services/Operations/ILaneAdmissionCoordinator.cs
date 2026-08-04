@@ -53,6 +53,7 @@ namespace AutoWashPro.BLL.Services.Operations
         public string? LaneName { get; set; }
         public string? BarrierCommandId { get; set; }
         public bool BarrierCommandCreated { get; set; }
+        public string? BarrierId { get; set; }
         public string? Message { get; set; }
     }
 
@@ -62,6 +63,7 @@ namespace AutoWashPro.BLL.Services.Operations
         public int? CompletedFleetWashLogId { get; set; }
         public int ReleasedLaneId { get; set; }
         public string? ExitBarrierCommandId { get; set; }
+        public string? BarrierId { get; set; }
         public AdmissionResult? NextAdmission { get; set; }
     }
 
@@ -73,5 +75,6 @@ namespace AutoWashPro.BLL.Services.Operations
         public int LaneId { get; set; }
         public string? LaneName { get; set; }
         public string? EntryBarrierCommandId { get; set; }
+        public string? BarrierId { get; set; }
     }
 }

@@ -22,21 +22,11 @@ namespace AutoWashPro.BLL.Services.Operations
             _context = context;
         }
 
-        private IQueryable<Lane> BuildCompatibleLaneQuery(int branchId, bool isBusiness, bool isVip)
+        private IQueryable<Lane> BuildCompatibleLaneQuery(int branchId, bool isBusiness)
         {
-            var query = _context.Lanes
-                .Where(l => l.BranchId == branchId && l.IsActive && l.IsBusinessLane == isBusiness);
-
-            if (isVip)
-            {
-                // VIPs prefer VIP lanes, then normal lanes
-                return query.OrderByDescending(l => l.IsVipLane).ThenBy(l => l.Name);
-            }
-            else
-            {
-                // Normal prefer normal lanes, then VIP lanes
-                return query.OrderBy(l => l.IsVipLane).ThenBy(l => l.Name);
-            }
+            return _context.Lanes
+                .Where(l => l.BranchId == branchId && l.IsActive && l.IsBusinessLane == isBusiness)
+                .OrderBy(l => l.Name);
         }
 
         public async Task<GateCheckInResult> CheckInAtEntryGateAsync(
@@ -104,7 +94,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 }
                 else
                 {
-                    var activeLanes = await BuildCompatibleLaneQuery(branchId, isBusiness, isVip).ToListAsync(cancellationToken);
+                    var activeLanes = await BuildCompatibleLaneQuery(branchId, isBusiness).ToListAsync(cancellationToken);
 
                     foreach (var lane in activeLanes)
                     {
@@ -113,31 +103,6 @@ namespace AutoWashPro.BLL.Services.Operations
                         
                         if (!isOccupied)
                         {
-                            if (!isVip && lane.IsVipLane)
-                            {
-                                var nowTime = DateTime.UtcNow;
-                                var thirtyMinsLater = nowTime.AddMinutes(30);
-
-                                var hasWaitingVip = await _context.Bookings
-                                    .Include(b => b.User)
-                                        .ThenInclude(u => u.CustomerProfile)
-                                            .ThenInclude(cp => cp.Tier)
-                                    .AnyAsync(b => b.BranchId == branchId 
-                                        && ((b.Status == "CheckedIn" && b.ProcessingLaneId == null)
-                                            || ((b.Status == "Pending" || b.Status == "Confirmed") && b.ScheduledTime >= nowTime && b.ScheduledTime <= thirtyMinsLater))
-                                        && b.User != null 
-                                        && b.User.CustomerProfile != null 
-                                        && (b.User.CustomerProfile.TotalPoint >= 5000 
-                                            || b.User.CustomerProfile.Tier.TierName == "Gold" 
-                                            || b.User.CustomerProfile.Tier.TierName == "Platinum" 
-                                            || b.User.CustomerProfile.Tier.TierName == "Diamond"), cancellationToken);
-                                
-                                if (hasWaitingVip)
-                                {
-                                    continue;
-                                }
-                            }
-
                             selectedLane = lane;
                             break;
                         }
@@ -182,12 +147,13 @@ namespace AutoWashPro.BLL.Services.Operations
                         fleetLog.Status = "Processing";
                     }
 
+                    var barrierId = isVip ? "ENTRY_VIP_GATE" : "ENTRY_REGULAR_GATE";
                     var commandId = Guid.NewGuid().ToString();
                     var barrierCmd = new BarrierCommand
                     {
                         CommandId = commandId,
                         BranchId = branchId,
-                        BarrierId = "ENTRY_GATE",
+                        BarrierId = barrierId,
                         Action = "OPEN",
                         BookingId = bookingId,
                         FleetWashLogId = fleetWashLogId,
@@ -214,6 +180,7 @@ namespace AutoWashPro.BLL.Services.Operations
                                 LaneId = selectedLane.LaneId,
                                 LaneName = selectedLane.Name,
                                 BarrierCommandId = commandId,
+                                BarrierId = barrierId,
                                 BookingId = bookingId
                             }, OperationsOutboxEnvelope.OutboxJsonOptions)
                         }, OperationsOutboxEnvelope.OutboxJsonOptions),
@@ -234,7 +201,7 @@ namespace AutoWashPro.BLL.Services.Operations
                             {
                                 commandId = commandId,
                                 branchId = branchId,
-                                barrierId = "ENTRY_GATE",
+                                barrierId = barrierId,
                                 action = "OPEN",
                                 bookingId = bookingId,
                                 fleetWashLogId = fleetWashLogId,
@@ -255,6 +222,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     result.LaneName = selectedLane.Name;
                     result.BarrierCommandId = commandId;
                     result.BarrierCommandCreated = true;
+                    result.BarrierId = barrierId;
                     result.Message = $"Assigned to {selectedLane.Name} and Entry Barrier OPEN command sent.";
                 }
                 else
@@ -480,7 +448,8 @@ namespace AutoWashPro.BLL.Services.Operations
                         {
                             LaneId = occupancy.LaneId,
                             LicensePlate = occupancy.LicensePlate,
-                            BarrierCommandId = exitCmdId
+                            BarrierCommandId = exitCmdId,
+                            BarrierId = exitCmdId != null ? "EXIT_GATE" : null
                         }, OperationsOutboxEnvelope.OutboxJsonOptions)
                     }, OperationsOutboxEnvelope.OutboxJsonOptions),
                     CreatedAt = now
@@ -494,7 +463,8 @@ namespace AutoWashPro.BLL.Services.Operations
                     CompletedBookingId = occupancy.BookingId,
                     CompletedFleetWashLogId = occupancy.FleetWashLogId,
                     ReleasedLaneId = occupancy.LaneId,
-                    ExitBarrierCommandId = exitCmdId
+                    ExitBarrierCommandId = exitCmdId,
+                    BarrierId = exitCmdId != null ? "EXIT_GATE" : null
                 };
 
                 var nextAdmitted = await InternalAdmitNextWaitingVehicleAsync(occupancy.LaneId, occupancy.BranchId, cancellationToken);
@@ -603,7 +573,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     return null;
                 }
 
-                admission = await GrantAdmissionAsync(laneId, branchId, waitingBookingObj.Booking.BookingId, null, waitingBookingObj.LicensePlate, cancellationToken);
+                admission = await GrantAdmissionAsync(laneId, branchId, waitingBookingObj.Booking.BookingId, null, waitingBookingObj.LicensePlate, waitingBookingObj.IsVip, cancellationToken);
                 waitingBookingObj.Booking.ProcessingLaneId = laneId;
                 waitingBookingObj.Booking.Status = "Processing";
                 waitingBookingObj.Booking.ProcessingStartTime = now;
@@ -617,7 +587,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     return null;
                 }
 
-                admission = await GrantAdmissionAsync(laneId, branchId, null, waitingFleet.FleetWashLogId, licensePlate, cancellationToken);
+                admission = await GrantAdmissionAsync(laneId, branchId, null, waitingFleet.FleetWashLogId, licensePlate, false, cancellationToken);
                 waitingFleet.LaneId = laneId;
                 waitingFleet.Status = "Processing";
             }
@@ -630,7 +600,7 @@ namespace AutoWashPro.BLL.Services.Operations
             return admission;
         }
 
-        private async Task<AdmissionResult> GrantAdmissionAsync(int laneId, int branchId, int? bookingId, int? fleetId, string licensePlate, CancellationToken cancellationToken)
+        private async Task<AdmissionResult> GrantAdmissionAsync(int laneId, int branchId, int? bookingId, int? fleetId, string licensePlate, bool isVip, CancellationToken cancellationToken)
         {
             var lane = await _context.Lanes.FindAsync(new object[] { laneId }, cancellationToken);
             var now = DateTime.UtcNow;
@@ -646,12 +616,13 @@ namespace AutoWashPro.BLL.Services.Operations
             };
             _context.LaneOccupancies.Add(occupancy);
 
+            var barrierId = isVip ? "ENTRY_VIP_GATE" : "ENTRY_REGULAR_GATE";
             var cmdId = Guid.NewGuid().ToString();
             var entryCmd = new BarrierCommand
             {
                 CommandId = cmdId,
                 BranchId = branchId,
-                BarrierId = "ENTRY_GATE",
+                BarrierId = barrierId,
                 Action = "OPEN",
                 BookingId = bookingId,
                 FleetWashLogId = fleetId,
@@ -678,6 +649,7 @@ namespace AutoWashPro.BLL.Services.Operations
                         LaneId = laneId,
                         LaneName = lane?.Name,
                         BarrierCommandId = cmdId,
+                        BarrierId = barrierId,
                         BookingId = bookingId
                     }, OperationsOutboxEnvelope.OutboxJsonOptions)
                 }, OperationsOutboxEnvelope.OutboxJsonOptions),
@@ -698,7 +670,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     {
                         commandId = cmdId,
                         branchId = branchId,
-                        barrierId = "ENTRY_GATE",
+                        barrierId = barrierId,
                         action = "OPEN",
                         bookingId = bookingId,
                         fleetWashLogId = fleetId,
@@ -719,7 +691,8 @@ namespace AutoWashPro.BLL.Services.Operations
                 LicensePlate = licensePlate,
                 LaneId = laneId,
                 LaneName = lane?.Name,
-                EntryBarrierCommandId = cmdId
+                EntryBarrierCommandId = cmdId,
+                BarrierId = barrierId
             };
         }
     }
