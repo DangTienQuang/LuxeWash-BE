@@ -54,6 +54,7 @@ namespace AutoWashPro.BLL.Services.Operations
         public string? BarrierCommandId { get; set; }
         public bool BarrierCommandCreated { get; set; }
         public string? BarrierId { get; set; }
+        public DateTime? BarrierCommandExpiresAt { get; set; }
         public string? Message { get; set; }
     }
 
@@ -64,6 +65,7 @@ namespace AutoWashPro.BLL.Services.Operations
         public int ReleasedLaneId { get; set; }
         public string? ExitBarrierCommandId { get; set; }
         public string? BarrierId { get; set; }
+        public DateTime? BarrierCommandExpiresAt { get; set; }
         public AdmissionResult? NextAdmission { get; set; }
     }
 

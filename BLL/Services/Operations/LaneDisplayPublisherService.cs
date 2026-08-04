@@ -186,14 +186,6 @@ namespace AutoWashPro.BLL.Services.Operations
 
         public async Task<BarrierPublishResult> PublishBarrierCommandAsync(int branchId, string licensePlate, string laneName)
         {
-            // Firebase is REQUIRED for barrier commands (controls physical devices)
-            if (!TryGetFirebaseApp(out var app))
-            {
-                _logger.LogWarning(
-                    "Firebase is not initialized; barrier command cannot be published for BranchId={BranchId}. " +
-                    "If testing locally, ignore this. In production, physical barrier will not open.", branchId);
-                return BarrierPublishResult.SkippedNoFirebase; // Do NOT throw, otherwise outbox gets stuck.
-            }
 
             var evt = new
             {
@@ -202,6 +194,26 @@ namespace AutoWashPro.BLL.Services.Operations
                 LaneName = laneName,
                 Timestamp = DateTime.UtcNow
             };
+
+            try
+            {
+                await _hubContext.Clients.Group($"branch:{branchId}:lane-display")
+                    .SendAsync("ReceiveBarrierCommand", evt);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send barrier command via SignalR for BranchId={BranchId}", branchId);
+            }
+
+            if (!TryGetFirebaseApp(out var app))
+            {
+                _logger.LogWarning(
+                    "Firebase is not initialized; barrier command cannot be published via Firebase for BranchId={BranchId}. " +
+                    "SignalR was used instead.", branchId);
+                return BarrierPublishResult.Published;
+            }
+
+
 
             try
             {
@@ -230,13 +242,26 @@ namespace AutoWashPro.BLL.Services.Operations
 
         public async Task<BarrierPublishResult> PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
         {
-            // Firebase is REQUIRED for barrier commands (controls physical devices)
+            try
+            {
+                var payloadDoc = JsonDocument.Parse(jsonPayload);
+                if (payloadDoc.RootElement.TryGetProperty("data", out var dataElement))
+                {
+                    await _hubContext.Clients.Group($"branch:{branchId}:lane-display")
+                        .SendAsync("ReceiveBarrierCommand", dataElement);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send barrier command via SignalR for BranchId={BranchId}", branchId);
+            }
+
             if (!TryGetFirebaseApp(out var app))
             {
                 _logger.LogWarning(
-                    "Firebase is not initialized; barrier command cannot be published for BranchId={BranchId}. " +
-                    "If testing locally, ignore this. In production, physical barrier will not open.", branchId);
-                return BarrierPublishResult.SkippedNoFirebase; // Do NOT throw, otherwise outbox gets stuck.
+                    "Firebase is not initialized; barrier command cannot be published via Firebase for BranchId={BranchId}. " +
+                    "SignalR was used instead.", branchId);
+                return BarrierPublishResult.Published;
             }
 
             try

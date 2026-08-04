@@ -72,7 +72,9 @@ namespace API.Controllers.Staff
                     laneId = result.LaneId,
                     laneName = result.LaneName,
                     barrierCommandId = result.BarrierCommandId,
-                    barrierCommandCreated = result.BarrierCommandCreated
+                    barrierCommandCreated = result.BarrierCommandCreated,
+                    barrierId = result.BarrierId,
+                    barrierCommandExpiresAt = result.BarrierCommandExpiresAt
                 }
             });
         }

@@ -775,7 +775,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             // 6. THỰC THI CẬP NHẬT (Tận dụng logic của hàm UpdateBookingStatusAsync)
-            var isUpdated = await UpdateBookingStatusAsync(booking.BookingId, newStatus);
+            var (isUpdated, checkInResult, checkOutResult) = await UpdateBookingStatusAsync(booking.BookingId, newStatus);
 
             if (!isUpdated)
             {
@@ -799,7 +799,10 @@ namespace AutoWashPro.BLL.Services
                 ActualDurationMinutes = booking.ActualDurationMinutes,
                 ProcessingLaneId = booking.ProcessingLaneId,
                 ProcessingLaneName = booking.ProcessingLane?.Name,
-                IsWaitingForLane = booking.ProcessingLaneId == null && newStatus == "CheckedIn"
+                IsWaitingForLane = booking.ProcessingLaneId == null && newStatus == "CheckedIn",
+                BarrierCommandId = checkInResult?.BarrierCommandId,
+                BarrierId = checkInResult?.BarrierId,
+                BarrierCommandExpiresAt = checkInResult?.BarrierCommandExpiresAt
             };
         }
 
@@ -845,7 +848,7 @@ namespace AutoWashPro.BLL.Services
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking is unpaid; cannot check out barrier.");
                 }
 
-                await UpdateBookingStatusAsync(targetBooking.BookingId, "Completed");
+                var (isUpdated, _, checkOutResult) = await UpdateBookingStatusAsync(targetBooking.BookingId, "Completed");
 
                 if (activeFleetLog != null && activeFleetLog.Status != "Completed")
                 {
@@ -881,7 +884,10 @@ namespace AutoWashPro.BLL.Services
                     ActualDurationMinutes = updatedBooking.ActualDurationMinutes,
                     ProcessingLaneId = updatedBooking.ProcessingLaneId,
                     ProcessingLaneName = updatedBooking.ProcessingLane?.Name,
-                    IsWaitingForLane = false
+                    IsWaitingForLane = false,
+                    ExitBarrierCommandId = checkOutResult?.ExitBarrierCommandId,
+                    BarrierId = checkOutResult?.BarrierId,
+                    BarrierCommandExpiresAt = checkOutResult?.BarrierCommandExpiresAt
                 };
             }
             else if (activeFleetLog != null)
@@ -890,9 +896,10 @@ namespace AutoWashPro.BLL.Services
                 activeFleetLog.CompletedTime = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
+                AutoWashPro.BLL.Services.Operations.CheckOutResult? checkOutResult = null;
                 if (activeFleetLog.LaneId > 0)
                 {
-                    await _laneCoordinator.CheckOutAtExitGateAsync(normalizedPlate, activeFleetLog.BranchId);
+                    checkOutResult = await _laneCoordinator.CheckOutAtExitGateAsync(normalizedPlate, activeFleetLog.BranchId);
                 }
 
                 return new BookingResponseDTO
@@ -911,13 +918,16 @@ namespace AutoWashPro.BLL.Services
                     ActualDurationMinutes = (int)Math.Max(1, Math.Round((activeFleetLog.CompletedTime.Value - activeFleetLog.CheckInTime).TotalMinutes)),
                     ProcessingLaneId = activeFleetLog.LaneId,
                     ProcessingLaneName = null, // Fleet log does not include lane name directly here
-                    IsWaitingForLane = false
+                    IsWaitingForLane = false,
+                    ExitBarrierCommandId = checkOutResult?.ExitBarrierCommandId,
+                    BarrierId = checkOutResult?.BarrierId,
+                    BarrierCommandExpiresAt = checkOutResult?.BarrierCommandExpiresAt
                 };
             }
 
             throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No active wash session found for vehicle {licensePlate}.");
         }
-        public async Task<bool> UpdateBookingStatusAsync(int bookingId, string newStatus)
+        public async Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus)
         {
             var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
@@ -934,10 +944,12 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking does not have an assigned lane; cannot start processing.");
             }
 
+            AutoWashPro.BLL.Services.Operations.GateCheckInResult? checkInResult = null;
+            AutoWashPro.BLL.Services.Operations.CheckOutResult? checkOutResult = null;
             var isCompletingNow = false;
             if (newStatus == "CheckedIn" && booking.ProcessingLaneId == null)
             {
-                var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
+                checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
                     booking.LicensePlate ?? "UNKNOWN",
                     booking.BranchId,
                     bookingId: booking.BookingId);
@@ -992,7 +1004,7 @@ namespace AutoWashPro.BLL.Services
             // Remove all old Publish and AssignNextVehicle logic. Coordinator handles it!
             if (isCompletingNow)
             {
-                await _laneCoordinator.CompletePhysicalCheckoutAsync(booking.BookingId, 0); 
+                checkOutResult = await _laneCoordinator.CompletePhysicalCheckoutAsync(booking.BookingId, 0); 
             }
             else if (newStatus == "Cancelled" || newStatus == "CancelledBySystem" || newStatus == "Delayed")
             {
@@ -1006,7 +1018,7 @@ namespace AutoWashPro.BLL.Services
                 await _voucherCampaignService.ProcessMilestoneCampaignsAsync(booking.UserId.Value);
             }
 
-            return true;
+            return (true, checkInResult, checkOutResult);
         }
 
         public async Task<CompatibilityDTO> ValidateBookingCompatibilityAsync(int userId, int branchId, int slotId, DateTime targetDate, int? vehicleId, string licensePlate, List<int> serviceIds)

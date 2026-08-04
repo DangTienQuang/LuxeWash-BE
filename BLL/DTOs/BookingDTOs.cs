@@ -181,6 +181,11 @@ namespace AutoWashPro.BLL.DTOs
         public string? ProcessingLaneName { get; set; }
         public bool IsWaitingForLane { get; set; }
         
+        public string? BarrierCommandId { get; set; }
+        public string? BarrierId { get; set; }
+        public DateTime? BarrierCommandExpiresAt { get; set; }
+        public string? ExitBarrierCommandId { get; set; }
+
         public bool HasPendingRelocation { get; set; } = false;
         public RelocationProposalCustomerDTO? Relocation { get; set; }
         public bool IsWaitAccepted { get; set; }

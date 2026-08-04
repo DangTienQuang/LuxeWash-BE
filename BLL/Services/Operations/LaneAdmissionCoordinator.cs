@@ -223,6 +223,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     result.BarrierCommandId = commandId;
                     result.BarrierCommandCreated = true;
                     result.BarrierId = barrierId;
+                    result.BarrierCommandExpiresAt = barrierCmd.ExpiresAt;
                     result.Message = $"Assigned to {selectedLane.Name} and Entry Barrier OPEN command sent.";
                 }
                 else
@@ -464,7 +465,8 @@ namespace AutoWashPro.BLL.Services.Operations
                     CompletedFleetWashLogId = occupancy.FleetWashLogId,
                     ReleasedLaneId = occupancy.LaneId,
                     ExitBarrierCommandId = exitCmdId,
-                    BarrierId = exitCmdId != null ? "EXIT_GATE" : null
+                    BarrierId = exitCmdId != null ? "EXIT_GATE" : null,
+                    BarrierCommandExpiresAt = exitCmdId != null ? now.AddMinutes(1) : null
                 };
 
                 var nextAdmitted = await InternalAdmitNextWaitingVehicleAsync(occupancy.LaneId, occupancy.BranchId, cancellationToken);

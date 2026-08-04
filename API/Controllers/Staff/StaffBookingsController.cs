@@ -30,7 +30,7 @@ namespace API.Controllers.Staff
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateBookingStatus(int id, [FromQuery] string newStatus)
         {
-            await _bookingService.UpdateBookingStatusAsync(id, newStatus);
+            var result = await _bookingService.UpdateBookingStatusAsync(id, newStatus);
             return Ok(new { statusCode = 200, message = $"Booking status updated to: {newStatus}" });
         }
 
