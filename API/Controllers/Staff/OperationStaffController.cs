@@ -43,6 +43,13 @@ namespace API.Controllers.Staff
             return Ok(tasks);
         }
 
+        [HttpGet("lane-occupancies")]
+        public async Task<IActionResult> GetLaneOccupancies()
+        {
+            var occupancies = await _staffService.GetLaneOccupanciesAsync(GetUserId());
+            return Ok(occupancies);
+        }
+
         [HttpPost("lanes/swap")]
         public async Task<IActionResult> SwapShiftByPhone([FromBody] SwapLaneByPhoneDTO dto)
         {

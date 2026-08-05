@@ -29,6 +29,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     LaneId = o.LaneId,
                     LicensePlate = o.LicensePlate,
                     BookingId = o.BookingId,
+                    FleetWashLogId = o.FleetWashLogId,
                     OccupiedAt = o.OccupiedAt,
                     LaneName = _context.Lanes.Where(l => l.LaneId == o.LaneId).Select(l => l.Name).FirstOrDefault() ?? ""
                 })
@@ -190,10 +191,10 @@ namespace AutoWashPro.BLL.Services.Operations
                             shouldDelete = true;
                             reason = $"FleetWashLog {occupancy.FleetWashLogId} is in terminal status '{fl.Status}'";
                         }
-                        else if (fl.Status != "Processing")
+                        else if (fl.Status != "Processing" && fl.Status != "Assigned")
                         {
                             shouldDelete = true;
-                            reason = $"FleetWashLog {occupancy.FleetWashLogId} status '{fl.Status}' is not Processing";
+                            reason = $"FleetWashLog {occupancy.FleetWashLogId} status '{fl.Status}' does not occupy a lane";
                         }
                         else if (fl.LaneId.HasValue && fl.LaneId.Value != occupancy.LaneId)
                         {

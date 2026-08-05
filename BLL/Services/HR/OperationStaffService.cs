@@ -59,6 +59,34 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
+        public async Task<List<Operations.LaneOccupancyDTO>> GetLaneOccupanciesAsync(int staffUserId)
+        {
+            var staffBranchId = await _context.EmployeeProfiles
+                .Where(e => e.EmployeeId == staffUserId)
+                .Select(e => e.BranchId)
+                .FirstOrDefaultAsync();
+
+            if (!staffBranchId.HasValue)
+            {
+                return new List<Operations.LaneOccupancyDTO>();
+            }
+
+            return await _context.LaneOccupancies
+                .AsNoTracking()
+                .Where(o => o.BranchId == staffBranchId.Value)
+                .OrderBy(o => o.LaneId)
+                .Select(o => new Operations.LaneOccupancyDTO
+                {
+                    LaneId = o.LaneId,
+                    LaneName = o.Lane.Name,
+                    LicensePlate = o.LicensePlate,
+                    BookingId = o.BookingId,
+                    FleetWashLogId = o.FleetWashLogId,
+                    OccupiedAt = o.OccupiedAt
+                })
+                .ToListAsync();
+        }
+
         public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId)
         {
             var booking = await _context.Bookings

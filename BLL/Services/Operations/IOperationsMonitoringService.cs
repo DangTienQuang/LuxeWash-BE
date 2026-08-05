@@ -26,6 +26,7 @@ namespace AutoWashPro.BLL.Services.Operations
         public string LaneName { get; set; } = null!;
         public string LicensePlate { get; set; } = null!;
         public int? BookingId { get; set; }
+        public int? FleetWashLogId { get; set; }
         public DateTime OccupiedAt { get; set; }
     }
 
