@@ -333,5 +333,26 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
             return true;
         }
+        public async Task<List<AutoWashPro.BLL.Services.Operations.LaneOccupancyDTO>> GetActiveLaneOccupanciesAsync(int staffUserId)
+        {
+            var staffBranchId = await _context.EmployeeProfiles
+                .Where(e => e.EmployeeId == staffUserId)
+                .Select(e => e.BranchId)
+                .FirstOrDefaultAsync();
+
+            var occupancies = await _context.LaneOccupancies
+                .Where(o => o.BranchId == staffBranchId)
+                .Select(o => new AutoWashPro.BLL.Services.Operations.LaneOccupancyDTO
+                {
+                    LaneId = o.LaneId,
+                    LicensePlate = o.LicensePlate,
+                    BookingId = o.BookingId,
+                    OccupiedAt = o.OccupiedAt,
+                    LaneName = _context.Lanes.Where(l => l.LaneId == o.LaneId).Select(l => l.Name).FirstOrDefault() ?? ""
+                })
+                .ToListAsync();
+
+            return occupancies;
+        }
     }
 }

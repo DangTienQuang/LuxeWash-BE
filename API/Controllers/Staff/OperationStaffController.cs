@@ -84,5 +84,12 @@ namespace API.Controllers.Staff
             await _staffService.UpdateBookingStatusAsync(GetUserId(), bookingId, dto.Status);
             return Ok(new { Message = $"Booking status updated to {dto.Status}." });
         }
+
+        [HttpGet("lane-occupancies")]
+        public async Task<IActionResult> GetLaneOccupancies()
+        {
+            var occupancies = await _staffService.GetActiveLaneOccupanciesAsync(GetUserId());
+            return Ok(occupancies);
+        }
     }
 }

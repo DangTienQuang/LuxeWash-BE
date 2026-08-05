@@ -167,10 +167,10 @@ namespace AutoWashPro.BLL.Services.Operations
                             shouldDelete = true;
                             reason = $"Booking {occupancy.BookingId} is in terminal status '{bk.Status}'";
                         }
-                        else if (bk.Status != "Processing")
+                        else if (bk.Status != "Processing" && bk.Status != "Assigned")
                         {
                             shouldDelete = true;
-                            reason = $"Booking {occupancy.BookingId} status '{bk.Status}' is not Processing";
+                            reason = $"Booking {occupancy.BookingId} status '{bk.Status}' is not Processing or Assigned";
                         }
                         else if (bk.ProcessingLaneId.HasValue && bk.ProcessingLaneId.Value != occupancy.LaneId)
                         {
@@ -190,10 +190,10 @@ namespace AutoWashPro.BLL.Services.Operations
                             shouldDelete = true;
                             reason = $"FleetWashLog {occupancy.FleetWashLogId} is in terminal status '{fl.Status}'";
                         }
-                        else if (fl.Status != "Processing")
+                        else if (fl.Status != "Processing" && fl.Status != "Assigned")
                         {
                             shouldDelete = true;
-                            reason = $"FleetWashLog {occupancy.FleetWashLogId} status '{fl.Status}' is not Processing";
+                            reason = $"FleetWashLog {occupancy.FleetWashLogId} status '{fl.Status}' is not Processing or Assigned";
                         }
                         else if (fl.LaneId.HasValue && fl.LaneId.Value != occupancy.LaneId)
                         {

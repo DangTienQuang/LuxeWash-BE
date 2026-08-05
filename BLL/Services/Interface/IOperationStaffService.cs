@@ -11,6 +11,7 @@ namespace AutoWashPro.BLL.Services
         Task<List<StaffBookingDTO>> GetAssignedBookingsAsync(int staffUserId, System.DateTime? date = null);
         Task<bool> UpdateBookingStatusAsync(int staffUserId, int bookingId, string newStatus);
         Task<GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId);
+        Task<List<LaneOccupancyDTO>> GetActiveLaneOccupanciesAsync(int staffUserId);
         Task<bool> SwapShiftByPhoneAsync(int currentStaffId, SwapLaneByPhoneDTO dto);
     }
 }
