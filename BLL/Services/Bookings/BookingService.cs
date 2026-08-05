@@ -1306,6 +1306,7 @@ namespace AutoWashPro.BLL.Services
                 {
                     UserId = userId,
                     VehicleId = vehicleTypeQuery.VehicleId,
+                    ActualVehicleTypeId = vehicleTypeQuery.VehicleTypeId,
                     LicensePlate = request.LicensePlate,
                     CapacityWeight = maxCapacityWeight,
                     VehicleCondition = VehicleCondition.Clean,
@@ -2096,6 +2097,7 @@ namespace AutoWashPro.BLL.Services
                     {
                         UserId = null,
                         VehicleId = vehicleTypeQuery.VehicleId,
+                        ActualVehicleTypeId = vehicleTypeQuery.VehicleTypeId,
                         LicensePlate = normalizedPlate,
                         CapacityWeight = maxCapacityWeight,
                         VehicleCondition = VehicleCondition.Clean,
@@ -2196,6 +2198,7 @@ namespace AutoWashPro.BLL.Services
                         {
                             UserId = customerUserId,
                             VehicleId = vehicleTypeQuery.VehicleId,
+                            ActualVehicleTypeId = vehicleTypeQuery.VehicleTypeId,
                             LicensePlate = normalizedPlate,
                             CapacityWeight = maxCapacityWeight,
                             VehicleCondition = VehicleCondition.Clean,
@@ -2226,6 +2229,7 @@ namespace AutoWashPro.BLL.Services
                         {
                             UserId = customerUserId,
                             VehicleId = vehicleTypeQuery.VehicleId,
+                            ActualVehicleTypeId = vehicleTypeQuery.VehicleTypeId,
                             LicensePlate = normalizedPlate,
                             CapacityWeight = maxCapacityWeight,
                             VehicleCondition = VehicleCondition.Clean,

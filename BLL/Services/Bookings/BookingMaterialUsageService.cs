@@ -38,7 +38,16 @@ namespace AutoWashPro.BLL.Services
             var vehicleTypeId = booking.ActualVehicleTypeId ?? booking.Vehicle?.VehicleTypeId ?? booking.FleetVehicle?.VehicleTypeId;
             if (!vehicleTypeId.HasValue)
             {
-                throw new BadRequestException("Cannot resolve vehicle type for material usage.");
+                var defaultType = await _context.VehicleTypes.FirstOrDefaultAsync(v => v.Name == "Other") 
+                               ?? await _context.VehicleTypes.FirstOrDefaultAsync();
+                if (defaultType != null)
+                {
+                    vehicleTypeId = defaultType.Id;
+                }
+                else
+                {
+                    throw new BadRequestException("Cannot resolve vehicle type for material usage.");
+                }
             }
 
             var multiplier = await GetConditionMultiplierAsync(booking.VehicleCondition);
