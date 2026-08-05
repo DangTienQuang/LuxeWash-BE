@@ -1,4 +1,4 @@
-﻿using AutoWashPro.DAL.Entities;
+using AutoWashPro.DAL.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,5 +24,7 @@ namespace DAL.Entities
         public int? StaffUserId { get; set; }
         public Lane? Lane { get; set; }
         public User? Staff { get; set; }
+        public string? CheckInImageUrl { get; set; }
+        public string? CheckOutImageUrl { get; set; }
     }
 }

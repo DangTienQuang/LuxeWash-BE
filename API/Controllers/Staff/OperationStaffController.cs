@@ -50,9 +50,9 @@ namespace API.Controllers.Staff
             return Ok(new { Message = "Shift swapped successfully." });
         }
         [HttpPost("bookings/{bookingId}/checkin")]
-        public async Task<IActionResult> StaffCheckin(int bookingId)
+        public async Task<IActionResult> StaffCheckin(int bookingId, [FromForm] CheckInRequestDTO dto)
         {
-            var result = await _staffService.CheckInBookingAsync(GetUserId(), bookingId);
+            var result = await _staffService.CheckInBookingAsync(GetUserId(), bookingId, dto.CheckInImage);
 
             var message = result.IsWaiting
                 ? "Check-in successful. All bays are currently busy — please wait before the barrier."
@@ -79,9 +79,9 @@ namespace API.Controllers.Staff
             });
         }
         [HttpPut("bookings/{bookingId}/status")]
-        public async Task<IActionResult> UpdateBookingStatus(int bookingId, [FromBody] UpdateBookingStatusDTO dto)
+        public async Task<IActionResult> UpdateBookingStatus(int bookingId, [FromForm] UpdateBookingStatusDTO dto)
         {
-            await _staffService.UpdateBookingStatusAsync(GetUserId(), bookingId, dto.Status);
+            await _staffService.UpdateBookingStatusAsync(GetUserId(), bookingId, dto.Status, dto.CheckOutImage);
             return Ok(new { Message = $"Booking status updated to {dto.Status}." });
         }
 

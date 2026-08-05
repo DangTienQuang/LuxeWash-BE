@@ -20,8 +20,9 @@ namespace AutoWashPro.BLL.Services
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
         private readonly global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService _overloadSuggestionService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
+        private readonly global::BLL.Services.Interface.IPhotoService _photoService;
 
-        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator)
+        public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator, global::BLL.Services.Interface.IPhotoService photoService)
         {
             _context = context;
             _walletService = walletService;
@@ -29,6 +30,7 @@ namespace AutoWashPro.BLL.Services
             _laneSchedulerService = laneSchedulerService;
             _overloadSuggestionService = overloadSuggestionService;
             _laneCoordinator = laneCoordinator;
+            _photoService = photoService;
         }
 
         public async Task<StaffLaneTaskDTO?> GetTodayLaneAssignmentAsync(int staffUserId, DateTime? date = null)
@@ -59,7 +61,7 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
-        public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId)
+        public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null)
         {
             var booking = await _context.Bookings
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
@@ -110,6 +112,12 @@ namespace AutoWashPro.BLL.Services
 
             // Set staff assignment (coordinator does not know the staffId)
             booking.ProcessingStaffId = staffUserId;
+            
+            if (checkInImage != null)
+            {
+                booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
+            }
+            
             await _context.SaveChangesAsync();
 
             // Await the overload check — do NOT fire-and-forget with a scoped DbContext
@@ -204,7 +212,7 @@ namespace AutoWashPro.BLL.Services
             }).ToList();
         }
 
-        public async Task<bool> UpdateBookingStatusAsync(int staffUserId, int bookingId, string newStatus)
+        public async Task<bool> UpdateBookingStatusAsync(int staffUserId, int bookingId, string newStatus, Microsoft.AspNetCore.Http.IFormFile? checkOutImage = null)
         {
             if (newStatus != "Processing" && newStatus != "Completed")
             {
@@ -247,6 +255,11 @@ namespace AutoWashPro.BLL.Services
                     throw new BadRequestException("Can only complete processing vehicles.");
 
                 booking.ProcessingStaffId = staffUserId;
+
+                if (checkOutImage != null)
+                {
+                    booking.CheckOutImageUrl = await _photoService.UploadImageAsync(checkOutImage);
+                }
             }
 
             var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";

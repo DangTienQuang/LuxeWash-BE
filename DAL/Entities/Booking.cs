@@ -95,5 +95,8 @@ namespace AutoWashPro.DAL.Entities
         public DateTime? OverloadNotifiedAt { get; set; }
 
         public ICollection<OverloadSuggestion> OverloadSuggestions { get; set; } = new List<OverloadSuggestion>();
+
+        public string? CheckInImageUrl { get; set; }
+        public string? CheckOutImageUrl { get; set; }
     }
 }
