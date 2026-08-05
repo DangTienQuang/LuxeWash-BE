@@ -26,6 +26,7 @@ namespace AutoWashPro.BLL.Services
             var booking = await _context.Bookings
                 .Include(b => b.BookingDetails)
                 .Include(b => b.Vehicle)
+                .Include(b => b.FleetVehicle)
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId)
                 ?? throw new NotFoundException("Booking not found.");
 
@@ -34,7 +35,7 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Materials can only be consumed after booking is completed.");
             }
 
-            var vehicleTypeId = booking.ActualVehicleTypeId ?? booking.Vehicle?.VehicleTypeId;
+            var vehicleTypeId = booking.ActualVehicleTypeId ?? booking.Vehicle?.VehicleTypeId ?? booking.FleetVehicle?.VehicleTypeId;
             if (!vehicleTypeId.HasValue)
             {
                 throw new BadRequestException("Cannot resolve vehicle type for material usage.");
