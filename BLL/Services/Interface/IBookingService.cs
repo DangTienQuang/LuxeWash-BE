@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoWashPro.BLL.DTOs;
+using Microsoft.AspNetCore.Http;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -18,8 +19,8 @@ namespace AutoWashPro.BLL.Services
         Task<List<AdminBookingResponseDTO>> GetAllBookingsByDateAsync(DateTime targetDate);
         Task<SmartLicensePlateResponseDTO> LookupLicensePlateAsync(string licensePlate, int branchId);
         Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus);
-        Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus);
-        Task<BookingResponseDTO> AutoCheckOutByLicensePlateAsync(string licensePlate);
+        Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null);
+        Task<BookingResponseDTO> AutoCheckOutByLicensePlateAsync(string licensePlate, IFormFile checkOutImage);
         Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId);
         Task<List<RelocationProposalCustomerDTO>> GetRelocationProposalsAsync(int userId);
         Task<bool> CancelBookingAsync(int userId, int bookingId);

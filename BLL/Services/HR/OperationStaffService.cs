@@ -63,6 +63,11 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null)
         {
+            if (checkInImage == null || checkInImage.Length == 0)
+            {
+                throw new BadRequestException("Check-in image is required.");
+            }
+
             var booking = await _context.Bookings
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
 
@@ -103,6 +108,10 @@ namespace AutoWashPro.BLL.Services
                 }
             }
 
+            // Upload before changing operational state so a failed upload cannot leave
+            // the booking checked in without its required evidence image.
+            booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
+
             // Always run through the coordinator — it owns: lane selection, LaneOccupancy creation,
             // status transition (Processing/CheckedIn), BarrierCommand, and Outbox events.
             var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
@@ -112,12 +121,7 @@ namespace AutoWashPro.BLL.Services
 
             // Set staff assignment (coordinator does not know the staffId)
             booking.ProcessingStaffId = staffUserId;
-            
-            if (checkInImage != null)
-            {
-                booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
-            }
-            
+
             await _context.SaveChangesAsync();
 
             // Await the overload check — do NOT fire-and-forget with a scoped DbContext
@@ -254,9 +258,15 @@ namespace AutoWashPro.BLL.Services
                 if (booking.Status != "Processing" && booking.Status != "Completed")
                     throw new BadRequestException("Can only complete processing vehicles.");
 
+                if ((checkOutImage == null || checkOutImage.Length == 0)
+                    && string.IsNullOrWhiteSpace(booking.CheckOutImageUrl))
+                {
+                    throw new BadRequestException("Check-out image is required to complete the booking.");
+                }
+
                 booking.ProcessingStaffId = staffUserId;
 
-                if (checkOutImage != null)
+                if (checkOutImage != null && checkOutImage.Length > 0)
                 {
                     booking.CheckOutImageUrl = await _photoService.UploadImageAsync(checkOutImage);
                 }
