@@ -35,7 +35,7 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Materials can only be consumed after booking is completed.");
             }
 
-            var vehicleTypeId = booking.ActualVehicleTypeId ?? booking.Vehicle?.VehicleTypeId ?? booking.FleetVehicle?.VehicleTypeId;
+            var vehicleTypeId = await ResolveVehicleTypeIdAsync(booking);
             if (!vehicleTypeId.HasValue)
             {
                 var defaultType = await _context.VehicleTypes.FirstOrDefaultAsync(v => v.Name == "Other") 
@@ -48,6 +48,10 @@ namespace AutoWashPro.BLL.Services
                 {
                     throw new BadRequestException("Cannot resolve vehicle type for material usage.");
                 }
+            }
+            if (!booking.ActualVehicleTypeId.HasValue)
+            {
+                booking.ActualVehicleTypeId = vehicleTypeId.Value;
             }
 
             var multiplier = await GetConditionMultiplierAsync(booking.VehicleCondition);
@@ -206,6 +210,126 @@ namespace AutoWashPro.BLL.Services
             return vehicleSpecific
                 .Concat(defaultUsages.Where(u => !materialIdsWithVehicleSpecific.Contains(u.MaterialId)))
                 .ToList();
+        }
+
+        private async Task<int?> ResolveVehicleTypeIdAsync(Booking booking)
+        {
+            if (booking.ActualVehicleTypeId.HasValue)
+            {
+                return booking.ActualVehicleTypeId.Value;
+            }
+
+            if (booking.Vehicle?.VehicleTypeId > 0)
+            {
+                return booking.Vehicle.VehicleTypeId;
+            }
+
+            if (booking.FleetVehicle?.VehicleTypeId > 0)
+            {
+                return booking.FleetVehicle.VehicleTypeId;
+            }
+
+            if (booking.VehicleId.HasValue)
+            {
+                var vehicleTypeId = await _context.Vehicles
+                    .Where(v => v.Id == booking.VehicleId.Value)
+                    .Select(v => (int?)v.VehicleTypeId)
+                    .FirstOrDefaultAsync();
+
+                if (vehicleTypeId.HasValue)
+                {
+                    return vehicleTypeId.Value;
+                }
+            }
+
+            if (booking.FleetVehicleId.HasValue)
+            {
+                var fleetVehicleTypeId = await _context.FleetVehicles
+                    .Where(v => v.FleetVehicleId == booking.FleetVehicleId.Value)
+                    .Select(v => (int?)v.VehicleTypeId)
+                    .FirstOrDefaultAsync();
+
+                if (fleetVehicleTypeId.HasValue)
+                {
+                    return fleetVehicleTypeId.Value;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(booking.LicensePlate))
+            {
+                var normalizedPlate = booking.LicensePlate.Replace("-", "").Replace(".", "").Trim().ToUpper();
+
+                var vehicleQuery = _context.Vehicles
+                    .Where(v => v.LicensePlate == normalizedPlate && !v.IsDeleted);
+
+                if (booking.UserId.HasValue)
+                {
+                    var userVehicleTypeId = await vehicleQuery
+                        .Where(v => v.UserId == booking.UserId.Value)
+                        .Select(v => (int?)v.VehicleTypeId)
+                        .FirstOrDefaultAsync();
+
+                    if (userVehicleTypeId.HasValue)
+                    {
+                        return userVehicleTypeId.Value;
+                    }
+                }
+
+                var plateVehicleTypeId = await vehicleQuery
+                    .Select(v => (int?)v.VehicleTypeId)
+                    .FirstOrDefaultAsync();
+
+                if (plateVehicleTypeId.HasValue)
+                {
+                    return plateVehicleTypeId.Value;
+                }
+
+                var fleetPlateVehicleTypeId = await _context.FleetVehicles
+                    .Where(v => v.LicensePlate == normalizedPlate)
+                    .Select(v => (int?)v.VehicleTypeId)
+                    .FirstOrDefaultAsync();
+
+                if (fleetPlateVehicleTypeId.HasValue)
+                {
+                    return fleetPlateVehicleTypeId.Value;
+                }
+            }
+
+            var serviceIds = booking.BookingDetails
+                .Select(d => d.ServiceId)
+                .Distinct()
+                .ToList();
+
+            if (serviceIds.Count > 0)
+            {
+                var expectedDetailTotal = booking.BookingDetails.Sum(d => d.Price);
+                var candidates = await _context.ServicePrices
+                    .Where(sp => sp.BranchId == booking.BranchId && serviceIds.Contains(sp.ServiceId))
+                    .GroupBy(sp => sp.VehicleTypeId)
+                    .Where(g => g.Select(sp => sp.ServiceId).Distinct().Count() == serviceIds.Count)
+                    .Select(g => new
+                    {
+                        VehicleTypeId = g.Key,
+                        TotalPrice = g.Sum(sp => sp.Price)
+                    })
+                    .ToListAsync();
+
+                var exactPriceCandidates = candidates
+                    .Where(c => c.TotalPrice == expectedDetailTotal)
+                    .ToList();
+
+                if (exactPriceCandidates.Count == 1)
+                {
+                    return exactPriceCandidates[0].VehicleTypeId;
+                }
+
+                if (candidates.Count == 1)
+                {
+                    return candidates[0].VehicleTypeId;
+                }
+            }
+
+            return null;
         }
 
         private async Task ConsumeMaterialAsync(Warehouse warehouse, Booking booking, int? bookingDetailId, int materialId, decimal quantity, string usageType, int? actorUserId, string? note)
