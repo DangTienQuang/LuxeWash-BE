@@ -176,6 +176,8 @@ namespace AutoWashPro.BLL.DTOs
         public DateTime? ProcessingStartTime { get; set; }
         public DateTime? CompletedTime { get; set; }
         public int? ActualDurationMinutes { get; set; }
+        public string? CheckInImageUrl { get; set; }
+        public string? CheckOutImageUrl { get; set; }
         
         public int? ProcessingLaneId { get; set; }
         public string? ProcessingLaneName { get; set; }

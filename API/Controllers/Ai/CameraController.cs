@@ -1,4 +1,5 @@
 using AutoWashPro.BLL.Services;
+using AutoWashPro.BLL.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -32,7 +33,9 @@ namespace API.Controllers.AI
         }
 
         [HttpPost("check-in")]
-        public async Task<IActionResult> AutoCheckInByCamera([FromQuery] string plate)
+        public async Task<IActionResult> AutoCheckInByCamera(
+            [FromQuery] string plate,
+            [FromForm] CheckInRequestDTO request)
         {
             if (string.IsNullOrWhiteSpace(plate)) return BadRequest("Plate is required");
             var normalizedPlate = plate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper();
@@ -77,7 +80,10 @@ namespace API.Controllers.AI
                     }
                 }
 
-                var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(normalizedPlate, "CheckedIn");
+                var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(
+                    normalizedPlate,
+                    "CheckedIn",
+                    request.CheckInImage);
                 if (result.IsWaitingForLane)
                 {
                     return Ok(new { statusCode = 200, message = "Check-in successful! All bays are currently busy. Please wait before the barrier.", isWaiting = true, data = result });
@@ -91,7 +97,9 @@ namespace API.Controllers.AI
         }
 
         [HttpPost("check-out")]
-        public async Task<IActionResult> AutoCheckOutByCamera([FromQuery] string plate)
+        public async Task<IActionResult> AutoCheckOutByCamera(
+            [FromQuery] string plate,
+            [FromForm] CheckOutRequestDTO request)
         {
             if (string.IsNullOrWhiteSpace(plate)) return BadRequest("Plate is required");
             var normalizedPlate = plate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper();
@@ -110,7 +118,9 @@ namespace API.Controllers.AI
 
             try
             {
-                var result = await _bookingService.AutoCheckOutByLicensePlateAsync(normalizedPlate);
+                var result = await _bookingService.AutoCheckOutByLicensePlateAsync(
+                    normalizedPlate,
+                    request.CheckOutImage);
                 return Ok(new { statusCode = 200, message = "Vehicle check-out completed, barrier opening!", data = result });
             }
             catch (System.Exception ex)

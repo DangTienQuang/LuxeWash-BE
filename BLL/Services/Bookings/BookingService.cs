@@ -10,6 +10,7 @@ using AutoWashPro.DAL.Entities;
 using BLL.Helpers;
 using Microsoft.EntityFrameworkCore;
 using AutoWashPro.BLL.Services.Interface;
+using Microsoft.AspNetCore.Http;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -26,6 +27,7 @@ namespace AutoWashPro.BLL.Services
         private readonly IOccupancyService _occupancyService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
+        private readonly global::BLL.Services.Interface.IPhotoService _photoService;
 
         public BookingService(
             AutoWashDbContext context,
@@ -38,7 +40,8 @@ namespace AutoWashPro.BLL.Services
             IBookingMaterialUsageService bookingMaterialUsageService,
             IOccupancyService occupancyService,
             global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService,
-            AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator)
+            AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator,
+            global::BLL.Services.Interface.IPhotoService photoService)
         {
             _context = context;
             _walletService = walletService;
@@ -51,6 +54,7 @@ namespace AutoWashPro.BLL.Services
             _occupancyService = occupancyService;
             _laneSchedulerService = laneSchedulerService;
             _laneCoordinator = laneCoordinator;
+            _photoService = photoService;
         }
 
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
@@ -309,7 +313,9 @@ namespace AutoWashPro.BLL.Services
                     CompletedTime = b.CompletedTime,
                     ActualDurationMinutes = b.ActualDurationMinutes,
                     ProcessingLaneId = b.ProcessingLaneId,
-                    ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null
+                    ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null,
+                    CheckInImageUrl = b.CheckInImageUrl,
+                    CheckOutImageUrl = b.CheckOutImageUrl
                 })
                 .ToListAsync();
 
@@ -353,7 +359,9 @@ namespace AutoWashPro.BLL.Services
                 FinalAmount = booking.FinalAmount,
                 ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
                 CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
-                ActualDurationMinutes = booking.ActualDurationMinutes
+                ActualDurationMinutes = booking.ActualDurationMinutes,
+                CheckInImageUrl = booking.CheckInImageUrl,
+                CheckOutImageUrl = booking.CheckOutImageUrl
             };
         }
 
@@ -708,7 +716,7 @@ namespace AutoWashPro.BLL.Services
 
 
 
-        public async Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus)
+        public async Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null)
         {
             // 1. KIỂM TRA DỮ LIỆU ĐẦU VÀO
             var allowedStatuses = new[] { "Pending", "CheckedIn", "Processing", "Completed", "Cancelled", "Delayed", "CancelledBySystem" };
@@ -774,6 +782,16 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Cannot change status from '{booking.Status}' to '{newStatus}'.");
             }
 
+            if (newStatus == "CheckedIn")
+            {
+                if (checkInImage == null || checkInImage.Length == 0)
+                {
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException("Check-in image is required.");
+                }
+
+                booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
+            }
+
             // 6. THỰC THI CẬP NHẬT (Tận dụng logic của hàm UpdateBookingStatusAsync)
             var (isUpdated, checkInResult, checkOutResult) = await UpdateBookingStatusAsync(booking.BookingId, newStatus);
 
@@ -806,8 +824,11 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
-        public async Task<BookingResponseDTO> AutoCheckOutByLicensePlateAsync(string licensePlate)
+        public async Task<BookingResponseDTO> AutoCheckOutByLicensePlateAsync(string licensePlate, IFormFile checkOutImage)
         {
+            if (checkOutImage == null || checkOutImage.Length == 0)
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Check-out image is required.");
+
             var normalizedPlate = NormalizeLicensePlate(licensePlate);
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
@@ -848,6 +869,13 @@ namespace AutoWashPro.BLL.Services
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Booking is unpaid; cannot check out barrier.");
                 }
 
+                var checkOutImageUrl = await _photoService.UploadImageAsync(checkOutImage);
+                targetBooking.CheckOutImageUrl = checkOutImageUrl;
+                if (activeFleetLog != null)
+                {
+                    activeFleetLog.CheckOutImageUrl = checkOutImageUrl;
+                }
+
                 var (isUpdated, _, checkOutResult) = await UpdateBookingStatusAsync(targetBooking.BookingId, "Completed");
 
                 if (activeFleetLog != null && activeFleetLog.Status != "Completed")
@@ -882,6 +910,8 @@ namespace AutoWashPro.BLL.Services
                     ProcessingStartTime = updatedBooking.ProcessingStartTime.HasValue ? updatedBooking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
                     CompletedTime = updatedBooking.CompletedTime.HasValue ? updatedBooking.CompletedTime.Value.ToVnTime() : DateTime.UtcNow.ToVnTime(),
                     ActualDurationMinutes = updatedBooking.ActualDurationMinutes,
+                    CheckInImageUrl = updatedBooking.CheckInImageUrl,
+                    CheckOutImageUrl = updatedBooking.CheckOutImageUrl,
                     ProcessingLaneId = updatedBooking.ProcessingLaneId,
                     ProcessingLaneName = updatedBooking.ProcessingLane?.Name,
                     IsWaitingForLane = false,
@@ -892,6 +922,7 @@ namespace AutoWashPro.BLL.Services
             }
             else if (activeFleetLog != null)
             {
+                activeFleetLog.CheckOutImageUrl = await _photoService.UploadImageAsync(checkOutImage);
                 activeFleetLog.Status = "Completed";
                 activeFleetLog.CompletedTime = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
@@ -916,6 +947,8 @@ namespace AutoWashPro.BLL.Services
                     ProcessingStartTime = activeFleetLog.CheckInTime.ToVnTime(),
                     CompletedTime = activeFleetLog.CompletedTime.Value.ToVnTime(),
                     ActualDurationMinutes = (int)Math.Max(1, Math.Round((activeFleetLog.CompletedTime.Value - activeFleetLog.CheckInTime).TotalMinutes)),
+                    CheckInImageUrl = activeFleetLog.CheckInImageUrl,
+                    CheckOutImageUrl = activeFleetLog.CheckOutImageUrl,
                     ProcessingLaneId = activeFleetLog.LaneId,
                     ProcessingLaneName = null, // Fleet log does not include lane name directly here
                     IsWaitingForLane = false,
@@ -1425,7 +1458,9 @@ namespace AutoWashPro.BLL.Services
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime,
                     CompletedTime = b.CompletedTime,
-                    ActualDurationMinutes = b.ActualDurationMinutes
+                    ActualDurationMinutes = b.ActualDurationMinutes,
+                    CheckInImageUrl = b.CheckInImageUrl,
+                    CheckOutImageUrl = b.CheckOutImageUrl
                 })
                 .ToListAsync();
 
