@@ -62,7 +62,15 @@ namespace BLL.Services.AI.Services
             using var results = _session.Run(inputs);
             var output = results.First().AsTensor<float>();
 
-            return PostProcess(output, scale, padX, padY, confidenceThreshold, original.Width, original.Height);
+            return PostProcess(
+                output,
+                scale,
+                padX,
+                padY,
+                confidenceThreshold,
+                iouThreshold,
+                original.Width,
+                original.Height);
         }
 
         private (DenseTensor<float> tensor, float scale, int padX, int padY) Preprocess(SKBitmap original)
@@ -102,7 +110,15 @@ namespace BLL.Services.AI.Services
                 "car", "pickup-truck", "vehicles", "vehicle", "bus", "truck", "suv", "van", "motorcycle", "bike", "bicycle", "automobile", "sedan", "hatchback", "mpv", "jeep", "minivan"
             };
 
-        private List<CarBoundingBox> PostProcess(Tensor<float> output, float scale, int padX, int padY, float confThreshold, int origWidth, int origHeight)
+        private List<CarBoundingBox> PostProcess(
+            Tensor<float> output,
+            float scale,
+            int padX,
+            int padY,
+            float confThreshold,
+            float iouThreshold,
+            int origWidth,
+            int origHeight)
         {
             var results = new List<CarBoundingBox>();
             int numDetections = (int)output.Dimensions[1]; // 300
@@ -120,19 +136,56 @@ namespace BLL.Services.AI.Services
                 float x2 = (output[0, i, 2] - padX) / scale;
                 float y2 = (output[0, i, 3] - padY) / scale;
 
+                var clampedX1 = Math.Max(0f, x1);
+                var clampedY1 = Math.Max(0f, y1);
+                var clampedX2 = Math.Min((float)origWidth, x2);
+                var clampedY2 = Math.Min((float)origHeight, y2);
+                if (clampedX2 <= clampedX1 || clampedY2 <= clampedY1) continue;
+
                 results.Add(new CarBoundingBox
                 {
-                    X1 = Math.Max(0f, x1),
-                    Y1 = Math.Max(0f, y1),
-                    X2 = Math.Min((float)origWidth, x2),
-                    Y2 = Math.Min((float)origHeight, y2),
+                    X1 = clampedX1,
+                    Y1 = clampedY1,
+                    X2 = clampedX2,
+                    Y2 = clampedY2,
                     Confidence = confidence,
                     ClassId = classId,
                     ClassName = className
                 });
             }
 
-            return results;
+            return ApplyNonMaximumSuppression(results, iouThreshold);
+        }
+
+        private static List<CarBoundingBox> ApplyNonMaximumSuppression(
+            IEnumerable<CarBoundingBox> boxes,
+            float iouThreshold)
+        {
+            var remaining = boxes.OrderByDescending(box => box.Confidence).ToList();
+            var selected = new List<CarBoundingBox>();
+
+            while (remaining.Count > 0)
+            {
+                var candidate = remaining[0];
+                selected.Add(candidate);
+                remaining.RemoveAt(0);
+                remaining.RemoveAll(box => CalculateIntersectionOverUnion(candidate, box) > iouThreshold);
+            }
+
+            return selected;
+        }
+
+        private static float CalculateIntersectionOverUnion(CarBoundingBox first, CarBoundingBox second)
+        {
+            var intersectionWidth = Math.Max(0f, Math.Min(first.X2, second.X2) - Math.Max(first.X1, second.X1));
+            var intersectionHeight = Math.Max(0f, Math.Min(first.Y2, second.Y2) - Math.Max(first.Y1, second.Y1));
+            var intersectionArea = intersectionWidth * intersectionHeight;
+            if (intersectionArea <= 0f) return 0f;
+
+            var firstArea = (first.X2 - first.X1) * (first.Y2 - first.Y1);
+            var secondArea = (second.X2 - second.X1) * (second.Y2 - second.Y1);
+            var unionArea = firstArea + secondArea - intersectionArea;
+            return unionArea > 0f ? intersectionArea / unionArea : 0f;
         }
 
         public void Dispose() => _session?.Dispose();
