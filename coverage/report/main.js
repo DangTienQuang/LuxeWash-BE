@@ -291,50 +291,50 @@ var assemblies = [
     "name": "BLL",
     "classes": [
       { "name": "AutoWashPro.BLL.Exceptions.BadRequestException", "rp": "BLL_BadRequestException.html", "cl": 1, "ucl": 0, "cal": 1, "tl": 24, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Exceptions.ForbiddenException", "rp": "BLL_ForbiddenException.html", "cl": 0, "ucl": 1, "cal": 1, "tl": 24, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Exceptions.ForbiddenException", "rp": "BLL_ForbiddenException.html", "cl": 1, "ucl": 0, "cal": 1, "tl": 24, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Exceptions.NotFoundException", "rp": "BLL_NotFoundException.html", "cl": 1, "ucl": 0, "cal": 1, "tl": 24, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Exceptions.UnauthorizedException", "rp": "BLL_UnauthorizedException.html", "cl": 1, "ucl": 0, "cal": 1, "tl": 24, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Extensions.ServiceCollectionExtensions", "rp": "BLL_ServiceCollectionExtensions.html", "cl": 0, "ucl": 8, "cal": 8, "tl": 24, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.AnnualTierService", "rp": "BLL_AnnualTierService.html", "cl": 0, "ucl": 18, "cal": 18, "tl": 38, "cb": 0, "tb": 4, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.AnnualTierService", "rp": "BLL_AnnualTierService.html", "cl": 18, "ucl": 0, "cal": 18, "tl": 38, "cb": 4, "tb": 4, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.AuthService", "rp": "BLL_AuthService.html", "cl": 375, "ucl": 26, "cal": 401, "tl": 542, "cb": 97, "tb": 136, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "rp": "BLL_BookingMaterialUsageService.html", "cl": 0, "ucl": 362, "cal": 362, "tl": 482, "cb": 0, "tb": 92, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.BookingService", "rp": "BLL_BookingService.html", "cl": 0, "ucl": 2023, "cal": 2023, "tl": 2593, "cb": 0, "tb": 836, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.BranchService", "rp": "BLL_BranchService.html", "cl": 0, "ucl": 98, "cal": 98, "tl": 137, "cb": 0, "tb": 6, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.CarModelService", "rp": "BLL_CarModelService.html", "cl": 0, "ucl": 137, "cal": 137, "tl": 192, "cb": 0, "tb": 28, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.CRMCampaignService", "rp": "BLL_CRMCampaignService.html", "cl": 0, "ucl": 316, "cal": 316, "tl": 419, "cb": 0, "tb": 58, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.EmailService", "rp": "BLL_EmailService.html", "cl": 0, "ucl": 63, "cal": 63, "tl": 90, "cb": 0, "tb": 12, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.EmployeeService", "rp": "BLL_EmployeeService.html", "cl": 0, "ucl": 66, "cal": 66, "tl": 100, "cb": 0, "tb": 22, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.InventoryReportService", "rp": "BLL_InventoryReportService.html", "cl": 0, "ucl": 42, "cal": 42, "tl": 69, "cb": 0, "tb": 8, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.InventoryTransferService", "rp": "BLL_InventoryTransferService.html", "cl": 0, "ucl": 396, "cal": 396, "tl": 496, "cb": 0, "tb": 114, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "rp": "BLL_BookingMaterialUsageService.html", "cl": 351, "ucl": 11, "cal": 362, "tl": 482, "cb": 77, "tb": 92, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.BookingService", "rp": "BLL_BookingService.html", "cl": 1757, "ucl": 266, "cal": 2023, "tl": 2593, "cb": 602, "tb": 836, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.BranchService", "rp": "BLL_BranchService.html", "cl": 98, "ucl": 0, "cal": 98, "tl": 137, "cb": 6, "tb": 6, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.CarModelService", "rp": "BLL_CarModelService.html", "cl": 135, "ucl": 2, "cal": 137, "tl": 192, "cb": 26, "tb": 28, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.CRMCampaignService", "rp": "BLL_CRMCampaignService.html", "cl": 308, "ucl": 8, "cal": 316, "tl": 419, "cb": 56, "tb": 58, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.EmailService", "rp": "BLL_EmailService.html", "cl": 14, "ucl": 49, "cal": 63, "tl": 90, "cb": 9, "tb": 12, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.EmployeeService", "rp": "BLL_EmployeeService.html", "cl": 66, "ucl": 0, "cal": 66, "tl": 100, "cb": 18, "tb": 22, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.InventoryReportService", "rp": "BLL_InventoryReportService.html", "cl": 42, "ucl": 0, "cal": 42, "tl": 69, "cb": 8, "tb": 8, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.InventoryTransferService", "rp": "BLL_InventoryTransferService.html", "cl": 392, "ucl": 4, "cal": 396, "tl": 496, "cb": 95, "tb": 114, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.LaneService", "rp": "BLL_LaneService.html", "cl": 0, "ucl": 73, "cal": 73, "tl": 109, "cb": 0, "tb": 12, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.ManagerService", "rp": "BLL_ManagerService.html", "cl": 0, "ucl": 433, "cal": 433, "tl": 614, "cb": 0, "tb": 96, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.MaterialService", "rp": "BLL_MaterialService.html", "cl": 0, "ucl": 280, "cal": 280, "tl": 361, "cb": 0, "tb": 34, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.OccupancyService", "rp": "BLL_OccupancyService.html", "cl": 0, "ucl": 28, "cal": 28, "tl": 55, "cb": 0, "tb": 10, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.ManagerService", "rp": "BLL_ManagerService.html", "cl": 423, "ucl": 10, "cal": 433, "tl": 614, "cb": 78, "tb": 96, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.MaterialService", "rp": "BLL_MaterialService.html", "cl": 270, "ucl": 10, "cal": 280, "tl": 361, "cb": 31, "tb": 34, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.OccupancyService", "rp": "BLL_OccupancyService.html", "cl": 28, "ucl": 0, "cal": 28, "tl": 55, "cb": 7, "tb": 10, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.OperationStaffService", "rp": "BLL_OperationStaffService.html", "cl": 0, "ucl": 193, "cal": 193, "tl": 268, "cb": 0, "tb": 98, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.PaymentLinkResult", "rp": "BLL_PaymentLinkResult.html", "cl": 0, "ucl": 2, "cal": 2, "tl": 22, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.PayOsOrderStatusResult", "rp": "BLL_PayOsOrderStatusResult.html", "cl": 0, "ucl": 10, "cal": 10, "tl": 45, "cb": 0, "tb": 8, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.PayOsPaymentResult", "rp": "BLL_PayOsPaymentResult.html", "cl": 0, "ucl": 2, "cal": 2, "tl": 45, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.PayOsService", "rp": "BLL_PayOsService.html", "cl": 0, "ucl": 67, "cal": 67, "tl": 106, "cb": 0, "tb": 42, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.PayOsOrderStatusResult", "rp": "BLL_PayOsOrderStatusResult.html", "cl": 10, "ucl": 0, "cal": 10, "tl": 45, "cb": 7, "tb": 8, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.PayOsPaymentResult", "rp": "BLL_PayOsPaymentResult.html", "cl": 2, "ucl": 0, "cal": 2, "tl": 45, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.PayOsService", "rp": "BLL_PayOsService.html", "cl": 25, "ucl": 42, "cal": 67, "tl": 106, "cb": 9, "tb": 42, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.PayOsWebhookResult", "rp": "BLL_PayOsWebhookResult.html", "cl": 0, "ucl": 3, "cal": 3, "tl": 45, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.ServiceMaterialUsageService", "rp": "BLL_ServiceMaterialUsageService.html", "cl": 0, "ucl": 179, "cal": 179, "tl": 249, "cb": 0, "tb": 48, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.ServiceMaterialUsageService", "rp": "BLL_ServiceMaterialUsageService.html", "cl": 175, "ucl": 4, "cal": 179, "tl": 249, "cb": 44, "tb": 48, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.ServiceService", "rp": "BLL_ServiceService.html", "cl": 0, "ucl": 91, "cal": 91, "tl": 153, "cb": 0, "tb": 20, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.StaffManagementService", "rp": "BLL_StaffManagementService.html", "cl": 0, "ucl": 496, "cal": 496, "tl": 654, "cb": 0, "tb": 206, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.TierService", "rp": "BLL_TierService.html", "cl": 0, "ucl": 89, "cal": 89, "tl": 134, "cb": 0, "tb": 24, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.StaffManagementService", "rp": "BLL_StaffManagementService.html", "cl": 397, "ucl": 99, "cal": 496, "tl": 654, "cb": 120, "tb": 206, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.TierService", "rp": "BLL_TierService.html", "cl": 85, "ucl": 4, "cal": 89, "tl": 134, "cb": 20, "tb": 24, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.TimeSlotService", "rp": "BLL_TimeSlotService.html", "cl": 0, "ucl": 100, "cal": 100, "tl": 148, "cb": 0, "tb": 16, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.UserService", "rp": "BLL_UserService.html", "cl": 0, "ucl": 230, "cal": 230, "tl": 302, "cb": 0, "tb": 110, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.VehicleService", "rp": "BLL_VehicleService.html", "cl": 0, "ucl": 316, "cal": 316, "tl": 447, "cb": 0, "tb": 132, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.VehicleTypeService", "rp": "BLL_VehicleTypeService.html", "cl": 0, "ucl": 48, "cal": 48, "tl": 83, "cb": 0, "tb": 10, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.VehicleService", "rp": "BLL_VehicleService.html", "cl": 269, "ucl": 47, "cal": 316, "tl": 447, "cb": 90, "tb": 132, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.VehicleTypeService", "rp": "BLL_VehicleTypeService.html", "cl": 48, "ucl": 0, "cal": 48, "tl": 83, "cb": 10, "tb": 10, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.VoucherCampaignService", "rp": "BLL_VoucherCampaignService.html", "cl": 0, "ucl": 312, "cal": 312, "tl": 395, "cb": 0, "tb": 118, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.VoucherService", "rp": "BLL_VoucherService.html", "cl": 0, "ucl": 271, "cal": 271, "tl": 352, "cb": 0, "tb": 78, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.WalletService", "rp": "BLL_WalletService.html", "cl": 0, "ucl": 454, "cal": 454, "tl": 625, "cb": 0, "tb": 165, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "AutoWashPro.BLL.Services.WeatherService", "rp": "BLL_WeatherService.html", "cl": 0, "ucl": 103, "cal": 103, "tl": 166, "cb": 0, "tb": 44, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.VoucherService", "rp": "BLL_VoucherService.html", "cl": 261, "ucl": 10, "cal": 271, "tl": 352, "cb": 58, "tb": 78, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.WalletService", "rp": "BLL_WalletService.html", "cl": 188, "ucl": 266, "cal": 454, "tl": 625, "cb": 56, "tb": 165, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "AutoWashPro.BLL.Services.WeatherService", "rp": "BLL_WeatherService.html", "cl": 92, "ucl": 11, "cal": 103, "tl": 166, "cb": 31, "tb": 44, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "AutoWashPro.BLL.Services.WebhookVerificationResult", "rp": "BLL_WebhookVerificationResult.html", "cl": 0, "ucl": 2, "cal": 2, "tl": 22, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Helpers.ClaimHelper", "rp": "BLL_ClaimHelper.html", "cl": 0, "ucl": 17, "cal": 17, "tl": 36, "cb": 0, "tb": 14, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Helpers.CloudinarySettings", "rp": "BLL_CloudinarySettings.html", "cl": 0, "ucl": 3, "cal": 3, "tl": 9, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Helpers.DateTimeExtensions", "rp": "BLL_DateTimeExtensions.html", "cl": 0, "ucl": 10, "cal": 10, "tl": 21, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Helpers.EmailTemplateBuilder", "rp": "BLL_EmailTemplateBuilder.html", "cl": 0, "ucl": 84, "cal": 84, "tl": 101, "cb": 0, "tb": 16, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Helpers.CloudinarySettings", "rp": "BLL_CloudinarySettings.html", "cl": 3, "ucl": 0, "cal": 3, "tl": 9, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Helpers.DateTimeExtensions", "rp": "BLL_DateTimeExtensions.html", "cl": 6, "ucl": 4, "cal": 10, "tl": 21, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Helpers.EmailTemplateBuilder", "rp": "BLL_EmailTemplateBuilder.html", "cl": 38, "ucl": 46, "cal": 84, "tl": 101, "cb": 0, "tb": 16, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Helpers.InvoiceFileNameHelper", "rp": "BLL_InvoiceFileNameHelper.html", "cl": 0, "ucl": 13, "cal": 13, "tl": 32, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Helpers.WashTimeEstimator", "rp": "BLL_WashTimeEstimator.html", "cl": 0, "ucl": 7, "cal": 7, "tl": 29, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Helpers.WashTimeEstimator", "rp": "BLL_WashTimeEstimator.html", "cl": 7, "ucl": 0, "cal": 7, "tl": 29, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.AI.Calculators.BranchPreferenceCalculator", "rp": "BLL_BranchPreferenceCalculator.html", "cl": 0, "ucl": 20, "cal": 20, "tl": 45, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.AI.Calculators.ConditionEvaluator", "rp": "BLL_ConditionEvaluator.html", "cl": 0, "ucl": 48, "cal": 48, "tl": 96, "cb": 0, "tb": 86, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.AI.Calculators.ConfidenceCalculator", "rp": "BLL_ConfidenceCalculator.html", "cl": 0, "ucl": 10, "cal": 10, "tl": 33, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
@@ -359,24 +359,24 @@ var assemblies = [
       { "name": "BLL.Services.AI.Services.FeatureGenerationService", "rp": "BLL_FeatureGenerationService.html", "cl": 0, "ucl": 70, "cal": 70, "tl": 116, "cb": 0, "tb": 6, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.AI.Services.ScenarioEvaluationService", "rp": "BLL_ScenarioEvaluationService.html", "cl": 0, "ucl": 97, "cal": 97, "tl": 154, "cb": 0, "tb": 28, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.AI.Services.ScenarioExecutionLogger", "rp": "BLL_ScenarioExecutionLogger.html", "cl": 0, "ucl": 14, "cal": 14, "tl": 38, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.AIChatbotService", "rp": "BLL_AIChatbotService.html", "cl": 0, "ucl": 479, "cal": 479, "tl": 678, "cb": 0, "tb": 104, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.AIIntentService", "rp": "BLL_AIIntentService.html", "cl": 0, "ucl": 48, "cal": 48, "tl": 77, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.AIModerationService", "rp": "BLL_AIModerationService.html", "cl": 0, "ucl": 33, "cal": 33, "tl": 55, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.AIChatbotService", "rp": "BLL_AIChatbotService.html", "cl": 437, "ucl": 42, "cal": 479, "tl": 678, "cb": 94, "tb": 104, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.AIIntentService", "rp": "BLL_AIIntentService.html", "cl": 48, "ucl": 0, "cal": 48, "tl": 77, "cb": 2, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.AIModerationService", "rp": "BLL_AIModerationService.html", "cl": 33, "ucl": 0, "cal": 33, "tl": 55, "cb": 2, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.BookingAttendanceService", "rp": "BLL_BookingAttendanceService.html", "cl": 0, "ucl": 4, "cal": 4, "tl": 22, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.BranchRevenueAnalyticsService", "rp": "BLL_BranchRevenueAnalyticsService.html", "cl": 0, "ucl": 505, "cal": 505, "tl": 638, "cb": 0, "tb": 110, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.BusinessBookingService", "rp": "BLL_BusinessBookingService.html", "cl": 0, "ucl": 1003, "cal": 1003, "tl": 1338, "cb": 0, "tb": 208, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.BusinessBookingService", "rp": "BLL_BusinessBookingService.html", "cl": 845, "ucl": 158, "cal": 1003, "tl": 1338, "cb": 148, "tb": 208, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.BusinessService", "rp": "BLL_BusinessService.html", "cl": 0, "ucl": 264, "cal": 264, "tl": 348, "cb": 0, "tb": 82, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.CloudinaryService", "rp": "BLL_CloudinaryService.html", "cl": 0, "ucl": 19, "cal": 19, "tl": 40, "cb": 0, "tb": 6, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.FleetService", "rp": "BLL_FleetService.html", "cl": 0, "ucl": 388, "cal": 388, "tl": 527, "cb": 0, "tb": 70, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.GeminiAIService", "rp": "BLL_GeminiAIService.html", "cl": 0, "ucl": 52, "cal": 52, "tl": 78, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.InvoicePdfService", "rp": "BLL_InvoicePdfService.html", "cl": 0, "ucl": 177, "cal": 177, "tl": 197, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.CloudinaryService", "rp": "BLL_CloudinaryService.html", "cl": 8, "ucl": 11, "cal": 19, "tl": 40, "cb": 3, "tb": 6, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.FleetService", "rp": "BLL_FleetService.html", "cl": 359, "ucl": 29, "cal": 388, "tl": 527, "cb": 64, "tb": 70, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.GeminiAIService", "rp": "BLL_GeminiAIService.html", "cl": 52, "ucl": 0, "cal": 52, "tl": 78, "cb": 2, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.InvoicePdfService", "rp": "BLL_InvoicePdfService.html", "cl": 177, "ucl": 0, "cal": 177, "tl": 197, "cb": 1, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.InvoiceService", "rp": "BLL_InvoiceService.html", "cl": 0, "ucl": 4, "cal": 4, "tl": 110, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.LaneSchedulerService", "rp": "BLL_LaneSchedulerService.html", "cl": 0, "ucl": 143, "cal": 143, "tl": 227, "cb": 0, "tb": 28, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.LaneSchedulerService", "rp": "BLL_LaneSchedulerService.html", "cl": 140, "ucl": 3, "cal": 143, "tl": 227, "cb": 23, "tb": 28, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.LicensePlateResult", "rp": "BLL_LicensePlateResult.html", "cl": 0, "ucl": 4, "cal": 4, "tl": 29, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.LicensePlateService", "rp": "BLL_LicensePlateService.html", "cl": 0, "ucl": 237, "cal": 237, "tl": 354, "cb": 0, "tb": 46, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "BLL.Services.PaddleOcrService", "rp": "BLL_PaddleOcrService.html", "cl": 0, "ucl": 310, "cal": 310, "tl": 397, "cb": 0, "tb": 132, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "BLL.Services.PhotoService", "rp": "BLL_PhotoService.html", "cl": 0, "ucl": 28, "cal": 28, "tl": 53, "cb": 0, "tb": 4, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "FleetCheckoutResponseDTO", "rp": "BLL_FleetCheckoutResponseDTO.html", "cl": 0, "ucl": 5, "cal": 5, "tl": 8, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "BLL.Services.PhotoService", "rp": "BLL_PhotoService.html", "cl": 14, "ucl": 14, "cal": 28, "tl": 53, "cb": 2, "tb": 4, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "FleetCheckoutResponseDTO", "rp": "BLL_FleetCheckoutResponseDTO.html", "cl": 3, "ucl": 2, "cal": 5, "tl": 8, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
     ]},
 ];
 
@@ -391,22 +391,10 @@ var riskHotspotMetrics = [
 
 var riskHotspots = [
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CreateWalkInBookingAsync()", "methodShortName": "CreateWalkInBookingAsync()", "fileIndex": 0, "line": 1666,
-    "metrics": [
-      { "value": 17556, "exceeded": true },
-      { "value": 132, "exceeded": true },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.AI.Services.CarRecognitionService", "reportPath": "BLL_CarRecognitionService.html", "methodName": "InferVehicleType(System.String,System.String,System.String)", "methodShortName": "InferVehicleType(...)", "fileIndex": 0, "line": 105,
     "metrics": [
       { "value": 9312, "exceeded": true },
       { "value": 96, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.AIChatbotService", "reportPath": "BLL_AIChatbotService.html", "methodName": "ChatAsync()", "methodShortName": "ChatAsync()", "fileIndex": 0, "line": 33,
-    "metrics": [
-      { "value": 5852, "exceeded": true },
-      { "value": 76, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "BLL.Services.AI.Services.CarRecognitionService", "reportPath": "BLL_CarRecognitionService.html", "methodName": "RecognizeAsync()", "methodShortName": "RecognizeAsync()", "fileIndex": 0, "line": 29,
@@ -421,24 +409,6 @@ var riskHotspots = [
       { "value": 62, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CalculateBookingPricingAsync()", "methodShortName": "CalculateBookingPricingAsync()", "fileIndex": 0, "line": 1434,
-    "metrics": [
-      { "value": 3422, "exceeded": true },
-      { "value": 58, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CreateBookingAsync()", "methodShortName": "CreateBookingAsync()", "fileIndex": 0, "line": 1051,
-    "metrics": [
-      { "value": 3192, "exceeded": true },
-      { "value": 56, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryTransferService", "reportPath": "BLL_InventoryTransferService.html", "methodName": "AdjustManagerStockAsync()", "methodShortName": "AdjustManagerStockAsync()", "fileIndex": 0, "line": 169,
-    "metrics": [
-      { "value": 2756, "exceeded": true },
-      { "value": 52, "exceeded": true },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.BusinessService", "reportPath": "BLL_BusinessService.html", "methodName": "GetInvoiceExportAsync()", "methodShortName": "GetInvoiceExportAsync()", "fileIndex": 0, "line": 202,
     "metrics": [
       { "value": 2756, "exceeded": true },
@@ -449,30 +419,6 @@ var riskHotspots = [
     "metrics": [
       { "value": 2352, "exceeded": true },
       { "value": 48, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetAvailableSlotsAsync()", "methodShortName": "GetAvailableSlotsAsync()", "fileIndex": 0, "line": 50,
-    "metrics": [
-      { "value": 2162, "exceeded": true },
-      { "value": 46, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetBookingPaymentStatusAsync()", "methodShortName": "GetBookingPaymentStatusAsync()", "fileIndex": 0, "line": 515,
-    "metrics": [
-      { "value": 1980, "exceeded": true },
-      { "value": 44, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ValidateBookingCompatibilityAsync()", "methodShortName": "ValidateBookingCompatibilityAsync()", "fileIndex": 0, "line": 920,
-    "metrics": [
-      { "value": 1980, "exceeded": true },
-      { "value": 44, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.FleetService", "reportPath": "BLL_FleetService.html", "methodName": "ImportFleetAsync()", "methodShortName": "ImportFleetAsync()", "fileIndex": 0, "line": 35,
-    "metrics": [
-      { "value": 1980, "exceeded": true },
-      { "value": 44, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.OperationStaffService", "reportPath": "BLL_OperationStaffService.html", "methodName": "UpdateBookingStatusAsync()", "methodShortName": "UpdateBookingStatusAsync()", "fileIndex": 0, "line": 164,
@@ -487,52 +433,10 @@ var riskHotspots = [
       { "value": 41, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "UpdateBookingStatusAsync()", "methodShortName": "UpdateBookingStatusAsync()", "fileIndex": 0, "line": 856,
-    "metrics": [
-      { "value": 1482, "exceeded": true },
-      { "value": 38, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "UpdateBookingStatusByLicensePlateAsync()", "methodShortName": "UpdateBookingStatusByLicensePlateAsync()", "fileIndex": 0, "line": 670,
-    "metrics": [
-      { "value": 1482, "exceeded": true },
-      { "value": 38, "exceeded": true },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.PaddleOcrService", "reportPath": "BLL_PaddleOcrService.html", "methodName": "ReadTwoLinePlate(SkiaSharp.SKBitmap,System.String,System.ValueTuple\u00602\u003CSystem.String,System.Single\u003E)", "methodShortName": "ReadTwoLinePlate(...)", "fileIndex": 0, "line": 126,
     "metrics": [
       { "value": 1482, "exceeded": true },
       { "value": 38, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CancelBookingAsync()", "methodShortName": "CancelBookingAsync()", "fileIndex": 0, "line": 1329,
-    "metrics": [
-      { "value": 1332, "exceeded": true },
-      { "value": 36, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "AddVehicleAsync()", "methodShortName": "AddVehicleAsync()", "fileIndex": 0, "line": 52,
-    "metrics": [
-      { "value": 1332, "exceeded": true },
-      { "value": 36, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "UpdateVehicleAsync()", "methodShortName": "UpdateVehicleAsync()", "fileIndex": 0, "line": 311,
-    "metrics": [
-      { "value": 1332, "exceeded": true },
-      { "value": 36, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "RescheduleBookingAsync()", "methodShortName": "RescheduleBookingAsync()", "fileIndex": 0, "line": 2227,
-    "metrics": [
-      { "value": 1190, "exceeded": true },
-      { "value": 34, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "UpdateStaffAsync()", "methodShortName": "UpdateStaffAsync()", "fileIndex": 0, "line": 125,
-    "metrics": [
-      { "value": 1190, "exceeded": true },
-      { "value": 34, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.UserService", "reportPath": "BLL_UserService.html", "methodName": "GetProfileAsync()", "methodShortName": "GetProfileAsync()", "fileIndex": 0, "line": 24,
@@ -547,109 +451,13 @@ var riskHotspots = [
       { "value": 34, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "ConsumeMaterialAsync()", "methodShortName": "ConsumeMaterialAsync()", "fileIndex": 0, "line": 202,
-    "metrics": [
-      { "value": 1056, "exceeded": true },
-      { "value": 32, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetAvailableSlotsWithSuggestionAsync()", "methodShortName": "GetAvailableSlotsWithSuggestionAsync()", "fileIndex": 0, "line": 153,
-    "metrics": [
-      { "value": 1056, "exceeded": true },
-      { "value": 32, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WalletService", "reportPath": "BLL_WalletService.html", "methodName": "CreatePaymentQrAsync()", "methodShortName": "CreatePaymentQrAsync()", "fileIndex": 0, "line": 74,
-    "metrics": [
-      { "value": 1056, "exceeded": true },
-      { "value": 32, "exceeded": true },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.BranchRevenueAnalyticsService", "reportPath": "BLL_BranchRevenueAnalyticsService.html", "methodName": "GenerateComprehensiveStimulusAnalysisAsync()", "methodShortName": "GenerateComprehensiveStimulusAnalysisAsync()", "fileIndex": 0, "line": 414,
     "metrics": [
       { "value": 1056, "exceeded": true },
       { "value": 32, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "CreateBusinessBookingAsync()", "methodShortName": "CreateBusinessBookingAsync()", "fileIndex": 0, "line": 162,
-    "metrics": [
-      { "value": 1056, "exceeded": true },
-      { "value": 32, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "RescheduleBookingAsync()", "methodShortName": "RescheduleBookingAsync()", "fileIndex": 0, "line": 377,
-    "metrics": [
-      { "value": 1056, "exceeded": true },
-      { "value": 32, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ForceCancelBookingsAsync()", "methodShortName": "ForceCancelBookingsAsync()", "fileIndex": 0, "line": 2139,
-    "metrics": [
-      { "value": 930, "exceeded": true },
-      { "value": 30, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "MarkTransactionCompletedAsync()", "methodShortName": "MarkTransactionCompletedAsync()", "fileIndex": 0, "line": 601,
-    "metrics": [
-      { "value": 930, "exceeded": true },
-      { "value": 30, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "AutoCheckOutByLicensePlateAsync()", "methodShortName": "AutoCheckOutByLicensePlateAsync()", "fileIndex": 0, "line": 760,
-    "metrics": [
-      { "value": 812, "exceeded": true },
-      { "value": 28, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.CRMCampaignService", "reportPath": "BLL_CRMCampaignService.html", "methodName": "TriggerSmartWeatherCampaignAsync()", "methodShortName": "TriggerSmartWeatherCampaignAsync()", "fileIndex": 0, "line": 115,
-    "metrics": [
-      { "value": 812, "exceeded": true },
-      { "value": 28, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "MapStaff(AutoWashPro.DAL.Entities.User)", "methodShortName": "MapStaff(...)", "fileIndex": 0, "line": 575,
-    "metrics": [
-      { "value": 812, "exceeded": true },
-      { "value": 28, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "AutoCheckInAndStartProcessingAsync()", "methodShortName": "AutoCheckInAndStartProcessingAsync()", "fileIndex": 0, "line": 2350,
-    "metrics": [
-      { "value": 702, "exceeded": true },
-      { "value": 26, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ProcessOverdueAutomatedWashesAsync()", "methodShortName": "ProcessOverdueAutomatedWashesAsync()", "fileIndex": 0, "line": 2414,
-    "metrics": [
-      { "value": 702, "exceeded": true },
-      { "value": 26, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "UpdateVehicleConditionAsync()", "methodShortName": "UpdateVehicleConditionAsync()", "fileIndex": 0, "line": 1519,
-    "metrics": [
-      { "value": 702, "exceeded": true },
-      { "value": 26, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.PayOsService", "reportPath": "BLL_PayOsService.html", "methodName": "GetPaymentStatusAsync()", "methodShortName": "GetPaymentStatusAsync()", "fileIndex": 0, "line": 73,
-    "metrics": [
-      { "value": 600, "exceeded": true },
-      { "value": 24, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "ApproveNewVehicleTypeAsync()", "methodShortName": "ApproveNewVehicleTypeAsync()", "fileIndex": 0, "line": 180,
-    "metrics": [
-      { "value": 600, "exceeded": true },
-      { "value": 24, "exceeded": true },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.AI.Calculators.ConditionEvaluator", "reportPath": "BLL_ConditionEvaluator.html", "methodName": "CompareValues(System.Object,System.String)", "methodShortName": "CompareValues(...)", "fileIndex": 0, "line": 80,
-    "metrics": [
-      { "value": 600, "exceeded": true },
-      { "value": 24, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "GetVehiclesByStatusAsync()", "methodShortName": "GetVehiclesByStatusAsync()", "fileIndex": 0, "line": 1248,
     "metrics": [
       { "value": 600, "exceeded": true },
       { "value": 24, "exceeded": true },
@@ -667,90 +475,6 @@ var riskHotspots = [
       { "value": 22, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "MarkTransactionTerminalAsync()", "methodShortName": "MarkTransactionTerminalAsync()", "fileIndex": 0, "line": 645,
-    "metrics": [
-      { "value": 420, "exceeded": true },
-      { "value": 20, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "CreateShiftSwapRequestAsync()", "methodShortName": "CreateShiftSwapRequestAsync()", "fileIndex": 0, "line": 413,
-    "metrics": [
-      { "value": 420, "exceeded": true },
-      { "value": 20, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherService", "reportPath": "BLL_VoucherService.html", "methodName": "RedeemVoucherAsync()", "methodShortName": "RedeemVoucherAsync()", "fileIndex": 0, "line": 54,
-    "metrics": [
-      { "value": 420, "exceeded": true },
-      { "value": 20, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.AIChatbotService", "reportPath": "BLL_AIChatbotService.html", "methodName": "GetRecommendationAsync()", "methodShortName": "GetRecommendationAsync()", "fileIndex": 0, "line": 449,
-    "metrics": [
-      { "value": 420, "exceeded": true },
-      { "value": 20, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "ConsumeForCompletedBookingAsync()", "methodShortName": "ConsumeForCompletedBookingAsync()", "fileIndex": 0, "line": 20,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "AcceptRelocationAsync()", "methodShortName": "AcceptRelocationAsync()", "fileIndex": 0, "line": 2480,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryTransferService", "reportPath": "BLL_InventoryTransferService.html", "methodName": "ValidateMaterialForImportAsync()", "methodShortName": "ValidateMaterialForImportAsync()", "fileIndex": 0, "line": 337,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ServiceMaterialUsageService", "reportPath": "BLL_ServiceMaterialUsageService.html", "methodName": "UpdateAsync()", "methodShortName": "UpdateAsync()", "fileIndex": 0, "line": 94,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "CreatePersonnelAsync()", "methodShortName": "CreatePersonnelAsync()", "fileIndex": 0, "line": 79,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "RecognizeVehicleAsync()", "methodShortName": "RecognizeVehicleAsync()", "fileIndex": 0, "line": 407,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WeatherService", "reportPath": "BLL_WeatherService.html", "methodName": "IsRainOrThunderstorm(System.Text.Json.JsonElement)", "methodShortName": "IsRainOrThunderstorm(...)", "fileIndex": 0, "line": 124,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WeatherService", "reportPath": "BLL_WeatherService.html", "methodName": "IsProlongedRainAsync()", "methodShortName": "IsProlongedRainAsync()", "fileIndex": 0, "line": 58,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "GetAvailableSlotsForBusinessAsync()", "methodShortName": "GetAvailableSlotsForBusinessAsync()", "fileIndex": 0, "line": 37,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.LaneSchedulerService", "reportPath": "BLL_LaneSchedulerService.html", "methodName": "ScheduleFleetAsync()", "methodShortName": "ScheduleFleetAsync()", "fileIndex": 0, "line": 85,
-    "metrics": [
-      { "value": 342, "exceeded": true },
-      { "value": 18, "exceeded": true },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.LicensePlateService", "reportPath": "BLL_LicensePlateService.html", "methodName": "ReconcileResults(DAL.DTOs.SinglePlateResult,DAL.DTOs.SinglePlateResult)", "methodShortName": "ReconcileResults(...)", "fileIndex": 0, "line": 127,
     "metrics": [
       { "value": 342, "exceeded": true },
@@ -761,18 +485,6 @@ var riskHotspots = [
     "metrics": [
       { "value": 342, "exceeded": true },
       { "value": 18, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "LookupLicensePlateAsync()", "methodShortName": "LookupLicensePlateAsync()", "fileIndex": 0, "line": 358,
-    "metrics": [
-      { "value": 272, "exceeded": true },
-      { "value": 16, "exceeded": true },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.EmployeeService", "reportPath": "BLL_EmployeeService.html", "methodName": "TransferEmployeeAsync()", "methodShortName": "TransferEmployeeAsync()", "fileIndex": 0, "line": 62,
-    "metrics": [
-      { "value": 272, "exceeded": true },
-      { "value": 16, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherCampaignService", "reportPath": "BLL_VoucherCampaignService.html", "methodName": "CreateCampaignVoucherAsync()", "methodShortName": "CreateCampaignVoucherAsync()", "fileIndex": 0, "line": 278,
@@ -787,28 +499,16 @@ var riskHotspots = [
       { "value": 16, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.CRMCampaignService", "reportPath": "BLL_CRMCampaignService.html", "methodName": "SimulateSmartWeatherCampaignAsync()", "methodShortName": "SimulateSmartWeatherCampaignAsync()", "fileIndex": 0, "line": 274,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.PayOsService", "reportPath": "BLL_PayOsService.html", "methodName": "GetPaymentStatusAsync()", "methodShortName": "GetPaymentStatusAsync()", "fileIndex": 0, "line": 73,
     "metrics": [
-      { "value": 210, "exceeded": true },
-      { "value": 14, "exceeded": false },
+      { "value": 267, "exceeded": true },
+      { "value": 24, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ManagerService", "reportPath": "BLL_ManagerService.html", "methodName": "ScanAndNotifyRelocationAsync()", "methodShortName": "ScanAndNotifyRelocationAsync()", "fileIndex": 0, "line": 546,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WalletService", "reportPath": "BLL_WalletService.html", "methodName": "CreatePaymentQrAsync()", "methodShortName": "CreatePaymentQrAsync()", "fileIndex": 0, "line": 74,
     "metrics": [
-      { "value": 210, "exceeded": true },
-      { "value": 14, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ServiceMaterialUsageService", "reportPath": "BLL_ServiceMaterialUsageService.html", "methodName": "UpsertAsync()", "methodShortName": "UpsertAsync()", "fileIndex": 0, "line": 35,
-    "metrics": [
-      { "value": 210, "exceeded": true },
-      { "value": 14, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.TierService", "reportPath": "BLL_TierService.html", "methodName": "EvaluateTierForProfileAsync()", "methodShortName": "EvaluateTierForProfileAsync()", "fileIndex": 0, "line": 90,
-    "metrics": [
-      { "value": 210, "exceeded": true },
-      { "value": 14, "exceeded": false },
+      { "value": 211, "exceeded": true },
+      { "value": 32, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherCampaignService", "reportPath": "BLL_VoucherCampaignService.html", "methodName": "CanProcessCampaignNow(AutoWashPro.DAL.Entities.Voucher)", "methodShortName": "CanProcessCampaignNow(...)", "fileIndex": 0, "line": 342,
@@ -841,22 +541,22 @@ var riskHotspots = [
       { "value": 14, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.PayOsService", "reportPath": "BLL_PayOsService.html", "methodName": "VerifyWebhookDataAsync()", "methodShortName": "VerifyWebhookDataAsync()", "fileIndex": 0, "line": 45,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CreateWalkInBookingAsync()", "methodShortName": "CreateWalkInBookingAsync()", "fileIndex": 0, "line": 1666,
     "metrics": [
-      { "value": 156, "exceeded": true },
-      { "value": 12, "exceeded": false },
+      { "value": 195, "exceeded": true },
+      { "value": 132, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "ReviewShiftSwapRequestAsync()", "methodShortName": "ReviewShiftSwapRequestAsync()", "fileIndex": 0, "line": 445,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CalculateBookingPricingAsync()", "methodShortName": "CalculateBookingPricingAsync()", "fileIndex": 0, "line": 1434,
     "metrics": [
-      { "value": 156, "exceeded": true },
-      { "value": 12, "exceeded": false },
+      { "value": 177, "exceeded": true },
+      { "value": 58, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherService", "reportPath": "BLL_VoucherService.html", "methodName": "ValidateVoucherAvailability(AutoWashPro.DAL.Entities.Voucher)", "methodShortName": "ValidateVoucherAvailability(...)", "fileIndex": 0, "line": 297,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "UpdateStaffAsync()", "methodShortName": "UpdateStaffAsync()", "fileIndex": 0, "line": 125,
     "metrics": [
       { "value": 156, "exceeded": true },
-      { "value": 12, "exceeded": false },
+      { "value": 34, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "BLL.Services.AI.Services.ScenarioEvaluationService", "reportPath": "BLL_ScenarioEvaluationService.html", "methodName": "EvaluateCustomerAsync()", "methodShortName": "EvaluateCustomerAsync()", "fileIndex": 0, "line": 39,
@@ -877,58 +577,16 @@ var riskHotspots = [
       { "value": 12, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "CancelBookingAsync()", "methodShortName": "CancelBookingAsync()", "fileIndex": 0, "line": 631,
-    "metrics": [
-      { "value": 156, "exceeded": true },
-      { "value": 12, "exceeded": false },
-    ]},
-  {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.AuthService", "reportPath": "BLL_AuthService.html", "methodName": "GetFullName(AutoWashPro.DAL.Entities.User)", "methodShortName": "GetFullName(...)", "fileIndex": 0, "line": 336,
     "metrics": [
       { "value": 143, "exceeded": true },
       { "value": 30, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "CreateExtraUsageRequestAsync()", "methodShortName": "CreateExtraUsageRequestAsync()", "fileIndex": 0, "line": 77,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CancelBookingAsync()", "methodShortName": "CancelBookingAsync()", "fileIndex": 0, "line": 1329,
     "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "SendBookingConfirmationEmailAsync()", "methodShortName": "SendBookingConfirmationEmailAsync()", "fileIndex": 0, "line": 1000,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.CarModelService", "reportPath": "BLL_CarModelService.html", "methodName": "RequestNewCarModelAsync()", "methodShortName": "RequestNewCarModelAsync()", "fileIndex": 0, "line": 86,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.CRMCampaignService", "reportPath": "BLL_CRMCampaignService.html", "methodName": "TriggerWeatherCampaignAsync()", "methodShortName": "TriggerWeatherCampaignAsync()", "fileIndex": 0, "line": 44,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.EmailService", "reportPath": "BLL_EmailService.html", "methodName": "SendWithSendGridAsync()", "methodShortName": "SendWithSendGridAsync()", "fileIndex": 0, "line": 35,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryTransferService", "reportPath": "BLL_InventoryTransferService.html", "methodName": "DiscardManagerBatchAsync()", "methodShortName": "DiscardManagerBatchAsync()", "fileIndex": 0, "line": 116,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.MaterialService", "reportPath": "BLL_MaterialService.html", "methodName": "DiscardBatchAsync()", "methodShortName": "DiscardBatchAsync()", "fileIndex": 0, "line": 216,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
+      { "value": 117, "exceeded": true },
+      { "value": 36, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.OperationStaffService", "reportPath": "BLL_OperationStaffService.html", "methodName": "CheckInBookingAsync()", "methodShortName": "CheckInBookingAsync()", "fileIndex": 0, "line": 57,
@@ -937,25 +595,7 @@ var riskHotspots = [
       { "value": 10, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ServiceMaterialUsageService", "reportPath": "BLL_ServiceMaterialUsageService.html", "methodName": "ResolveItems(AutoWashPro.BLL.DTOs.UpsertServiceMaterialUsageDTO)", "methodShortName": "ResolveItems(...)", "fileIndex": 0, "line": 196,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "GetPersonnelName(AutoWashPro.DAL.Entities.User)", "methodShortName": "GetPersonnelName(...)", "fileIndex": 0, "line": 601,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.UserService", "reportPath": "BLL_UserService.html", "methodName": "DeleteAccountAsync()", "methodShortName": "DeleteAccountAsync()", "fileIndex": 0, "line": 152,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "RejectNewVehicleTypeAsync()", "methodShortName": "RejectNewVehicleTypeAsync()", "fileIndex": 0, "line": 261,
     "metrics": [
       { "value": 110, "exceeded": true },
       { "value": 10, "exceeded": false },
@@ -979,55 +619,31 @@ var riskHotspots = [
       { "value": 10, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "CheckOutAsync()", "methodShortName": "CheckOutAsync()", "fileIndex": 0, "line": 860,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.PaddleOcrService", "reportPath": "BLL_PaddleOcrService.html", "methodName": "PostProcessPlateText(System.String)", "methodShortName": "PostProcessPlateText(...)", "fileIndex": 0, "line": 304,
     "metrics": [
       { "value": 110, "exceeded": true },
       { "value": 10, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryTransferService", "reportPath": "BLL_InventoryTransferService.html", "methodName": "MapTransaction(AutoWashPro.DAL.Entities.InventoryTransaction)", "methodShortName": "MapTransaction(...)", "fileIndex": 0, "line": 460,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.EmailService", "reportPath": "BLL_EmailService.html", "methodName": "SendWithSendGridAsync()", "methodShortName": "SendWithSendGridAsync()", "fileIndex": 0, "line": 35,
     "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
+      { "value": 82, "exceeded": true },
+      { "value": 10, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ManagerService", "reportPath": "BLL_ManagerService.html", "methodName": "AssignStaffToLaneAsync()", "methodShortName": "AssignStaffToLaneAsync()", "fileIndex": 0, "line": 64,
+    "assembly": "BLL", "class": "BLL.Services.AIChatbotService", "reportPath": "BLL_AIChatbotService.html", "methodName": "ChatAsync()", "methodShortName": "ChatAsync()", "fileIndex": 0, "line": 33,
     "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
+      { "value": 80, "exceeded": true },
+      { "value": 76, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ManagerService", "reportPath": "BLL_ManagerService.html", "methodName": "ConfirmCheckInAndAssignLaneAsync()", "methodShortName": "ConfirmCheckInAndAssignLaneAsync()", "fileIndex": 0, "line": 344,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "UpdateVehicleAsync()", "methodShortName": "UpdateVehicleAsync()", "fileIndex": 0, "line": 311,
     "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ManagerService", "reportPath": "BLL_ManagerService.html", "methodName": "UpdateTimeSlotAsync()", "methodShortName": "UpdateTimeSlotAsync()", "fileIndex": 0, "line": 418,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.MaterialService", "reportPath": "BLL_MaterialService.html", "methodName": "UpdateMaterialUnitAsync()", "methodShortName": "UpdateMaterialUnitAsync()", "fileIndex": 0, "line": 87,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
+      { "value": 77, "exceeded": true },
+      { "value": 36, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.OperationStaffService", "reportPath": "BLL_OperationStaffService.html", "methodName": "SwapShiftByPhoneAsync()", "methodShortName": "SwapShiftByPhoneAsync()", "fileIndex": 0, "line": 239,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "ReviewOvertimeRequestAsync()", "methodShortName": "ReviewOvertimeRequestAsync()", "fileIndex": 0, "line": 379,
     "metrics": [
       { "value": 72, "exceeded": true },
       { "value": 8, "exceeded": false },
@@ -1040,30 +656,6 @@ var riskHotspots = [
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherCampaignService", "reportPath": "BLL_VoucherCampaignService.html", "methodName": "GetEligibleUsersAsync()", "methodShortName": "GetEligibleUsersAsync()", "fileIndex": 0, "line": 212,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherService", "reportPath": "BLL_VoucherService.html", "methodName": "ConsumePhysicalVoucherAsync()", "methodShortName": "ConsumePhysicalVoucherAsync()", "fileIndex": 0, "line": 272,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherService", "reportPath": "BLL_VoucherService.html", "methodName": "GrantVouchersAsync()", "methodShortName": "GrantVouchersAsync()", "fileIndex": 0, "line": 121,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherService", "reportPath": "BLL_VoucherService.html", "methodName": "UpdateVoucherAsync()", "methodShortName": "UpdateVoucherAsync()", "fileIndex": 0, "line": 189,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WalletService", "reportPath": "BLL_WalletService.html", "methodName": "NormalizePaymentType(System.String)", "methodShortName": "NormalizePaymentType(...)", "fileIndex": 0, "line": 548,
     "metrics": [
       { "value": 72, "exceeded": true },
       { "value": 8, "exceeded": false },
@@ -1099,18 +691,6 @@ var riskHotspots = [
       { "value": 8, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "AssignLaneAsync()", "methodShortName": "AssignLaneAsync()", "fileIndex": 0, "line": 1138,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "GetFleetWashHistoryAsync()", "methodShortName": "GetFleetWashHistoryAsync()", "fileIndex": 0, "line": 936,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "StartProcessingAsync()", "methodShortName": "StartProcessingAsync()", "fileIndex": 0, "line": 805,
     "metrics": [
       { "value": 72, "exceeded": true },
@@ -1123,121 +703,67 @@ var riskHotspots = [
       { "value": 8, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "BLL.Services.FleetService", "reportPath": "BLL_FleetService.html", "methodName": "GetHistoryAsync()", "methodShortName": "GetHistoryAsync()", "fileIndex": 0, "line": 354,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "CreateBookingAsync()", "methodShortName": "CreateBookingAsync()", "fileIndex": 0, "line": 1051,
     "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
+      { "value": 65, "exceeded": true },
+      { "value": 56, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "BLL.Services.LaneSchedulerService", "reportPath": "BLL_LaneSchedulerService.html", "methodName": "GetLaneProjectedFreeTimesAsync()", "methodShortName": "GetLaneProjectedFreeTimesAsync()", "fileIndex": 0, "line": 27,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ForceCancelBookingsAsync()", "methodShortName": "ForceCancelBookingsAsync()", "fileIndex": 0, "line": 2139,
     "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
+      { "value": 54, "exceeded": true },
+      { "value": 30, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "ApproveExtraUsageRequestAsync()", "methodShortName": "ApproveExtraUsageRequestAsync()", "fileIndex": 0, "line": 124,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryTransferService", "reportPath": "BLL_InventoryTransferService.html", "methodName": "AdjustManagerStockAsync()", "methodShortName": "AdjustManagerStockAsync()", "fileIndex": 0, "line": 169,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 52, "exceeded": true },
+      { "value": 52, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "GetBranchWarehouseAsync()", "methodShortName": "GetBranchWarehouseAsync()", "fileIndex": 0, "line": 351,
+    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "GetVehiclesByStatusAsync()", "methodShortName": "GetVehiclesByStatusAsync()", "fileIndex": 0, "line": 1248,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 52, "exceeded": true },
+      { "value": 24, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "GetConditionMultiplierAsync()", "methodShortName": "GetConditionMultiplierAsync()", "fileIndex": 0, "line": 383,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetAvailableSlotsAsync()", "methodShortName": "GetAvailableSlotsAsync()", "fileIndex": 0, "line": 50,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 47, "exceeded": true },
+      { "value": 46, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "RejectExtraUsageRequestAsync()", "methodShortName": "RejectExtraUsageRequestAsync()", "fileIndex": 0, "line": 155,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetBookingPaymentStatusAsync()", "methodShortName": "GetBookingPaymentStatusAsync()", "fileIndex": 0, "line": 515,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 45, "exceeded": true },
+      { "value": 44, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ToPayOsAmount(System.Decimal)", "methodShortName": "ToPayOsAmount(...)", "fileIndex": 0, "line": 2579,
+    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "RescheduleBookingAsync()", "methodShortName": "RescheduleBookingAsync()", "fileIndex": 0, "line": 377,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 45, "exceeded": true },
+      { "value": 32, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetAllBookingsByDateAsync()", "methodShortName": "GetAllBookingsByDateAsync()", "fileIndex": 0, "line": 286,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ValidateBookingCompatibilityAsync()", "methodShortName": "ValidateBookingCompatibilityAsync()", "fileIndex": 0, "line": 920,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 44, "exceeded": true },
+      { "value": 44, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetBookingByIdAsync()", "methodShortName": "GetBookingByIdAsync()", "fileIndex": 0, "line": 325,
+    "assembly": "BLL", "class": "BLL.Services.FleetService", "reportPath": "BLL_FleetService.html", "methodName": "ImportFleetAsync()", "methodShortName": "ImportFleetAsync()", "fileIndex": 0, "line": 35,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 44, "exceeded": true },
+      { "value": 44, "exceeded": true },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetMyBookingsAsync()", "methodShortName": "GetMyBookingsAsync()", "fileIndex": 0, "line": 1298,
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "AcceptRelocationAsync()", "methodShortName": "AcceptRelocationAsync()", "fileIndex": 0, "line": 2480,
     "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ReportMismatchAsync()", "methodShortName": "ReportMismatchAsync()", "fileIndex": 0, "line": 1639,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.CarModelService", "reportPath": "BLL_CarModelService.html", "methodName": "ApproveCarModelAsync()", "methodShortName": "ApproveCarModelAsync()", "fileIndex": 0, "line": 164,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.CRMCampaignService", "reportPath": "BLL_CRMCampaignService.html", "methodName": "GetOrCreateWeatherCampaignScenarioAsync()", "methodShortName": "GetOrCreateWeatherCampaignScenarioAsync()", "fileIndex": 0, "line": 376,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.EmployeeService", "reportPath": "BLL_EmployeeService.html", "methodName": "CreateEmployeeAsync()", "methodShortName": "CreateEmployeeAsync()", "fileIndex": 0, "line": 22,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryReportService", "reportPath": "BLL_InventoryReportService.html", "methodName": "BuildReportAsync()", "methodShortName": "BuildReportAsync()", "fileIndex": 0, "line": 38,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryTransferService", "reportPath": "BLL_InventoryTransferService.html", "methodName": "MapStock(AutoWashPro.DAL.Entities.WarehouseStock)", "methodShortName": "MapStock(...)", "fileIndex": 0, "line": 419,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
+      { "value": 43, "exceeded": true },
+      { "value": 18, "exceeded": true },
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.LaneService", "reportPath": "BLL_LaneService.html", "methodName": "UpdateLaneAsync()", "methodShortName": "UpdateLaneAsync()", "fileIndex": 0, "line": 84,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ManagerService", "reportPath": "BLL_ManagerService.html", "methodName": "DeleteTimeSlotAsync()", "methodShortName": "DeleteTimeSlotAsync()", "fileIndex": 0, "line": 465,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ManagerService", "reportPath": "BLL_ManagerService.html", "methodName": "UnassignStaffFromLaneAsync()", "methodShortName": "UnassignStaffFromLaneAsync()", "fileIndex": 0, "line": 116,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.PayOsService", "reportPath": "BLL_PayOsService.html", "methodName": "CreatePaymentLinkAsync()", "methodShortName": "CreatePaymentLinkAsync()", "fileIndex": 0, "line": 22,
     "metrics": [
       { "value": 42, "exceeded": true },
       { "value": 6, "exceeded": false },
@@ -1250,18 +776,6 @@ var riskHotspots = [
     ]},
   {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "ApplyAssignmentFilters(System.Linq.IQueryable\u00601\u003CAutoWashPro.DAL.Entities.StaffShiftAssignment\u003E\u0026,System.Nullable\u00601\u003CSystem.DateTime\u003E,System.Nullable\u00601\u003CSystem.DateTime\u003E,System.Nullable\u00601\u003CSystem.Int32\u003E)", "methodShortName": "ApplyAssignmentFilters(...)", "fileIndex": 0, "line": 530,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "CreateShiftAssignmentAsync()", "methodShortName": "CreateShiftAssignmentAsync()", "fileIndex": 0, "line": 285,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "GetStaffsAsync()", "methodShortName": "GetStaffsAsync()", "fileIndex": 0, "line": 20,
     "metrics": [
       { "value": 42, "exceeded": true },
       { "value": 6, "exceeded": false },
@@ -1291,25 +805,7 @@ var riskHotspots = [
       { "value": 6, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherService", "reportPath": "BLL_VoucherService.html", "methodName": "CreateVoucherAsync()", "methodShortName": "CreateVoucherAsync()", "fileIndex": 0, "line": 150,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WalletService", "reportPath": "BLL_WalletService.html", "methodName": "ToPayOsAmount(System.Decimal)", "methodShortName": "ToPayOsAmount(...)", "fileIndex": 0, "line": 534,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WalletService", "reportPath": "BLL_WalletService.html", "methodName": "DeductSpendablePointsAsync()", "methodShortName": "DeductSpendablePointsAsync()", "fileIndex": 0, "line": 407,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WalletService", "reportPath": "BLL_WalletService.html", "methodName": "GetWalletInfoAsync()", "methodShortName": "GetWalletInfoAsync()", "fileIndex": 0, "line": 37,
     "metrics": [
       { "value": 42, "exceeded": true },
       { "value": 6, "exceeded": false },
@@ -1351,25 +847,7 @@ var riskHotspots = [
       { "value": 6, "exceeded": false },
     ]},
   {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "CheckInAsync()", "methodShortName": "CheckInAsync()", "fileIndex": 0, "line": 686,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "WalkInAsync()", "methodShortName": "WalkInAsync()", "fileIndex": 0, "line": 727,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
     "assembly": "BLL", "class": "BLL.Services.BusinessService", "reportPath": "BLL_BusinessService.html", "methodName": "ReviewBusinessProfileAsync()", "methodShortName": "ReviewBusinessProfileAsync()", "fileIndex": 0, "line": 123,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "BLL", "class": "BLL.Services.CloudinaryService", "reportPath": "BLL_CloudinaryService.html", "methodName": "UploadFileAsync()", "methodShortName": "UploadFileAsync()", "fileIndex": 0, "line": 18,
     "metrics": [
       { "value": 42, "exceeded": true },
       { "value": 6, "exceeded": false },
@@ -1387,6 +865,96 @@ var riskHotspots = [
       { "value": 6, "exceeded": false },
     ]},
   {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "UpdateBookingStatusByLicensePlateAsync()", "methodShortName": "UpdateBookingStatusByLicensePlateAsync()", "fileIndex": 0, "line": 670,
+    "metrics": [
+      { "value": 39, "exceeded": true },
+      { "value": 38, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "AddVehicleAsync()", "methodShortName": "AddVehicleAsync()", "fileIndex": 0, "line": 52,
+    "metrics": [
+      { "value": 39, "exceeded": true },
+      { "value": 36, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "UpdateBookingStatusAsync()", "methodShortName": "UpdateBookingStatusAsync()", "fileIndex": 0, "line": 856,
+    "metrics": [
+      { "value": 38, "exceeded": true },
+      { "value": 38, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "UpdateVehicleConditionAsync()", "methodShortName": "UpdateVehicleConditionAsync()", "fileIndex": 0, "line": 1519,
+    "metrics": [
+      { "value": 36, "exceeded": true },
+      { "value": 26, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "MarkTransactionCompletedAsync()", "methodShortName": "MarkTransactionCompletedAsync()", "fileIndex": 0, "line": 601,
+    "metrics": [
+      { "value": 34, "exceeded": true },
+      { "value": 30, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "RescheduleBookingAsync()", "methodShortName": "RescheduleBookingAsync()", "fileIndex": 0, "line": 2227,
+    "metrics": [
+      { "value": 34, "exceeded": true },
+      { "value": 34, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "CreateBusinessBookingAsync()", "methodShortName": "CreateBusinessBookingAsync()", "fileIndex": 0, "line": 162,
+    "metrics": [
+      { "value": 33, "exceeded": true },
+      { "value": 32, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "ConsumeMaterialAsync()", "methodShortName": "ConsumeMaterialAsync()", "fileIndex": 0, "line": 202,
+    "metrics": [
+      { "value": 32, "exceeded": true },
+      { "value": 32, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "GetAvailableSlotsWithSuggestionAsync()", "methodShortName": "GetAvailableSlotsWithSuggestionAsync()", "fileIndex": 0, "line": 153,
+    "metrics": [
+      { "value": 32, "exceeded": true },
+      { "value": 32, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "AutoCheckOutByLicensePlateAsync()", "methodShortName": "AutoCheckOutByLicensePlateAsync()", "fileIndex": 0, "line": 760,
+    "metrics": [
+      { "value": 28, "exceeded": false },
+      { "value": 28, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.CRMCampaignService", "reportPath": "BLL_CRMCampaignService.html", "methodName": "TriggerSmartWeatherCampaignAsync()", "methodShortName": "TriggerSmartWeatherCampaignAsync()", "fileIndex": 0, "line": 115,
+    "metrics": [
+      { "value": 28, "exceeded": false },
+      { "value": 28, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "MapStaff(AutoWashPro.DAL.Entities.User)", "methodShortName": "MapStaff(...)", "fileIndex": 0, "line": 575,
+    "metrics": [
+      { "value": 28, "exceeded": false },
+      { "value": 28, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "AutoCheckInAndStartProcessingAsync()", "methodShortName": "AutoCheckInAndStartProcessingAsync()", "fileIndex": 0, "line": 2350,
+    "metrics": [
+      { "value": 26, "exceeded": false },
+      { "value": 26, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "ProcessOverdueAutomatedWashesAsync()", "methodShortName": "ProcessOverdueAutomatedWashesAsync()", "fileIndex": 0, "line": 2414,
+    "metrics": [
+      { "value": 26, "exceeded": false },
+      { "value": 26, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "ApproveNewVehicleTypeAsync()", "methodShortName": "ApproveNewVehicleTypeAsync()", "fileIndex": 0, "line": 180,
+    "metrics": [
+      { "value": 26, "exceeded": false },
+      { "value": 24, "exceeded": true },
+    ]},
+  {
     "assembly": "BLL", "class": "AutoWashPro.BLL.Services.AuthService", "reportPath": "BLL_AuthService.html", "methodName": "VerifyOtpAsync()", "methodShortName": "VerifyOtpAsync()", "fileIndex": 0, "line": 197,
     "metrics": [
       { "value": 29, "exceeded": false },
@@ -1397,6 +965,96 @@ var riskHotspots = [
     "metrics": [
       { "value": 20, "exceeded": false },
       { "value": 20, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "MarkTransactionTerminalAsync()", "methodShortName": "MarkTransactionTerminalAsync()", "fileIndex": 0, "line": 645,
+    "metrics": [
+      { "value": 23, "exceeded": false },
+      { "value": 20, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "CreateShiftSwapRequestAsync()", "methodShortName": "CreateShiftSwapRequestAsync()", "fileIndex": 0, "line": 413,
+    "metrics": [
+      { "value": 20, "exceeded": false },
+      { "value": 20, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VoucherService", "reportPath": "BLL_VoucherService.html", "methodName": "RedeemVoucherAsync()", "methodShortName": "RedeemVoucherAsync()", "fileIndex": 0, "line": 54,
+    "metrics": [
+      { "value": 21, "exceeded": false },
+      { "value": 20, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "BLL.Services.AIChatbotService", "reportPath": "BLL_AIChatbotService.html", "methodName": "GetRecommendationAsync()", "methodShortName": "GetRecommendationAsync()", "fileIndex": 0, "line": 449,
+    "metrics": [
+      { "value": 20, "exceeded": false },
+      { "value": 20, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingMaterialUsageService", "reportPath": "BLL_BookingMaterialUsageService.html", "methodName": "ConsumeForCompletedBookingAsync()", "methodShortName": "ConsumeForCompletedBookingAsync()", "fileIndex": 0, "line": 20,
+    "metrics": [
+      { "value": 18, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.InventoryTransferService", "reportPath": "BLL_InventoryTransferService.html", "methodName": "ValidateMaterialForImportAsync()", "methodShortName": "ValidateMaterialForImportAsync()", "fileIndex": 0, "line": 337,
+    "metrics": [
+      { "value": 18, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.ServiceMaterialUsageService", "reportPath": "BLL_ServiceMaterialUsageService.html", "methodName": "UpdateAsync()", "methodShortName": "UpdateAsync()", "fileIndex": 0, "line": 94,
+    "metrics": [
+      { "value": 19, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.StaffManagementService", "reportPath": "BLL_StaffManagementService.html", "methodName": "CreatePersonnelAsync()", "methodShortName": "CreatePersonnelAsync()", "fileIndex": 0, "line": 79,
+    "metrics": [
+      { "value": 18, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.VehicleService", "reportPath": "BLL_VehicleService.html", "methodName": "RecognizeVehicleAsync()", "methodShortName": "RecognizeVehicleAsync()", "fileIndex": 0, "line": 407,
+    "metrics": [
+      { "value": 18, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WeatherService", "reportPath": "BLL_WeatherService.html", "methodName": "IsRainOrThunderstorm(System.Text.Json.JsonElement)", "methodShortName": "IsRainOrThunderstorm(...)", "fileIndex": 0, "line": 124,
+    "metrics": [
+      { "value": 21, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.WeatherService", "reportPath": "BLL_WeatherService.html", "methodName": "IsProlongedRainAsync()", "methodShortName": "IsProlongedRainAsync()", "fileIndex": 0, "line": 58,
+    "metrics": [
+      { "value": 18, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "BLL.Services.BusinessBookingService", "reportPath": "BLL_BusinessBookingService.html", "methodName": "GetAvailableSlotsForBusinessAsync()", "methodShortName": "GetAvailableSlotsForBusinessAsync()", "fileIndex": 0, "line": 37,
+    "metrics": [
+      { "value": 18, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "BLL.Services.LaneSchedulerService", "reportPath": "BLL_LaneSchedulerService.html", "methodName": "ScheduleFleetAsync()", "methodShortName": "ScheduleFleetAsync()", "fileIndex": 0, "line": 85,
+    "metrics": [
+      { "value": 18, "exceeded": false },
+      { "value": 18, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.BookingService", "reportPath": "BLL_BookingService.html", "methodName": "LookupLicensePlateAsync()", "methodShortName": "LookupLicensePlateAsync()", "fileIndex": 0, "line": 358,
+    "metrics": [
+      { "value": 16, "exceeded": false },
+      { "value": 16, "exceeded": true },
+    ]},
+  {
+    "assembly": "BLL", "class": "AutoWashPro.BLL.Services.EmployeeService", "reportPath": "BLL_EmployeeService.html", "methodName": "TransferEmployeeAsync()", "methodShortName": "TransferEmployeeAsync()", "fileIndex": 0, "line": 62,
+    "metrics": [
+      { "value": 16, "exceeded": false },
+      { "value": 16, "exceeded": true },
     ]},
 ];
 
