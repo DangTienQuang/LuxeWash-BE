@@ -16,7 +16,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static BLL.Services.FleetService;
-
 namespace BLL.Services
 {
     public class FleetService : IFleetService
@@ -24,33 +23,27 @@ namespace BLL.Services
         private readonly AutoWashDbContext _context;
         private readonly ICloudinaryService _cloudinaryService;
         private readonly IConfiguration _configuration;
-
         public FleetService(AutoWashDbContext context, ICloudinaryService cloudinaryService, IConfiguration configuration)
         {
             _context = context;
             _cloudinaryService = cloudinaryService;
             _configuration = configuration;
         }
-
         public async Task<FleetImportResultDTO> ImportFleetAsync(int userId, IFormFile file)
         {
             var business = await _context.BusinessProfiles.FirstOrDefaultAsync(x =>
                     x.UserId == userId &&
                     x.ApprovalStatus == "Approved");
-
             if (business == null)
             {
                 throw new BadRequestException("Business account has not been approved.");
             }
-
             if (file == null || file.Length == 0)
             {
                 throw new BadRequestException("Please upload an Excel file.");
             }
-
             var fileUrl =
                 await _cloudinaryService.UploadFileAsync(file, "fleet-imports");
-
             var batch = new FleetImportBatch
             {
                 BusinessProfileId = business.BusinessProfileId,
@@ -58,29 +51,19 @@ namespace BLL.Services
                 Status = "Processing",
                 CreatedAt = DateTime.UtcNow
             };
-
             _context.FleetImportBatches.Add(batch);
-
             await _context.SaveChangesAsync();
-
             using var stream = new MemoryStream();
-
             await file.CopyToAsync(stream);
-
             stream.Position = 0;
-
             using var package = new ExcelPackage(stream);
-
             var worksheet = package.Workbook.Worksheets[0];
-
             if (worksheet?.Dimension == null)
             {
                 throw new BadRequestException("The Excel file contains no data.");
             }
             int rowCount = worksheet.Dimension.Rows;
-
             var importedPlates = new HashSet<string>();
-
             for (int row = 2; row <= rowCount; row++)
             {
                 string licensePlate = worksheet.Cells[row, 2].Text.Trim();
@@ -89,8 +72,6 @@ namespace BLL.Services
                 string model = worksheet.Cells[row, 5].Text.Trim();
                 string driverName = worksheet.Cells[row, 6].Text.Trim();
                 string employeeCode = worksheet.Cells[row, 7].Text.Trim();
-
-                // Skip completely empty rows
                 bool isEmptyRow =
                     string.IsNullOrWhiteSpace(licensePlate) &&
                     string.IsNullOrWhiteSpace(vehicleTypeName) &&
@@ -98,42 +79,32 @@ namespace BLL.Services
                     string.IsNullOrWhiteSpace(model) &&
                     string.IsNullOrWhiteSpace(driverName) &&
                     string.IsNullOrWhiteSpace(employeeCode);
-
                 if (isEmptyRow)
                 {
                     continue;
                 }
-
                 var errors = new List<string>();
-
                 if (string.IsNullOrWhiteSpace(licensePlate))
                 {
                     errors.Add("License plate cannot be empty.");
                 }
-
                 if (importedPlates.Contains(licensePlate))
                 {
                     errors.Add("Duplicate license plate found in file.");
                 }
-
                 bool existed = await _context.FleetVehicles.AnyAsync(x => x.LicensePlate == licensePlate);
-
                 if (existed)
                 {
                     errors.Add("License plate already exists in the system.");
                 }
-
                 importedPlates.Add(licensePlate);
-
                 var vehicleType = await _context.VehicleTypes
                     .FirstOrDefaultAsync(x => x.Name.ToLower().Contains(vehicleTypeName.ToLower()) || 
                                               x.Name == vehicleTypeName);
-
                 if (vehicleType == null)
                 {
                     errors.Add($"Vehicle Type '{vehicleTypeName}' not found in the system.");
                 }
-
                 if (errors.Any())
                 {
                     foreach (var error in errors)
@@ -145,18 +116,14 @@ namespace BLL.Services
                             ErrorMessage = error
                         });
                     }
-
                     batch.FailedRows++;
                     continue;
                 }
-
-                // Auto-approve if CarModel (Brand + Model name) already exists and is Active
                 bool carModelExists = await _context.CarModels.AnyAsync(x =>
                     x.Brand == brand &&
                     x.Name == model &&
                     x.VehicleTypeId == vehicleType!.Id &&
                     x.IsActive == true);
-
                 var fleetVehicle = new FleetVehicle
                 {
                     BusinessProfileId = business.BusinessProfileId,
@@ -170,12 +137,10 @@ namespace BLL.Services
                     Status = carModelExists ? "Active" : "PendingApproval",
                     CreatedAt = DateTime.UtcNow
                 };
-
                 _context.FleetVehicles.Add(fleetVehicle);
                 batch.SuccessRows++;
             }
             batch.TotalRows = batch.SuccessRows + batch.FailedRows;
-
             if (batch.SuccessRows == 0)
             {
                 batch.Status = "Failed";
@@ -188,9 +153,7 @@ namespace BLL.Services
             {
                 batch.Status = "Completed";
             }
-
             await _context.SaveChangesAsync();
-
             return new FleetImportResultDTO
             {
                 FleetImportBatchId = batch.FleetImportBatchId,
@@ -200,23 +163,19 @@ namespace BLL.Services
                 Status = batch.Status
             };
         }
-
         public async Task<List<FleetImportBatch>> GetImportBatchesAsync()
         {
             return await _context.FleetImportBatches
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
         }
-
         public async Task<FleetImportDetailDTO> GetImportBatchDetailAsync(int batchId)
         {
             var batch = await _context.FleetImportBatches.FirstOrDefaultAsync(x => x.FleetImportBatchId == batchId);
-
             if (batch == null)
             {
                 throw new NotFoundException("Vehicle import batch not found.");
             }
-
             var errors = await _context.FleetImportErrors
                     .Where(x => x.FleetImportBatchId == batchId)
                     .Select(x =>
@@ -226,7 +185,6 @@ namespace BLL.Services
                             ErrorMessage = x.ErrorMessage
                         })
                     .ToListAsync();
-
             return new FleetImportDetailDTO
             {
                 FleetImportBatchId = batch.FleetImportBatchId,
@@ -237,16 +195,13 @@ namespace BLL.Services
                 Errors = errors
             };
         }
-
         public async Task<List<FleetVehicleDTO>> GetPendingVehiclesAsync(int businessUserId)
         {
             var business = await _context.BusinessProfiles.FirstOrDefaultAsync(x => x.UserId == businessUserId);
-
             if (business == null)
             {
                 throw new NotFoundException("Business profile not found.");
             }
-
             return await _context.FleetVehicles
                 .Include(x => x.VehicleType)
                 .Where(x =>
@@ -266,7 +221,6 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-
         public async Task<List<StaffPendingVehicleDTO>> GetAllPendingVehiclesAsync(int? businessProfileId = null)
         {
             var query = _context.FleetVehicles
@@ -274,12 +228,10 @@ namespace BLL.Services
                 .Include(x => x.VehicleType)
                 .Include(x => x.BusinessProfile)
                 .Where(x => x.Status == "PendingApproval");
-
             if (businessProfileId.HasValue)
             {
                 query = query.Where(x => x.BusinessProfileId == businessProfileId.Value);
             }
-
             return await query
                 .OrderBy(x => x.CreatedAt)
                 .Select(x => new StaffPendingVehicleDTO
@@ -299,36 +251,27 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-
         public async Task ApproveFleetVehicleAsync(int fleetVehicleId)
         {
             var vehicle = await _context.FleetVehicles.FirstOrDefaultAsync(x => x.FleetVehicleId == fleetVehicleId);
-
             if (vehicle == null)
             {
                 throw new NotFoundException("Vehicle not found in the fleet.");
             }
-
             vehicle.Status = "Active";
-
             await _context.SaveChangesAsync();
         }
-
         public async Task RejectFleetVehicleAsync(int fleetVehicleId, string reason)
         {
             var vehicle = await _context.FleetVehicles.FirstOrDefaultAsync(x => x.FleetVehicleId == fleetVehicleId);
-
             if (vehicle == null)
             {
                 throw new NotFoundException("Vehicle not found in the fleet.");
             }
-
             vehicle.Status = "Rejected";
             vehicle.RejectionReason = reason;
-
             await _context.SaveChangesAsync();
         }
-
         public async Task<List<FleetQueueDTO>> GetBusinessQueueAsync(int branchId)
         {
             var queue = await _context.FleetWashLogs
@@ -338,7 +281,6 @@ namespace BLL.Services
                     x.Status == "CheckedIn")
                 .OrderBy(x => x.CheckInTime)
                 .ToListAsync();
-
             return queue
                 .Select((x, index) => new FleetQueueDTO
                 {
@@ -351,38 +293,31 @@ namespace BLL.Services
                 })
                 .ToList();
         }
-
         public async Task<List<FleetHistoryDTO>> GetHistoryAsync(int businessUserId, FleetHistoryFilterDTO filter)
         {
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
-
             if (business == null)
             {
                 throw new NotFoundException("Business profile not found.");
             }
-
             var query = _context.FleetWashLogs
                 .Include(x => x.FleetVehicle)
                 .Include(x => x.Booking)
                 .ThenInclude(x => x!.Branch)
                 .Where(x => x.FleetVehicle.BusinessProfileId == business.BusinessProfileId);
-
             if (filter.FleetVehicleId.HasValue)
             {
                 query = query.Where(x => x.FleetVehicleId == filter.FleetVehicleId.Value);
             }
-
             if (filter.FromDate.HasValue)
             {
                 query = query.Where(x => x.CheckInTime >= filter.FromDate.Value);
             }
-
             if (filter.ToDate.HasValue)
             {
                 query = query.Where(x => x.CheckInTime <= filter.ToDate.Value);
             }
-
             return await query
                 .OrderByDescending(x => x.CheckInTime)
                 .Skip((filter.Page - 1) * filter.PageSize)
@@ -403,48 +338,36 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-
         public async Task<FleetDashboardDTO> GetDashboardAsync(int businessUserId)
         {
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
-
             if (business == null)
             {
                 throw new NotFoundException("Business profile not found.");
             }
-
             var today = DateTime.Today;
-
             var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
-
             var totalVehicles =
                 await _context.FleetVehicles
                     .CountAsync(x => x.BusinessProfileId == business.BusinessProfileId);
-
             var activeVehicles =
                 await _context.FleetVehicles
                     .CountAsync(x => x.BusinessProfileId == business.BusinessProfileId && x.Status == "Active");
-
             var pendingVehicles =
                 await _context.FleetVehicles
                     .CountAsync(x => x.BusinessProfileId == business.BusinessProfileId && x.Status == "PendingApproval");
-
             var todayWashCount =
                 await _context.FleetWashLogs
                     .CountAsync(x => x.FleetVehicle.BusinessProfileId == business.BusinessProfileId && x.CheckInTime.Date == today);
-
             var monthlyWashCount =
                 await _context.FleetWashLogs
                     .CountAsync(x => x.FleetVehicle.BusinessProfileId == business.BusinessProfileId && x.CheckInTime >= firstDayOfMonth);
-
             var monthlySpend = await _context.FleetWashLogs
                     .Where(x => x.FleetVehicle.BusinessProfileId == business.BusinessProfileId && x.CheckInTime >= firstDayOfMonth)
                     .SumAsync(x => (decimal?)x.WashCost) ?? 0;
-
             var vehiclesCurrentlyInStation = await _context.FleetWashLogs
                     .CountAsync(x => x.FleetVehicle.BusinessProfileId == business.BusinessProfileId && (x.Status == "CheckedIn" || x.Status == "Processing"));
-
             return new FleetDashboardDTO
             {
                 TotalVehicles = totalVehicles,
@@ -456,15 +379,12 @@ namespace BLL.Services
                 VehiclesCurrentlyInStation = vehiclesCurrentlyInStation
             };
         }
-
         public async Task<List<FleetWashHistoryDTO>> GetWashHistoryAsync(int businessUserId)
         {
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
-
             if (business == null)
                 throw new NotFoundException("Business profile not found.");
-
             return await _context.FleetWashLogs
                 .Include(x => x.Booking)
                 .Include(x => x.Booking!.FleetVehicle)
@@ -483,28 +403,56 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-
-        public async Task<FleetTemplateDTO> GetFleetTemplateAsync()
+        public async Task<FleetTemplateDTO> GetFleetTemplateInfoAsync(string fallbackBaseUrl)
         {
             var url = _configuration["FleetTemplate:DownloadUrl"];
-
-            if (string.IsNullOrWhiteSpace(url))
+            string finalUrl = $"{fallbackBaseUrl}/api/v1/fleet/template/download";
+            if (!string.IsNullOrWhiteSpace(url))
             {
-                throw new NotFoundException("Template file download path not configured.");
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    var response = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, url));
+                    if (response.IsSuccessStatusCode)
+                    {
+                        finalUrl = url;
+                    }
+                }
+                catch
+                {
+                }
             }
-
-            return await Task.FromResult(new FleetTemplateDTO
+            return new FleetTemplateDTO
             {
                 FileName = "FleetTemplate.xlsx",
-                DownloadUrl = url
-            });
+                DownloadUrl = finalUrl
+            };
         }
-
+        public async Task<byte[]> GenerateFleetTemplateAsync()
+        {
+            using var package = new ExcelPackage();
+            var worksheet = package.Workbook.Worksheets.Add("Fleet Template");
+            worksheet.Cells[1, 1].Value = "STT";
+            worksheet.Cells[1, 2].Value = "Biển số xe (*)";
+            worksheet.Cells[1, 3].Value = "Loại xe (*)";
+            worksheet.Cells[1, 4].Value = "Hãng xe";
+            worksheet.Cells[1, 5].Value = "Mẫu xe";
+            worksheet.Cells[1, 6].Value = "Tên tài xế";
+            worksheet.Cells[1, 7].Value = "Mã nhân viên";
+            using (var range = worksheet.Cells[1, 1, 1, 7])
+            {
+                range.Style.Font.Bold = true;
+                range.Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                range.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+                range.Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+            }
+            worksheet.Cells.AutoFitColumns();
+            return await package.GetAsByteArrayAsync();
+        }
         public async Task<LaneDTO> CreateBusinessLaneAsync(CreateBusinessLaneDTO dto)
         {
             var branch = await _context.Branches.FindAsync(dto.BranchId);
             if (branch == null) throw new NotFoundException("Branch not found.");
-
             var lane = new Lane
             {
                 Name = dto.Name,
@@ -512,10 +460,8 @@ namespace BLL.Services
                 IsActive = true,
                 IsBusinessLane = true
             };
-
             _context.Lanes.Add(lane);
             await _context.SaveChangesAsync();
-
             return new LaneDTO
             {
                 LaneId = lane.LaneId,
@@ -527,5 +473,4 @@ namespace BLL.Services
         }
     }
 }
-
 #pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

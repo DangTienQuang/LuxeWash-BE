@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-
 namespace BLL.DTOs.Business
 {
     public class BranchMonthlyRevenueDTO
@@ -16,7 +15,6 @@ namespace BLL.DTOs.Business
         public bool IsRevenueDropped { get; set; }
         public int CalculatedVoucherDiscountPercent { get; set; }
     }
-
     public class MonthlyRevenueCampaignResultDTO
     {
         public int BranchId { get; set; }
@@ -31,9 +29,8 @@ namespace BLL.DTOs.Business
         public string? GeneratedVoucherCode { get; set; }
         public int DiscountPercentage { get; set; }
         public int GrantedUsersCount { get; set; }
-        public string ApprovalStatus { get; set; } = "Approved"; // "Approved", "Proposed", "Rejected"
+        public string ApprovalStatus { get; set; } = "Approved"; 
     }
-
     public class VoucherProposalDTO
     {
         public int VoucherId { get; set; }
@@ -53,7 +50,6 @@ namespace BLL.DTOs.Business
         public int EstimatedTargetCustomers { get; set; }
         public DateTime CreatedAt { get; set; }
     }
-
     public class ModifyVoucherProposalDTO
     {
         public string? Code { get; set; }
@@ -62,12 +58,10 @@ namespace BLL.DTOs.Business
         public int? ExpiryDays { get; set; }
         public string? ProposalNote { get; set; }
     }
-
     public class RejectVoucherProposalDTO
     {
         public string? RejectReason { get; set; }
     }
-
     public class BranchTrafficStatsDTO
     {
         public int TotalCheckInsThisMonth { get; set; }
@@ -76,7 +70,6 @@ namespace BLL.DTOs.Business
         public int AtRiskLoyalCustomersCount { get; set; }
         public int ActiveCustomersCount { get; set; }
     }
-
     public class BranchComprehensiveStimulusDTO
     {
         public int BranchId { get; set; }

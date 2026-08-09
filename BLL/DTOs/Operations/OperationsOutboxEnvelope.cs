@@ -1,6 +1,5 @@
 using System;
 using System.Text.Json;
-
 namespace AutoWashPro.BLL.DTOs.Operations
 {
     public class OperationsOutboxEnvelope
@@ -10,7 +9,6 @@ namespace AutoWashPro.BLL.DTOs.Operations
         public int BranchId { get; set; }
         public DateTime OccurredAt { get; set; }
         public JsonElement Data { get; set; }
-
         public static readonly JsonSerializerOptions OutboxJsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace BLL.DTOs.Business
 {
     public class BusinessBookingListDTO
@@ -14,7 +13,6 @@ namespace BLL.DTOs.Business
         public string Status { get; set; } = null!;
         public decimal FinalAmount { get; set; }
     }
-
     public class BusinessVehicleStatusDTO
     {
         public int? FleetWashLogId { get; set; }

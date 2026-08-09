@@ -8,43 +8,32 @@ using BLL.DTOs.Fleet;
 using BLL.Services.Interface;
 using DAL.Entities;
 using Microsoft.EntityFrameworkCore;
-
 namespace BLL.Services
 {
     public class BusinessService : IBusinessService
     {
         private readonly AutoWashDbContext _context;
         private readonly ICloudinaryService _cloudinaryService;
-
         public BusinessService(AutoWashDbContext context, ICloudinaryService cloudinaryService)
         {
             _context = context;
             _cloudinaryService = cloudinaryService;
         }
-    
         public async Task<RegisterBusinessUserResponse> RegisterBusinessUserAsync(RegisterBusinessUserRequest request)
         {
-            // 1. Check phone
             var phoneExists = await _context.Users
                 .AnyAsync(u => u.PhoneNumber == request.PhoneNumber);
             if (phoneExists) throw new BadRequestException("This phone number is already registered.");
-
-            // 2. Check email
             var emailExists = await _context.Users.AnyAsync(u => u.Email == request.Email);
             if (emailExists) throw new BadRequestException("This email has already been used for registration.");
-
-            // 3. Upload documents
             var businessLicenseUrl = await _cloudinaryService
                 .UploadFileAsync(request.BusinessLicense, "business-documents");
-
             string? authorizationLetterUrl = null;
             if (request.AuthorizationLetter != null)
             {
                 authorizationLetterUrl = await _cloudinaryService
                     .UploadFileAsync(request.AuthorizationLetter, "business-documents");
             }
-
-            // 4. Create User + BusinessProfile
             await using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -58,7 +47,6 @@ namespace BLL.Services
                 };
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
-
                 var profile = new BusinessProfile
                 {
                     UserId = user.UserId,
@@ -77,13 +65,11 @@ namespace BLL.Services
                     DiscountPercent = 0,
                     ContractStartDate = DateTime.UtcNow,
                     ContractEndDate = DateTime.UtcNow.AddYears(1),
-                    IsContractActive = false, // activated after approval
+                    IsContractActive = false, 
                 };
                 _context.BusinessProfiles.Add(profile);
                 await _context.SaveChangesAsync();
-
                 await transaction.CommitAsync();
-
                 return new RegisterBusinessUserResponse
                 {
                     UserId = user.UserId,
@@ -102,7 +88,6 @@ namespace BLL.Services
                 throw;
             }
         }
-
         public async Task<BusinessProfileResponseDTO?> GetByUserIdAsync(int userId)
         {
             return await _context.BusinessProfiles
@@ -119,27 +104,22 @@ namespace BLL.Services
                 })
                 .FirstOrDefaultAsync();
         }
-
         public async Task ReviewBusinessProfileAsync(int reviewerId, ReviewBusinessProfileDTO dto)
         {
             var profile = await _context.BusinessProfiles
                 .Include(x => x.User)
                 .FirstOrDefaultAsync(x =>
                     x.BusinessProfileId == dto.BusinessProfileId);
-
             if (profile == null)
             {
                 throw new NotFoundException("Business profile not found.");
             }
-
             if (profile.ApprovalStatus != "Pending")
             {
                 throw new BadRequestException("Application has already been reviewed.");
             }
-
             profile.ReviewedByUserId = reviewerId;
             profile.ReviewedAt = DateTime.UtcNow;
-
             if (dto.IsApproved)
             {
                 profile.ApprovalStatus = "Approved";
@@ -150,10 +130,8 @@ namespace BLL.Services
                 profile.ApprovalStatus = "Rejected";
                 profile.RejectionReason = dto.RejectionReason;
             }
-
             await _context.SaveChangesAsync();
         }
-
         public async Task<List<PendingBusinessApplicationDTO>> GetPendingBusinessApplicationsAsync()
         {
             return await _context.BusinessProfiles
@@ -172,17 +150,14 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-
         public async Task<PendingBusinessApplicationDTO?> GetBusinessApplicationDetailAsync(int businessProfileId)
         {
             var profile = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x => x.BusinessProfileId == businessProfileId);
-
             if (profile == null)
             {
                 throw new NotFoundException("Business application not found.");
             }
-
             return new PendingBusinessApplicationDTO
             {
                 BusinessProfileId = profile.BusinessProfileId,
@@ -198,7 +173,6 @@ namespace BLL.Services
                 CreatedAt = profile.CreatedAt
             };
         }
-
         public async Task<InvoiceExportDTO> GetInvoiceExportAsync(int invoiceId)
         {
             var invoice = await _context.Invoices
@@ -210,12 +184,10 @@ namespace BLL.Services
                         .ThenInclude(f => f.VehicleType)
                 .Include(i => i.InvoiceItems)
                 .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId);
-
             if (invoice == null)
             {
                 throw new NotFoundException("Invoice not found.");
             }
-
             return new InvoiceExportDTO
             {
                 InvoiceId = invoice.InvoiceId,
@@ -238,7 +210,6 @@ namespace BLL.Services
                 BranchName = invoice.Booking?.Branch?.Name ?? "",
                 BranchAddress = invoice.Booking?.Branch?.Address ?? "",
                 BookingId = invoice.BookingId ?? 0,
-
                 Items = invoice.InvoiceItems
                     .Select(x => new InvoiceItemDTO
                     {
@@ -251,33 +222,25 @@ namespace BLL.Services
                     .ToList()
             };
         }
-
         public async Task<int> GenerateMonthlyInvoiceAsync(int businessProfileId, int year, int month)
         {
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x =>
                     x.BusinessProfileId == businessProfileId);
-
             if (business == null)
             {
                 throw new NotFoundException("Business profile not found.");
             }
-
             var invoiceCode = $"MONTHLY-{businessProfileId}-{year}{month:00}";
-
             var existingInvoice = await _context.Invoices
                 .FirstOrDefaultAsync(x =>
                     x.InvoiceCode == invoiceCode);
-
             if (existingInvoice != null)
             {
                 throw new BadRequestException("Monthly invoice has already been created.");
             }
-
             var startDate = new DateTime(year, month, 1);
-
             var endDate = startDate.AddMonths(1);
-
             var completedWashes = await _context.FleetWashLogs
                 .Include(x => x.Booking)
                 .ThenInclude(x => x.BookingDetails)
@@ -289,12 +252,10 @@ namespace BLL.Services
                     x.CompletedTime >= startDate &&
                     x.CompletedTime < endDate)
                     .ToListAsync();
-
             if (!completedWashes.Any())
             {
                 throw new BadRequestException("No completed washes found in this time period.");
             }
-
             var invoice = new Invoice
             {
                 InvoiceCode = invoiceCode,
@@ -303,20 +264,14 @@ namespace BLL.Services
                 Status = "Issued",
                 IssuedAt = DateTime.UtcNow
             };
-
             _context.Invoices.Add(invoice);
-
             await _context.SaveChangesAsync();
-
             var invoiceItems = new List<InvoiceItem>();
-
             foreach (var wash in completedWashes)
             {
                 var booking = wash.Booking;
-
                 if (booking == null)
                     continue;
-
                 foreach (var detail in booking.BookingDetails)
                 {
                     invoiceItems.Add(new InvoiceItem
@@ -330,18 +285,14 @@ namespace BLL.Services
                     });
                 }
             }
-
             if (!invoiceItems.Any())
             {
                 throw new BadRequestException("Could not create any items for invoice.");
             }
-
             await _context.InvoiceItems.AddRangeAsync(invoiceItems);
-
             invoice.Subtotal = invoiceItems.Sum(x => x.Amount);
             invoice.TaxAmount = 0;
             invoice.TotalAmount = invoice.Subtotal + invoice.TaxAmount;
-
             await _context.SaveChangesAsync();
             return invoice.InvoiceId;
         }

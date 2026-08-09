@@ -11,7 +11,6 @@ using BLL.Helpers;
 using BLL.Services.Interface;
 using BLL.DTOs.Business;
 using AutoWashPro.BLL.Services.Interface;
-
 namespace AutoWashPro.BLL.Services
 {
     public class ManagerService : IManagerService
@@ -20,7 +19,6 @@ namespace AutoWashPro.BLL.Services
         private readonly IBranchRevenueAnalyticsService _branchRevenueAnalyticsService;
         private readonly IOverloadSuggestionService _overloadSuggestionService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
-
         public ManagerService(
             AutoWashDbContext context,
             IBranchRevenueAnalyticsService branchRevenueAnalyticsService,
@@ -32,29 +30,23 @@ namespace AutoWashPro.BLL.Services
             _overloadSuggestionService = overloadSuggestionService;
             _laneCoordinator = laneCoordinator;
         }
-
         private async Task<EmployeeProfile> GetManagerProfileAsync(int managerUserId)
         {
             var profile = await _context.EmployeeProfiles
                 .FirstOrDefaultAsync(e => e.EmployeeId == managerUserId);
-
             if (profile == null)
             {
                 throw new BadRequestException("Manager profile not found.");
             }
-
             if (!profile.BranchId.HasValue)
             {
                 throw new BadRequestException("Manager is not assigned to any branch.");
             }
-
             return profile;
         }
-
         public async Task<List<ManagerStaffDTO>> GetStaffInBranchAsync(int managerUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var staffList = await _context.EmployeeProfiles
                 .Include(e => e.User)
                 .Where(e => e.BranchId == managerProfile.BranchId && e.User.Role == "Staff")
@@ -66,49 +58,35 @@ namespace AutoWashPro.BLL.Services
                     Status = e.User.Status
                 })
                 .ToListAsync();
-
             return staffList;
         }
-
         public async Task<bool> AssignStaffToLaneAsync(int managerUserId, AssignStaffToLaneDTO assignDto)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
-            // Verify staff belongs to manager's branch
             var staffProfile = await _context.EmployeeProfiles
                 .Include(e => e.User)
                 .FirstOrDefaultAsync(e => e.EmployeeId == assignDto.StaffId && e.BranchId == managerProfile.BranchId && e.User.Role == "Staff");
-
             if (staffProfile == null)
             {
                 throw new BadRequestException("Staff not found in your branch.");
             }
-
-            // Verify lane belongs to manager's branch
             var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == assignDto.LaneId && l.BranchId == managerProfile.BranchId);
             if (lane == null)
             {
                 throw new BadRequestException("Lane not found in your branch.");
             }
-
-            // Verify staff has a scheduled work shift on that Date and WorkShiftId
             var hasScheduledShift = await _context.StaffShiftAssignments
                 .AnyAsync(s => s.StaffUserId == staffProfile.EmployeeId && s.WorkDate.Date == assignDto.AssignedDate.Date && s.WorkShiftId == assignDto.WorkShiftId);
-
             if (!hasScheduledShift)
             {
                 throw new BadRequestException("Employee does not have a work schedule in this shift on the selected date.");
             }
-
-            // Verify staff is not already assigned to ANY lane for the exact same WorkShiftId on the exact same Date
             var existingAssignment = await _context.StaffLaneAssignments
                 .AnyAsync(a => a.StaffId == assignDto.StaffId && a.AssignedDate.Date == assignDto.AssignedDate.Date && a.WorkShiftId == assignDto.WorkShiftId);
-
             if (existingAssignment)
             {
                 throw new BadRequestException("This employee is already assigned to another lane in this shift.");
             }
-
             var assignment = new StaffLaneAssignment
             {
                 StaffId = assignDto.StaffId,
@@ -116,43 +94,32 @@ namespace AutoWashPro.BLL.Services
                 AssignedDate = assignDto.AssignedDate.Date,
                 WorkShiftId = assignDto.WorkShiftId
             };
-
             _context.StaffLaneAssignments.Add(assignment);
             await _context.SaveChangesAsync();
             return true;
         }
-
         public async Task<bool> UnassignStaffFromLaneAsync(int managerUserId, int laneId, int staffId, System.DateTime? date = null)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
-            // Verify the Lane belongs to managerProfile.BranchId
             var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == laneId && l.BranchId == managerProfile.BranchId);
             if (lane == null)
             {
                 throw new NotFoundException("Lane not found in your branch.");
             }
-
             var targetDate = date?.Date ?? System.DateTime.UtcNow.ToVnTime().Date;
-
-            // Find the active shift assignment for targetDate
             var assignment = await _context.StaffLaneAssignments
                 .FirstOrDefaultAsync(a => a.LaneId == laneId && a.StaffId == staffId && a.AssignedDate.Date == targetDate);
-
             if (assignment == null)
             {
                 throw new NotFoundException("Active staff assignment not found for the specified date in this lane.");
             }
-
             _context.StaffLaneAssignments.Remove(assignment);
             await _context.SaveChangesAsync();
             return true;
         }
-
         public async Task<List<ManagerBookingListDTO>> GetCheckInBookingsInBranchAsync(int managerUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var bookings = await _context.Bookings
                 .Include(b => b.User)
                     .ThenInclude(u => u.CustomerProfile)
@@ -163,7 +130,6 @@ namespace AutoWashPro.BLL.Services
                     .ThenInclude(s => s.EmployeeProfile)
                 .Where(b => b.BranchId == managerProfile.BranchId && (b.Status == "CheckedIn" || b.Status == "Pending" || b.Status == "Processing"))
                 .ToListAsync();
-
             return bookings.Select(b => new ManagerBookingListDTO
             {
                 BookingId = b.BookingId,
@@ -183,11 +149,9 @@ namespace AutoWashPro.BLL.Services
                 ActualDurationMinutes = b.ActualDurationMinutes
             }).ToList();
         }
-
         public async Task<List<TimeSlotAdminResponseDTO>> GetTimeSlotsInBranchAsync(int managerUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var timeSlots = await _context.TimeSlots
                 .Where(ts => ts.BranchId == managerProfile.BranchId)
                 .OrderBy(ts => ts.StartTime)
@@ -201,17 +165,12 @@ namespace AutoWashPro.BLL.Services
                     IsVipOnly = ts.IsVipOnly
                 })
                 .ToListAsync();
-
             return timeSlots;
         }
-
         public async Task<LaneDTO> CreateLaneAsync(int managerUserId, CreateLaneDTO request)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
-            // Override BranchId to manager's branch
             request.BranchId = managerProfile.BranchId!.Value;
-
             var lane = new Lane
             {
                 Name = request.Name,
@@ -220,10 +179,8 @@ namespace AutoWashPro.BLL.Services
                 IsVipLane = request.IsVipLane,
                 IsActive = true
             };
-
             _context.Lanes.Add(lane);
             await _context.SaveChangesAsync();
-
             return new LaneDTO
             {
                 LaneId = lane.LaneId,
@@ -234,31 +191,23 @@ namespace AutoWashPro.BLL.Services
                 IsVipLane = lane.IsVipLane
             };
         }
-
         public async Task<TimeSlotAdminResponseDTO> CreateTimeSlotAsync(int managerUserId, CreateTimeSlotDTO request)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
-            // Override BranchId to manager's branch
             request.BranchId = managerProfile.BranchId!.Value;
-
             if (request.StartTime >= request.EndTime)
             {
                 throw new BadRequestException("Start time must be earlier than end time.");
             }
-
-            // Kiểm tra trùng lặp thời gian trong chi nhánh của manager
             var isOverlap = await _context.TimeSlots.AnyAsync(ts =>
                 ts.BranchId == request.BranchId &&
                 ((request.StartTime >= ts.StartTime && request.StartTime < ts.EndTime) ||
                 (request.EndTime > ts.StartTime && request.EndTime <= ts.EndTime) ||
                 (request.StartTime <= ts.StartTime && request.EndTime >= ts.EndTime)));
-
             if (isOverlap)
             {
                 throw new BadRequestException("Time slot overlaps with an existing time slot.");
             }
-
             var timeSlot = new TimeSlot
             {
                 BranchId = request.BranchId,
@@ -267,10 +216,8 @@ namespace AutoWashPro.BLL.Services
                 MaxCapacity = request.MaxCapacity,
                 IsVipOnly = request.IsVipOnly
             };
-
             _context.TimeSlots.Add(timeSlot);
             await _context.SaveChangesAsync();
-
             return new TimeSlotAdminResponseDTO
             {
                 SlotId = timeSlot.SlotId,
@@ -281,12 +228,10 @@ namespace AutoWashPro.BLL.Services
                 IsVipOnly = timeSlot.IsVipOnly
             };
         }
-
         public async Task<List<LaneStaffAssignmentDTO>> GetLanesInBranchAsync(int managerUserId, System.DateTime? date = null)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             var targetDate = date?.Date ?? System.DateTime.UtcNow.ToVnTime().Date;
-
             var lanes = await _context.Lanes
                 .Where(l => l.BranchId == managerProfile.BranchId)
                 .Select(l => new LaneStaffAssignmentDTO
@@ -299,7 +244,6 @@ namespace AutoWashPro.BLL.Services
                     IsVipLane = l.IsVipLane
                 })
                 .ToListAsync();
-
             var laneIds = lanes.Select(l => l.LaneId).ToList();
             var assignments = await _context.StaffLaneAssignments
                 .Include(a => a.Staff)
@@ -307,7 +251,6 @@ namespace AutoWashPro.BLL.Services
                 .Include(a => a.WorkShift)
                 .Where(a => laneIds.Contains(a.LaneId) && a.AssignedDate.Date == targetDate)
                 .ToListAsync();
-
             foreach (var lane in lanes)
             {
                 lane.AssignedStaff = assignments.Where(a => a.LaneId == lane.LaneId).Select(a => new ManagerStaffDTO
@@ -322,26 +265,21 @@ namespace AutoWashPro.BLL.Services
             }
             return lanes;
         }
-
         public async Task<List<ManagerStaffDTO>> GetStaffAssignedToLaneAsync(int managerUserId, int laneId, System.DateTime? date = null)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == laneId && l.BranchId == managerProfile.BranchId);
             if (lane == null)
             {
                 throw new NotFoundException("Lane not found in your branch.");
             }
-
             var targetDate = date?.Date ?? System.DateTime.UtcNow.ToVnTime().Date;
-
             var assignments = await _context.StaffLaneAssignments
                 .Include(a => a.Staff)
                     .ThenInclude(s => s.EmployeeProfile)
                 .Include(a => a.WorkShift)
                 .Where(a => a.LaneId == laneId && a.AssignedDate.Date == targetDate)
                 .ToListAsync();
-
             return assignments.Select(a => new ManagerStaffDTO
             {
                 UserId = a.Staff.UserId,
@@ -352,78 +290,62 @@ namespace AutoWashPro.BLL.Services
                 ShiftName = a.WorkShift.ShiftName
             }).ToList();
         }
-
         public async Task<bool> ConfirmCheckInAndAssignLaneAsync(int managerUserId, int bookingId, AssignBookingToLaneDTO assignment)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             int retryCount = 3;
             while (retryCount > 0)
             {
                 try
                 {
                     using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-
                     var booking = await _context.Bookings
                         .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.BranchId == managerProfile.BranchId);
-
                     if (booking == null)
                     {
                         throw new NotFoundException("Booking not found in your branch.");
                     }
-
                     if (booking.Status != "Pending" && booking.Status != "CheckedIn")
                     {
                         throw new BadRequestException("Booking is not in a valid state for check-in and assignment.");
                     }
-
                     if (booking.Status == "CheckedIn" && booking.ProcessingLaneId != null && booking.ProcessingLaneId != assignment.LaneId)
                     {
                         throw new BadRequestException("Booking already has a lane assigned. Please use reassignment.");
                     }
-
                     if (!await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))
                     {
                         throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
                     }
-
                     var validLane = await _context.Lanes
                         .FirstOrDefaultAsync(l => l.LaneId == assignment.LaneId && l.BranchId == managerProfile.BranchId);
-
                     if (validLane == null)
                     {
                         throw new BadRequestException("Lane is invalid or does not belong to your branch.");
                     }
-
                     if (!validLane.IsActive)
                     {
                         throw new BadRequestException("LANE_INACTIVE");
                     }
-
                     bool isBusinessBooking = booking.BookingType == "Business";
                     if (validLane.IsBusinessLane != isBusinessBooking)
                     {
                         throw new BadRequestException("LANE_TYPE_MISMATCH");
                     }
-
-                    // Check if lane is available (not reserved by another active booking/wash log)
                     bool laneOccupied = await _context.Bookings.AnyAsync(b => 
                         b.ProcessingLaneId == assignment.LaneId 
                         && b.BookingId != bookingId 
                         && (b.Status == "Processing" || b.Status == "CheckedIn"));
-
                     if (!laneOccupied)
                     {
                         laneOccupied = await _context.FleetWashLogs.AnyAsync(f => 
                             f.LaneId == assignment.LaneId 
                             && (f.Status == "Processing" || f.Status == "CheckedIn" || f.Status == "Assigned"));
                     }
-
                     if (laneOccupied)
                     {
                         throw new BadRequestException("LANE_UNAVAILABLE");
                     }
-
                     var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
                     var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
                         vehicle?.LicensePlate ?? "UNKNOWN",
@@ -431,7 +353,6 @@ namespace AutoWashPro.BLL.Services
                         bookingId: booking.BookingId,
                         fleetWashLogId: null,
                         forcedLaneId: assignment.LaneId);
-
                     if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
                     {
                         booking.ProcessingLaneId = checkInResult.LaneId;
@@ -441,10 +362,8 @@ namespace AutoWashPro.BLL.Services
                         throw new BadRequestException("LANE_UNAVAILABLE");
                     }
                     booking.UpdatedAt = DateTime.UtcNow;
-
                     await _context.SaveChangesAsync();
                     await dbTransaction.CommitAsync();
-
                     return true;
                 }
                 catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
@@ -453,36 +372,29 @@ namespace AutoWashPro.BLL.Services
                     if (retryCount == 0) throw;
                     await Task.Delay(50);
                 }
-                catch (MySqlConnector.MySqlException ex) when (ex.Number == 1213 || ex.Number == 1205) // Deadlock or Lock wait timeout
+                catch (MySqlConnector.MySqlException ex) when (ex.Number == 1213 || ex.Number == 1205) 
                 {
                     retryCount--;
                     if (retryCount == 0) throw;
                     await Task.Delay(50);
                 }
             }
-            
             return false;
         }
-
         public async Task<LaneDTO> UpdateLaneAsync(int managerUserId, int laneId, UpdateLaneDTO request)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == laneId);
             if (lane == null || lane.BranchId != managerProfile.BranchId)
             {
                 throw new NotFoundException("Lane not found in your branch.");
             }
-
             request.BranchId = managerProfile.BranchId.Value;
-
             lane.Name = request.Name;
             lane.IsActive = request.IsActive;
             lane.IsBusinessLane = request.IsBusinessLane;
             lane.IsVipLane = request.IsVipLane;
-
             await _context.SaveChangesAsync();
-
             return new LaneDTO
             {
                 LaneId = lane.LaneId,
@@ -493,59 +405,46 @@ namespace AutoWashPro.BLL.Services
                 IsVipLane = lane.IsVipLane
             };
         }
-
         public async Task<bool> DeleteLaneAsync(int managerUserId, int laneId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == laneId);
             if (lane == null || lane.BranchId != managerProfile.BranchId)
             {
                 throw new NotFoundException("Lane not found in your branch.");
             }
-
             lane.IsActive = false;
             await _context.SaveChangesAsync();
-
             return true;
         }
-
         public async Task<TimeSlotAdminResponseDTO> UpdateTimeSlotAsync(int managerUserId, int slotId, UpdateTimeSlotDTO request)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var timeSlot = await _context.TimeSlots.FindAsync(slotId);
             if (timeSlot == null || timeSlot.BranchId != managerProfile.BranchId)
             {
                 throw new NotFoundException("Time slot not found in your branch.");
             }
-
             request.BranchId = managerProfile.BranchId.Value;
-
             if (request.StartTime >= request.EndTime)
             {
                 throw new BadRequestException("Start time must be earlier than end time.");
             }
-
             var isOverlap = await _context.TimeSlots.AnyAsync(ts =>
                 ts.SlotId != slotId &&
                 ts.BranchId == request.BranchId &&
                 ((request.StartTime >= ts.StartTime && request.StartTime < ts.EndTime) ||
                  (request.EndTime > ts.StartTime && request.EndTime <= ts.EndTime) ||
                  (request.StartTime <= ts.StartTime && request.EndTime >= ts.EndTime)));
-
             if (isOverlap)
             {
                 throw new BadRequestException("Time slot overlaps with an existing time slot.");
             }
-
             timeSlot.StartTime = request.StartTime;
             timeSlot.EndTime = request.EndTime;
             timeSlot.MaxCapacity = request.MaxCapacity;
             timeSlot.IsVipOnly = request.IsVipOnly;
-
             await _context.SaveChangesAsync();
-
             return new TimeSlotAdminResponseDTO
             {
                 SlotId = timeSlot.SlotId,
@@ -556,93 +455,71 @@ namespace AutoWashPro.BLL.Services
                 IsVipOnly = timeSlot.IsVipOnly
             };
         }
-
         public async Task<bool> DeleteTimeSlotAsync(int managerUserId, int slotId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var timeSlot = await _context.TimeSlots.FindAsync(slotId);
             if (timeSlot == null || timeSlot.BranchId != managerProfile.BranchId)
             {
                 throw new NotFoundException("Time slot not found in your branch.");
             }
-
             var isBooked = await _context.DailySlotCapacities.AnyAsync(dsc => dsc.SlotId == slotId && dsc.BookedWeight > 0);
             if (isBooked)
             {
                 throw new BadRequestException("Cannot delete this time slot because there are existing bookings. Please check again.");
             }
-
             _context.TimeSlots.Remove(timeSlot);
             await _context.SaveChangesAsync();
             return true;
         }
-
         public async Task<bool> DeactivateStaffAsync(int managerUserId, int staffUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-
             var staffProfile = await _context.EmployeeProfiles
                 .Include(e => e.User)
                 .FirstOrDefaultAsync(e => e.EmployeeId == staffUserId && e.BranchId == managerProfile.BranchId && e.User.Role == "Staff");
-
             if (staffProfile == null)
             {
                 throw new NotFoundException("Staff not found in your branch.");
             }
-
             if (staffProfile.User.Status == "Inactive")
             {
                 return true;
             }
-
             staffProfile.User.Status = "Inactive";
             await _context.SaveChangesAsync();
-
             return true;
         }
-
         public async Task<MonthlyRevenueCampaignResultDTO> CheckRevenueStimulusCampaignAsync(int managerUserId, int? month = null, int? year = null)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.CheckAndTriggerMonthlyRevenueCampaignAsync(managerProfile.BranchId!.Value, month, year);
         }
-
         public async Task<List<VoucherProposalDTO>> GetPendingProposalsAsync(int managerUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.GetPendingProposalsAsync(managerProfile.BranchId!.Value);
         }
-
         public async Task<VoucherProposalDTO> ModifyProposalAsync(int managerUserId, int voucherId, ModifyVoucherProposalDTO dto)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.ModifyProposalAsync(managerProfile.BranchId!.Value, voucherId, dto);
         }
-
         public async Task<MonthlyRevenueCampaignResultDTO> ApproveProposalAsync(int managerUserId, int voucherId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.ApproveProposalAsync(managerProfile.BranchId!.Value, voucherId);
         }
-
         public async Task<bool> RejectProposalAsync(int managerUserId, int voucherId, string? rejectReason)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.RejectProposalAsync(managerProfile.BranchId!.Value, voucherId, rejectReason);
         }
-
         public async Task<BranchComprehensiveStimulusDTO> GenerateComprehensiveStimulusAnalysisAsync(int managerUserId, int? month = null, int? year = null)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             return await _branchRevenueAnalyticsService.GenerateComprehensiveStimulusAnalysisAsync(managerProfile.BranchId!.Value, month, year);
         }
-
-        /// <summary>
-        /// P0.3: Delegates to OverloadSuggestionService.CheckAndTriggerOverloadAsync.
-        /// Creates OverloadSuggestion rows for affected pending bookings and sends FCM.
-        /// Vouchers are only issued when the customer accepts Switch via handle-overload-suggestion.
-        /// </summary>
         public async Task<OverloadScanResultDTO> ScanAndNotifyRelocationAsync(int managerUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
@@ -650,5 +527,4 @@ namespace AutoWashPro.BLL.Services
         }
     }
 }
-
 #pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

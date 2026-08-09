@@ -1,10 +1,9 @@
-﻿using BLL.DTOs.Fleet;
+using BLL.DTOs.Fleet;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace BLL.DTOs.Business
 {
     public class InvoiceDTO
@@ -19,7 +18,6 @@ namespace BLL.DTOs.Business
         public decimal TotalAmount { get; set; }
         public List<InvoiceItemDTO> Items { get; set; } = new();
     }
-
     public class InvoiceItemDTO
     {
         public int InvoiceItemId { get; set; }
@@ -28,7 +26,6 @@ namespace BLL.DTOs.Business
         public decimal UnitPrice { get; set; }
         public decimal Amount { get; set; }
     }
-
     public class InvoiceListDTO
     {
         public int InvoiceId { get; set; }
@@ -38,7 +35,6 @@ namespace BLL.DTOs.Business
         public string Status { get; set; } = null!;
         public string LicensePlate { get; set; } = null!;
     }
-
     public class InvoiceDetailDTO
     {
         public int InvoiceId { get; set; }
@@ -51,7 +47,6 @@ namespace BLL.DTOs.Business
         public string LicensePlate { get; set; } = null!;
         public List<InvoiceItemDTO> Items { get; set; } = new();
     }
-
     public class MonthlyStatementDTO
     {
         public int Year { get; set; }
@@ -60,14 +55,12 @@ namespace BLL.DTOs.Business
         public decimal TotalCost { get; set; }
         public List<VehicleStatementDTO> Vehicles { get; set; } = new();
     }
-
     public class GenerateMonthlyInvoiceRequest
     {
         public int BusinessProfileId { get; set; }
         public int Year { get; set; }
         public int Month { get; set; }
     }
-
     public class InvoiceExportDTO
     {
         public int InvoiceId { get; set; }
@@ -92,4 +85,3 @@ namespace BLL.DTOs.Business
         public List<InvoiceItemDTO> Items { get; set; } = new();
     }
 }
-

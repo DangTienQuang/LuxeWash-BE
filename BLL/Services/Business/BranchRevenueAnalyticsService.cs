@@ -11,20 +11,17 @@ using BLL.Helpers;
 using BLL.Services.Interface;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
 namespace BLL.Services
 {
     public class BranchRevenueAnalyticsService : IBranchRevenueAnalyticsService
     {
         private readonly AutoWashDbContext _context;
         private readonly ILogger<BranchRevenueAnalyticsService> _logger;
-
         public BranchRevenueAnalyticsService(AutoWashDbContext context, ILogger<BranchRevenueAnalyticsService> logger)
         {
             _context = context;
             _logger = logger;
         }
-
         public async Task<BranchMonthlyRevenueDTO> EvaluateBranchMonthlyRevenueAsync(int branchId, int? targetMonth = null, int? targetYear = null)
         {
             var branch = await _context.Branches.FirstOrDefaultAsync(b => b.BranchId == branchId);
@@ -32,45 +29,31 @@ namespace BLL.Services
             {
                 throw new NotFoundException($"Branch with ID {branchId} not found.");
             }
-
             var now = DateTime.UtcNow.ToVnTime();
             int month = targetMonth ?? now.Month;
             int year = targetYear ?? now.Year;
-
-            // Compute current target month range
             var currentMonthStart = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
             var currentMonthEnd = currentMonthStart.AddMonths(1);
-
-            // Compute previous month range
             var prevMonthStart = currentMonthStart.AddMonths(-1);
             var prevMonthEnd = currentMonthStart;
-
-            // Query completed bookings revenue for current month
             var currentRevenue = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.Status == "Completed" && b.ScheduledTime >= currentMonthStart && b.ScheduledTime < currentMonthEnd)
                 .SumAsync(b => b.FinalAmount);
-
-            // Query completed bookings revenue for previous month
             var prevRevenue = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.Status == "Completed" && b.ScheduledTime >= prevMonthStart && b.ScheduledTime < prevMonthEnd)
                 .SumAsync(b => b.FinalAmount);
-
             decimal dropAmount = prevRevenue - currentRevenue;
             double dropPercentage = 0;
             bool isDropped = false;
             int discountPercent = 0;
-
             if (prevRevenue > 0 && dropAmount > 0)
             {
                 dropPercentage = (double)(dropAmount / prevRevenue) * 100.0;
                 isDropped = true;
-
-                // Formula: min(max(RoundTo5(dropPercentage * 0.8 + 5), 10), 30)
                 double rawCalc = dropPercentage * 0.8 + 5.0;
                 int roundedTo5 = (int)(Math.Round(rawCalc / 5.0) * 5.0);
                 discountPercent = Math.Clamp(roundedTo5, 10, 30);
             }
-
             return new BranchMonthlyRevenueDTO
             {
                 BranchId = branch.BranchId,
@@ -85,11 +68,9 @@ namespace BLL.Services
                 CalculatedVoucherDiscountPercent = discountPercent
             };
         }
-
         public async Task<MonthlyRevenueCampaignResultDTO> CheckAndTriggerMonthlyRevenueCampaignAsync(int branchId, int? targetMonth = null, int? targetYear = null)
         {
             var eval = await EvaluateBranchMonthlyRevenueAsync(branchId, targetMonth, targetYear);
-
             if (!eval.IsRevenueDropped || eval.CalculatedVoucherDiscountPercent <= 0)
             {
                 return new MonthlyRevenueCampaignResultDTO
@@ -109,10 +90,7 @@ namespace BLL.Services
                     GrantedUsersCount = 0
                 };
             }
-
             string voucherCode = $"WINBACK_BR{branchId}_M{eval.TargetMonth:D2}Y{eval.TargetYear}_{eval.CalculatedVoucherDiscountPercent}%";
-
-            // Check if voucher or proposal already exists
             var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == voucherCode && v.BranchId == branchId);
             if (voucher == null)
             {
@@ -126,25 +104,21 @@ namespace BLL.Services
                     ExpiryDays = 30,
                     MaxUsagePerUser = 1,
                     MaxUsages = 999999,
-                    IsActive = false, // Not active yet, waiting for Manager approval
+                    IsActive = false, 
                     ApprovalStatus = "Proposed",
                     ProposalNote = $"Doanh thu tháng {eval.TargetMonth:D2}/{eval.TargetYear} của {eval.BranchName} giảm {eval.RevenueDropPercentage}% (còn {eval.CurrentMonthRevenue:N0}đ so với {eval.PreviousMonthRevenue:N0}đ). Đề xuất Voucher giảm {eval.CalculatedVoucherDiscountPercent}% để kéo khách hàng trở lại.",
                     StartDate = DateTime.UtcNow,
                     ExpiryDate = DateTime.UtcNow.AddDays(30)
                 };
-
                 _context.Vouchers.Add(voucher);
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Created winback voucher proposal ({Code}) for branch {BranchId}, status: Proposed", voucherCode, branchId);
             }
-
-            // Estimate target customer users (users who have booked at this branch or active customers)
             var branchCustomerIds = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.UserId != null)
                 .Select(b => b.UserId!.Value)
                 .Distinct()
                 .ToListAsync();
-
             if (!branchCustomerIds.Any())
             {
                 branchCustomerIds = await _context.Users
@@ -152,14 +126,11 @@ namespace BLL.Services
                     .Select(u => u.UserId)
                     .ToListAsync();
             }
-
-            // If voucher is already Approved, we count actual granted vouchers
             int grantedCount = 0;
             if (voucher.ApprovalStatus == "Approved")
             {
                 grantedCount = await _context.UserVouchers.CountAsync(uv => uv.VoucherId == voucher.VoucherId);
             }
-
             return new MonthlyRevenueCampaignResultDTO
             {
                 BranchId = eval.BranchId,
@@ -179,31 +150,25 @@ namespace BLL.Services
                 GrantedUsersCount = grantedCount
             };
         }
-
         public async Task<List<VoucherProposalDTO>> GetPendingProposalsAsync(int branchId)
         {
             var branch = await _context.Branches.FirstOrDefaultAsync(b => b.BranchId == branchId);
             if (branch == null) throw new NotFoundException($"Branch with ID {branchId} not found.");
-
             var proposals = await _context.Vouchers
                 .Where(v => v.BranchId == branchId && v.ApprovalStatus == "Proposed" && (v.CampaignType == VoucherCampaignType.Winback || v.CampaignType == VoucherCampaignType.Manual))
                 .OrderByDescending(v => v.CreatedAt)
                 .ToListAsync();
-
             var branchCustomerCount = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.UserId != null)
                 .Select(b => b.UserId!.Value)
                 .Distinct()
                 .CountAsync();
-
             if (branchCustomerCount == 0)
             {
                 branchCustomerCount = await _context.Users.CountAsync(u => u.Status == "Active" && u.Role == "Customer");
             }
-
             var list = new List<VoucherProposalDTO>();
             var now = DateTime.UtcNow.ToVnTime();
-
             foreach (var v in proposals)
             {
                 list.Add(new VoucherProposalDTO
@@ -223,54 +188,43 @@ namespace BLL.Services
                     CreatedAt = v.CreatedAt
                 });
             }
-
             return list;
         }
-
         public async Task<VoucherProposalDTO> ModifyProposalAsync(int branchId, int voucherId, ModifyVoucherProposalDTO dto)
         {
             var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.VoucherId == voucherId && v.BranchId == branchId);
             if (voucher == null) throw new NotFoundException($"Proposal Voucher #{voucherId} not found for this branch.");
-
             if (voucher.ApprovalStatus != "Proposed")
             {
                 throw new BadRequestException($"Only proposals in 'Proposed' status can be modified. Current status: {voucher.ApprovalStatus}");
             }
-
             if (!string.IsNullOrWhiteSpace(dto.Code))
             {
                 var exists = await _context.Vouchers.AnyAsync(v => v.Code == dto.Code && v.VoucherId != voucherId);
                 if (exists) throw new BadRequestException($"Voucher code '{dto.Code}' already exists.");
                 voucher.Code = dto.Code.Trim();
             }
-
             if (dto.DiscountAmount.HasValue && dto.DiscountAmount.Value > 0)
             {
                 voucher.DiscountAmount = dto.DiscountAmount.Value;
             }
-
             if (dto.MaxUsages.HasValue && dto.MaxUsages.Value > 0)
             {
                 voucher.MaxUsages = dto.MaxUsages.Value;
             }
-
             if (dto.ExpiryDays.HasValue && dto.ExpiryDays.Value > 0)
             {
                 voucher.ExpiryDays = dto.ExpiryDays.Value;
                 voucher.ExpiryDate = DateTime.UtcNow.AddDays(dto.ExpiryDays.Value);
             }
-
             if (dto.ProposalNote != null)
             {
                 voucher.ProposalNote = dto.ProposalNote;
             }
-
             await _context.SaveChangesAsync();
             _logger.LogInformation("Modified voucher proposal #{VoucherId} for branch {BranchId}", voucherId, branchId);
-
             var branch = await _context.Branches.FirstAsync(b => b.BranchId == branchId);
             var now = DateTime.UtcNow.ToVnTime();
-
             return new VoucherProposalDTO
             {
                 VoucherId = voucher.VoucherId,
@@ -287,29 +241,23 @@ namespace BLL.Services
                 CreatedAt = voucher.CreatedAt
             };
         }
-
         public async Task<MonthlyRevenueCampaignResultDTO> ApproveProposalAsync(int branchId, int voucherId)
         {
             var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.VoucherId == voucherId && v.BranchId == branchId);
             if (voucher == null) throw new NotFoundException($"Proposal Voucher #{voucherId} not found for this branch.");
-
             if (voucher.ApprovalStatus != "Proposed")
             {
                 throw new BadRequestException($"Cannot approve proposal #{voucherId}. Current status is '{voucher.ApprovalStatus}'.");
             }
-
             voucher.ApprovalStatus = "Approved";
             voucher.IsActive = true;
             voucher.StartDate = DateTime.UtcNow;
             voucher.ExpiryDate = DateTime.UtcNow.AddDays(voucher.ExpiryDays ?? 30);
-
-            // Find target customer users (users who have booked at this branch or active customers)
             var branchCustomerIds = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.UserId != null)
                 .Select(b => b.UserId!.Value)
                 .Distinct()
                 .ToListAsync();
-
             if (!branchCustomerIds.Any())
             {
                 branchCustomerIds = await _context.Users
@@ -317,16 +265,12 @@ namespace BLL.Services
                     .Select(u => u.UserId)
                     .ToListAsync();
             }
-
-            // Check who already received this voucher
             var existingUserVouchers = await _context.UserVouchers
                 .Where(uv => uv.VoucherId == voucher.VoucherId)
                 .Select(uv => uv.UserId)
                 .ToListAsync();
-
             var alreadyReceivedSet = new HashSet<int>(existingUserVouchers);
             int grantedCount = 0;
-
             foreach (var userId in branchCustomerIds)
             {
                 if (alreadyReceivedSet.Add(userId))
@@ -340,18 +284,14 @@ namespace BLL.Services
                         IsUsed = false,
                         TriggerKey = $"RevenueWinback_BR{branchId}_Approved"
                     };
-
                     _context.UserVouchers.Add(userVoucher);
                     grantedCount++;
                 }
             }
-
             await _context.SaveChangesAsync();
             _logger.LogInformation("Approved winback proposal #{VoucherId} ({Code}) for branch {BranchId}. Distributed to {Count} users.", voucherId, voucher.Code, branchId, grantedCount);
-
             var branch = await _context.Branches.FirstAsync(b => b.BranchId == branchId);
             var now = DateTime.UtcNow.ToVnTime();
-
             return new MonthlyRevenueCampaignResultDTO
             {
                 BranchId = branchId,
@@ -369,61 +309,47 @@ namespace BLL.Services
                 GrantedUsersCount = grantedCount
             };
         }
-
         public async Task<bool> RejectProposalAsync(int branchId, int voucherId, string? rejectReason)
         {
             var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.VoucherId == voucherId && v.BranchId == branchId);
             if (voucher == null) throw new NotFoundException($"Proposal Voucher #{voucherId} not found for this branch.");
-
             if (voucher.ApprovalStatus != "Proposed")
             {
                 throw new BadRequestException($"Cannot reject proposal #{voucherId}. Current status is '{voucher.ApprovalStatus}'.");
             }
-
             voucher.ApprovalStatus = "Rejected";
             voucher.IsActive = false;
-
             if (!string.IsNullOrWhiteSpace(rejectReason))
             {
                 voucher.ProposalNote = (voucher.ProposalNote + $" [Từ chối bởi Manager: {rejectReason.Trim()}]").Trim();
             }
-
             await _context.SaveChangesAsync();
             _logger.LogInformation("Rejected winback proposal #{VoucherId} for branch {BranchId}. Reason: {Reason}", voucherId, branchId, rejectReason);
             return true;
         }
-
         public async Task<List<MonthlyRevenueCampaignResultDTO>> CheckAndTriggerAllBranchesRevenueCampaignAsync(int? targetMonth = null, int? targetYear = null)
         {
             var activeBranches = await _context.Branches
                 .Where(b => b.IsActive)
                 .OrderBy(b => b.BranchId)
                 .ToListAsync();
-
             var results = new List<MonthlyRevenueCampaignResultDTO>();
             foreach (var branch in activeBranches)
             {
                 var res = await CheckAndTriggerMonthlyRevenueCampaignAsync(branch.BranchId, targetMonth, targetYear);
                 results.Add(res);
             }
-
             return results;
         }
-
         public async Task<BranchComprehensiveStimulusDTO> GenerateComprehensiveStimulusAnalysisAsync(int branchId, int? targetMonth = null, int? targetYear = null)
         {
             var branch = await _context.Branches.FindAsync(branchId);
             if (branch == null) throw new NotFoundException($"Branch with ID {branchId} not found.");
-
             var now = DateTime.UtcNow;
             int month = targetMonth ?? now.Month;
             int year = targetYear ?? now.Year;
-
-            // 1. Đối chiếu mức doanh thu hiện tại với tháng trước
             var eval = await EvaluateBranchMonthlyRevenueAsync(branchId, month, year);
             bool isHealthy = !eval.IsRevenueDropped || eval.CalculatedVoucherDiscountPercent <= 0;
-
-            // 2. Thống kê lưu lượng khách ra vào trong tháng và xác định khung/ngày vắng khách
             var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
             var endDate = startDate.AddMonths(1).AddDays(-1);
             if (year == now.Year && month == now.Month)
@@ -431,29 +357,23 @@ namespace BLL.Services
                 endDate = now;
             }
             int daysCount = Math.Max(1, (endDate - startDate).Days + 1);
-
             var bookingsInMonth = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.ScheduledTime >= startDate && b.ScheduledTime <= endDate &&
                             (b.Status == "CheckedIn" || b.Status == "Processing" || b.Status == "Completed"))
                 .ToListAsync();
-
             int totalCheckIns = bookingsInMonth.Count;
             double avgDaily = Math.Round((double)totalCheckIns / daysCount, 1);
-
             var dayGroups = bookingsInMonth
                 .GroupBy(b => b.ScheduledTime.DayOfWeek)
                 .Select(g => new { Day = g.Key, Count = g.Count() })
                 .OrderBy(g => g.Count)
                 .ToList();
-
             string slowestDaysStr = "Thứ 3, Thứ 4";
             if (dayGroups.Any())
             {
                 var names = dayGroups.Take(2).Select(g => GetVietnameseDayOfWeek(g.Day)).ToList();
                 slowestDaysStr = string.Join(", ", names);
             }
-
-            // 3. Thống kê khách hàng thân thiết (>2 lượt) và số lượng có dấu hiệu rời bỏ (>45 ngày)
             var fortyFiveDaysAgo = DateTime.UtcNow.AddDays(-45);
             var loyalCustomers = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.UserId != null && b.Status == "Completed")
@@ -461,14 +381,10 @@ namespace BLL.Services
                 .Where(g => g.Count() >= 2)
                 .Select(g => new { UserId = g.Key, LastVisit = g.Max(b => b.ScheduledTime) })
                 .ToListAsync();
-
             int activeCount = loyalCustomers.Count;
             int atRiskCount = loyalCustomers.Count(c => c.LastVisit < fortyFiveDaysAgo);
-
-            // 4. Tính toán mức giảm giá và đề xuất kịch bản dựa trên đối chiếu doanh thu
             int weekdayDiscount = 15;
             int winbackDiscount = 20;
-
             if (eval.IsRevenueDropped)
             {
                 if (eval.RevenueDropPercentage >= 25)
@@ -492,14 +408,10 @@ namespace BLL.Services
                 weekdayDiscount = 10;
                 winbackDiscount = 15;
             }
-
             var proposalsList = new List<VoucherProposalDTO>();
-
-            // Kịch bản 1: Ngày trong tuần vắng khách
             string weekdayCode = $"OFFPEAK_B{branchId}_M{month:D2}Y{year}_{weekdayDiscount}";
             var existingWeekdayVoucher = await _context.Vouchers
                 .FirstOrDefaultAsync(v => v.BranchId == branchId && v.Code == weekdayCode);
-
             if (existingWeekdayVoucher == null)
             {
                 existingWeekdayVoucher = new Voucher
@@ -522,7 +434,6 @@ namespace BLL.Services
                 _context.Vouchers.Add(existingWeekdayVoucher);
                 await _context.SaveChangesAsync();
             }
-
             proposalsList.Add(new VoucherProposalDTO
             {
                 VoucherId = existingWeekdayVoucher.VoucherId,
@@ -542,13 +453,10 @@ namespace BLL.Services
                 EstimatedTargetCustomers = totalCheckIns > 0 ? totalCheckIns * 2 : 50,
                 CreatedAt = existingWeekdayVoucher.CreatedAt
             });
-
-            // Kịch bản 2: Khách hàng thân thiết có dấu hiệu rời bỏ
             int targetWinbackUsers = Math.Max(10, atRiskCount);
             string winbackCode = $"LOYAL_B{branchId}_M{month:D2}Y{year}_{winbackDiscount}";
             var existingWinbackVoucher = await _context.Vouchers
                 .FirstOrDefaultAsync(v => v.BranchId == branchId && v.Code == winbackCode);
-
             if (existingWinbackVoucher == null)
             {
                 existingWinbackVoucher = new Voucher
@@ -571,7 +479,6 @@ namespace BLL.Services
                 _context.Vouchers.Add(existingWinbackVoucher);
                 await _context.SaveChangesAsync();
             }
-
             proposalsList.Add(new VoucherProposalDTO
             {
                 VoucherId = existingWinbackVoucher.VoucherId,
@@ -591,12 +498,10 @@ namespace BLL.Services
                 EstimatedTargetCustomers = targetWinbackUsers,
                 CreatedAt = existingWinbackVoucher.CreatedAt
             });
-
             string summary = $"Doanh thu tháng {month:D2}/{year} đạt {eval.CurrentMonthRevenue:N0}đ " +
                              $"{(eval.IsRevenueDropped ? $"(giảm {eval.RevenueDropPercentage}% so với tháng trước {eval.PreviousMonthRevenue:N0}đ)" : $"(duy trì/tăng so với {eval.PreviousMonthRevenue:N0}đ)")}. " +
                              $"Lưu lượng khách trung bình {avgDaily} xe/ngày, vắng nhất vào {slowestDaysStr}. " +
                              $"Phát hiện {atRiskCount} khách hàng thân thiết (>45 ngày chưa quay lại). Hệ thống đã tạo 2 đề xuất mã ưu đãi tối ưu hóa theo tỷ lệ doanh thu hiện tại.";
-
             return new BranchComprehensiveStimulusDTO
             {
                 BranchId = branchId,
@@ -619,7 +524,6 @@ namespace BLL.Services
                 ComprehensiveAnalysisSummary = summary
             };
         }
-
         private static string GetVietnameseDayOfWeek(DayOfWeek day)
         {
             return day switch

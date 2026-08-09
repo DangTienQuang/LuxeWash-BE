@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace BLL.DTOs.Business
 {
     public class CreateBusinessBookingDTO
@@ -13,7 +12,6 @@ namespace BLL.DTOs.Business
         public int SlotId { get; set; }
         public DateTime ScheduledTime { get; set; }
     }
-
     public class VehicleBookingItemDTO
     {
         public int FleetVehicleId { get; set; }

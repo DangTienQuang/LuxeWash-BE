@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace BLL.DTOs.Business
 {
     public class RescheduleBusinessBookingDTO
@@ -12,7 +11,6 @@ namespace BLL.DTOs.Business
         public DateTime NewScheduledDate { get; set; }
         public int NewSlotId { get; set; }
     }
-
     public class RescheduleBusinessResponseDTO
     {
         public int BookingId { get; set; }

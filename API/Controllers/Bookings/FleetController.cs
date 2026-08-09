@@ -24,9 +24,12 @@ namespace API.Controllers
 
         [Authorize(Roles = "Business")]
         [HttpGet("template")]
-        public async Task<IActionResult> DownloadTemplate()
+        public async Task<IActionResult> DownloadTemplateInfo()
         {
-            var result = await _fleetService.GetFleetTemplateAsync();
+            var request = Request;
+            var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
+            
+            var result = await _fleetService.GetFleetTemplateInfoAsync(baseUrl);
 
             return Ok(new
             {
@@ -34,6 +37,14 @@ namespace API.Controllers
                 message = "Success",
                 data = result
             });
+        }
+
+        [AllowAnonymous]
+        [HttpGet("template/download")]
+        public async Task<IActionResult> DownloadTemplateFile()
+        {
+            var content = await _fleetService.GenerateFleetTemplateAsync();
+            return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "FleetTemplate.xlsx");
         }
 
         [Authorize(Roles = "Business")]

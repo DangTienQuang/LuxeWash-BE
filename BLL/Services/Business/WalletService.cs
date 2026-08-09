@@ -14,7 +14,6 @@ using PayOS.Models.Webhooks;
 using Microsoft.Extensions.Logging;
 using AutoWashPro.BLL.Exceptions;
 using BLL.Helpers;
-
 namespace AutoWashPro.BLL.Services
 {
     public class WalletService : IWalletService
@@ -26,7 +25,6 @@ namespace AutoWashPro.BLL.Services
         private readonly IEmailService _emailService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
-
         public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator)
         {
             _context = context;
@@ -37,7 +35,6 @@ namespace AutoWashPro.BLL.Services
             _laneSchedulerService = laneSchedulerService;
             _laneCoordinator = laneCoordinator;
         }
-
         public async Task<WalletResponseDTO> GetWalletInfoAsync(int userId)
         {
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
@@ -47,9 +44,7 @@ namespace AutoWashPro.BLL.Services
                 _context.Wallets.Add(wallet);
                 await _context.SaveChangesAsync();
             }
-
             var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(cp => cp.UserId == userId);
-
             return new WalletResponseDTO
             {
                 Balance = wallet.Balance,
@@ -57,7 +52,6 @@ namespace AutoWashPro.BLL.Services
                 PromotionPoints = profile?.PromotionPoint ?? 0
             };
         }
-
         public async Task<TopUpResponseDTO> CreateTopUpLinkAsync(int userId, TopUpRequestDTO request)
         {
             var result = await CreatePaymentQrAsync(userId, new PaymentQrRequestDTO
@@ -67,20 +61,17 @@ namespace AutoWashPro.BLL.Services
                 CancelUrl = request.CancelUrl,
                 ReturnUrl = request.ReturnUrl
             });
-
             return new TopUpResponseDTO
             {
                 PaymentUrl = result.PaymentUrl,
                 OrderCode = result.OrderCode
             };
         }
-
         public async Task<PaymentQrResponseDTO> CreatePaymentQrAsync(int userId, PaymentQrRequestDTO request)
         {
             var userExists = await _context.Users.AnyAsync(u => u.UserId == userId);
             if (!userExists)
                 throw new NotFoundException("User corresponding to token not found. Please log in again.");
-
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
             if (wallet == null)
             {
@@ -95,19 +86,16 @@ namespace AutoWashPro.BLL.Services
                     throw new BadRequestException($"Could not create wallet for user. DB Error: {ex.InnerException?.Message ?? ex.Message}");
                 }
             }
-
             var paymentType = NormalizePaymentType(request.PaymentType);
             decimal amount;
             int? referenceBookingId = null;
             string transactionType;
             string transactionDescription;
             string paymentDescription;
-
             if (paymentType == "Topup")
             {
                 if (!request.Amount.HasValue || request.Amount.Value <= 0)
                     throw new BadRequestException("Please enter a valid wallet deposit amount.");
-
                 amount = request.Amount.Value;
                 transactionType = "Topup";
                 transactionDescription = "Yeu cau nap tien";
@@ -117,19 +105,14 @@ namespace AutoWashPro.BLL.Services
             {
                 if (!request.BookingId.HasValue)
                     throw new BadRequestException("Please provide BookingId when paying for a booking.");
-
                 var booking = await _context.Bookings
                     .FirstOrDefaultAsync(b => b.BookingId == request.BookingId.Value && b.UserId == userId);
-
                 if (booking == null)
                     throw new NotFoundException("Booking not found or you do not have permission to pay.");
-
                 if (booking.Status == "Cancelled" || booking.Status == "CancelledBySystem" || booking.Status == "NoShow")
                     throw new BadRequestException("Cannot pay for a cancelled or no-show booking.");
-
                 if (await HasCompletedBookingPaymentAsync(booking.BookingId))
                     throw new BadRequestException("This booking has already been paid.");
-
                 if (booking.FinalAmount <= 0)
                 {
                     return new PaymentQrResponseDTO
@@ -141,17 +124,14 @@ namespace AutoWashPro.BLL.Services
                         BookingId = booking.BookingId
                     };
                 }
-
                 amount = booking.FinalAmount;
                 referenceBookingId = booking.BookingId;
                 transactionType = "BookingPayment";
                 transactionDescription = $"Yeu cau thanh toan booking #{booking.BookingId}";
                 paymentDescription = $"Booking #{booking.BookingId}";
             }
-
             var payOsAmount = ToPayOsAmount(amount);
             var orderCode = GenerateOrderCode();
-
             var transaction = new Transaction
             {
                 WalletId = wallet.WalletId,
@@ -173,7 +153,6 @@ namespace AutoWashPro.BLL.Services
             {
                 throw new BadRequestException($"Could not create payment transaction. Check if Transactions table has OrderCode, ReferenceBookingId, Status columns. DB Error: {ex.InnerException?.Message ?? ex.Message}");
             }
-
             var paymentRequest = new CreatePaymentLinkRequest
             {
                 OrderCode = orderCode,
@@ -182,9 +161,7 @@ namespace AutoWashPro.BLL.Services
                 CancelUrl = request.CancelUrl,
                 ReturnUrl = request.ReturnUrl
             };
-
             var createPaymentResult = await _payOSClient.PaymentRequests.CreateAsync(paymentRequest);
-
             return new PaymentQrResponseDTO
             {
                 PaymentUrl = createPaymentResult.CheckoutUrl,
@@ -194,7 +171,6 @@ namespace AutoWashPro.BLL.Services
                 BookingId = referenceBookingId
             };
         }
-
         public async Task ProcessPayOsWebhookAsync(WebhookTopUpDTO webhookData)
         {
             if (webhookData.Data == null)
@@ -202,7 +178,6 @@ namespace AutoWashPro.BLL.Services
                 _logger.LogWarning("Webhook contains no data. Code: {Code}", webhookData.Code);
                 return;
             }
-
             WebhookData data;
             try
             {
@@ -213,39 +188,31 @@ namespace AutoWashPro.BLL.Services
                 _logger.LogWarning(ex, "Invalid PayOS webhook.");
                 throw new UnauthorizedException("Invalid PayOS webhook.");
             }
-
             if (webhookData.Code != "00" || !webhookData.Success)
             {
                 _logger.LogWarning("Webhook reported unsuccessful payment. Code: {Code}", webhookData.Code);
                 return;
             }
-
             var orderCodeStr = data.OrderCode.ToString();
-
             var transaction = await _context.Transactions
                 .Include(t => t.Wallet)
                 .FirstOrDefaultAsync(t => t.OrderCode == orderCodeStr);
-
             if (transaction == null)
             {
                 _logger.LogWarning("Transaction with OrderCode not found: {OrderCode}", data.OrderCode);
                 throw new NotFoundException("PayOS transaction corresponding to orderCode not found.");
             }
-
             if (transaction.Status != "Pending")
             {
                 _logger.LogInformation("Transaction {OrderCode} is currently in {Status} status.", data.OrderCode, transaction.Status);
                 return;
             }
-
             await ConfirmTransactionPaymentAsync(transaction.TransactionId, data.Amount, orderCodeStr);
         }
-
         public async Task<List<TransactionResponseDTO>> GetTransactionsAsync(int userId)
         {
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
             if (wallet == null) return new List<TransactionResponseDTO>();
-
             return await _context.Transactions
                 .Where(t => t.WalletId == wallet.WalletId)
                 .OrderByDescending(t => t.CreatedAt)
@@ -261,7 +228,6 @@ namespace AutoWashPro.BLL.Services
                     CreatedAt = t.CreatedAt
                 }).ToListAsync();
         }
-
         private async Task SendBookingPaymentConfirmationEmailAsync(int bookingId)
         {
             try
@@ -272,19 +238,16 @@ namespace AutoWashPro.BLL.Services
                     .Include(b => b.User)
                         .ThenInclude(u => u.CustomerProfile)
                     .FirstOrDefaultAsync(b => b.BookingId == bookingId);
-
                 if (booking?.User == null || string.IsNullOrWhiteSpace(booking.User.Email))
                 {
                     _logger.LogWarning("Cannot send email for booking #{BookingId}: invalid user/email.", bookingId);
                     return;
                 }
-
                 var customerName = booking.User.CustomerProfile?.FullName ?? "Quy khach";
                 var emailHtml = EmailTemplateBuilder.BuildBookingConfirmationEmail(
                     booking,
                     booking.BookingDetails.ToList(),
                     customerName);
-
                 await _emailService.SendEmailAsync(
                     booking.User.Email,
                     $"[SmartWash] Booking successful - #{booking.BookingId}",
@@ -295,7 +258,6 @@ namespace AutoWashPro.BLL.Services
                 _logger.LogWarning(ex, "Failed to send confirmation email for booking #{BookingId} after QR payment.", bookingId);
             }
         }
-
         public async Task<List<PointHistoryResponseDTO>> GetPointsHistoryAsync(int userId)
         {
             return await _context.PointLedgers
@@ -310,21 +272,16 @@ namespace AutoWashPro.BLL.Services
                     TransactionDate = p.TransactionDate
                 }).ToListAsync();
         }
-
         public async Task DeductSpendablePointsAsync(int userId, int pointsToDeduct, string reason)
         {
             if (pointsToDeduct <= 0) throw new BadRequestException("Deducted points must be greater than 0.");
-
             try
             {
                 var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(cp => cp.UserId == userId);
                 if (profile == null) throw new NotFoundException("Customer profile not found.");
-
                 if (profile.TotalPoint < pointsToDeduct)
                     throw new BadRequestException($"Insufficient available points. You have {profile.TotalPoint} points.");
-
                 profile.TotalPoint -= pointsToDeduct;
-
                 _context.PointLedgers.Add(new PointLedger
                 {
                     UserId = userId,
@@ -332,7 +289,6 @@ namespace AutoWashPro.BLL.Services
                     Reason = reason,
                     TransactionDate = DateTime.UtcNow
                 });
-
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
@@ -340,18 +296,14 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Data was modified by another transaction. Please try again.");
             }
         }
-
         public async Task RefundSpendablePointsAsync(int userId, int pointsToRefund, string reason, int? referenceBookingId = null)
         {
             if (pointsToRefund <= 0) throw new BadRequestException("Refunded points must be greater than 0.");
-
             try
             {
                 var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(cp => cp.UserId == userId);
                 if (profile == null) throw new NotFoundException("Customer profile not found.");
-
                 profile.TotalPoint += pointsToRefund;
-
                 _context.PointLedgers.Add(new PointLedger
                 {
                     UserId = userId,
@@ -360,7 +312,6 @@ namespace AutoWashPro.BLL.Services
                     ReferenceBookingId = referenceBookingId,
                     TransactionDate = DateTime.UtcNow
                 });
-
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
@@ -368,17 +319,14 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Data was modified by another transaction. Please try again.");
             }
         }
-
         public async Task MarkTransactionTerminalAsync(int transactionId, string terminalStatus)
         {
             var tx = await _context.Transactions.FirstOrDefaultAsync(t => t.TransactionId == transactionId);
             if (tx == null) return;
             if (string.Equals(tx.Status, "Completed", StringComparison.OrdinalIgnoreCase)) return;
-
             tx.Status = terminalStatus;
             await _context.SaveChangesAsync();
         }
-
         public async Task ConfirmTransactionPaymentAsync(int transactionId, decimal? webhookAmount, string orderCode)
         {
             using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
@@ -387,20 +335,16 @@ namespace AutoWashPro.BLL.Services
                 var transaction = await _context.Transactions
                     .Include(t => t.Wallet)
                     .FirstOrDefaultAsync(t => t.TransactionId == transactionId);
-                
                 if (transaction == null) return;
                 if (transaction.Status == "Completed") return;
-
                 if (webhookAmount.HasValue && transaction.Amount != webhookAmount.Value)
                 {
                     throw new BadRequestException("Webhook amount does not match the pending transaction.");
                 }
-
                 if (transaction.TransactionType == "Topup")
                 {
                     if (transaction.Wallet == null)
                         throw new BadRequestException("Wallet top-up transaction is missing wallet info.");
-
                     transaction.Status = "Completed";
                     transaction.Description = $"Top-up successful (Code: {orderCode})";
                     transaction.Wallet.Balance += transaction.Amount;
@@ -409,36 +353,30 @@ namespace AutoWashPro.BLL.Services
                 {
                     if (!transaction.ReferenceBookingId.HasValue)
                         throw new BadRequestException("Booking payment transaction is missing booking ID.");
-
                     transaction.Status = "Completed";
                     transaction.Description = transaction.TransactionType == "WalkInPayment" 
                         ? $"Walk-in payment successful (Code: {orderCode})" 
                         : $"Booking payment successful (Code: {orderCode})";
-
                     var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == transaction.ReferenceBookingId.Value);
                     if (booking != null)
                     {
                         booking.UpdatedAt = DateTime.UtcNow;
-
                         var otherPendingBookingPayments = await _context.Transactions
                             .Where(t => t.ReferenceBookingId == booking.BookingId
                                      && t.TransactionId != transaction.TransactionId
                                      && (t.TransactionType == "BookingPayment" || t.TransactionType == "WalkInPayment")
                                      && t.Status == "Pending")
                             .ToListAsync();
-
                         foreach (var pendingPayment in otherPendingBookingPayments)
                         {
                             pendingPayment.Status = "Expired";
                         }
-
                         if (transaction.TransactionType == "WalkInPayment" && booking.ProcessingLaneId == null && booking.Status == "CheckedIn")
                         {
                             var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
                                 booking.LicensePlate ?? "UNKNOWN",
                                 booking.BranchId,
                                 bookingId: booking.BookingId);
-
                             if (!checkInResult.IsWaiting && checkInResult.LaneId.HasValue)
                             {
                                 booking.ProcessingLaneId = checkInResult.LaneId.Value;
@@ -450,10 +388,8 @@ namespace AutoWashPro.BLL.Services
                 {
                     throw new BadRequestException("Transaction type not supported for webhook.");
                 }
-
                 await _context.SaveChangesAsync();
                 await dbTransaction.CommitAsync();
-
                 if ((transaction.TransactionType == "BookingPayment" || transaction.TransactionType == "WalkInPayment") && transaction.ReferenceBookingId.HasValue)
                 {
                     _ = Task.Run(() => SendBookingPaymentConfirmationEmailAsync(transaction.ReferenceBookingId.Value));
@@ -465,23 +401,17 @@ namespace AutoWashPro.BLL.Services
                 throw;
             }
         }
-
         public async Task<int> AwardCompletionPointsAsync(int userId, int pointsEarned, int bookingId)
         {
             if (pointsEarned <= 0) throw new BadRequestException("Bonus points must be greater than 0.");
-
             try
             {
                 var profile = await _context.CustomerProfiles
                     .Include(cp => cp.Tier)
                     .FirstOrDefaultAsync(cp => cp.UserId == userId);
-
                 if (profile == null) throw new NotFoundException("Customer profile not found.");
-
                 profile.TotalPoint += pointsEarned;
-                // LUỒNG 1: Tiền tệ (Đưa vào ví và sổ cái, hạn 1 năm)
                 profile.PromotionPoint += pointsEarned;
-
                 _context.PointLedgers.Add(new PointLedger
                 {
                     UserId = userId,
@@ -491,12 +421,8 @@ namespace AutoWashPro.BLL.Services
                     ReferenceBookingId = bookingId,
                     TransactionDate = DateTime.UtcNow
                 });
-
-                // LUỒNG 2: Danh vọng (Cộng thẳng vào điểm xét hạng năm nay)
                 profile.CurrentYearTierPoints += pointsEarned;
-
                 await _tierService.EvaluateTierForProfileAsync(profile.UserId);
-
                 await _context.SaveChangesAsync();
                 return pointsEarned;
             }
@@ -508,12 +434,9 @@ namespace AutoWashPro.BLL.Services
         public async Task RefundBalanceAsync(int userId, decimal amount, string reason)
         {
             if (amount <= 0) throw new BadRequestException("Refund amount must be greater than 0.");
-
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
             if (wallet == null) throw new NotFoundException("User wallet not found.");
-
             wallet.Balance += amount;
-
             var transaction = new Transaction
             {
                 WalletId = wallet.WalletId,
@@ -523,45 +446,35 @@ namespace AutoWashPro.BLL.Services
                 Status = "Completed",
                 CreatedAt = DateTime.UtcNow
             };
-
             _context.Transactions.Add(transaction);
             await _context.SaveChangesAsync();
         }
-
         private static long GenerateOrderCode()
         {
             var timestampPart = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1_000_000_000_000;
             var randomPart = Random.Shared.Next(10, 99);
             return timestampPart * 100 + randomPart;
         }
-
         private static int ToPayOsAmount(decimal amount)
         {
             if (amount <= 0)
                 throw new BadRequestException("PayOS payment amount must be greater than 0.");
-
             if (amount != decimal.Truncate(amount))
                 throw new BadRequestException("PayOS only supports whole VND amounts, without decimal parts.");
-
             if (amount > int.MaxValue)
                 throw new BadRequestException("PayOS payment amount exceeds the supported limit.");
-
             return decimal.ToInt32(amount);
         }
-
         private static string NormalizePaymentType(string paymentType)
         {
             if (string.Equals(paymentType, "Topup", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(paymentType, "TopUp", StringComparison.OrdinalIgnoreCase))
                 return "Topup";
-
             if (string.Equals(paymentType, "BookingPayment", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(paymentType, "Booking", StringComparison.OrdinalIgnoreCase))
                 return "BookingPayment";
-
             throw new BadRequestException("PaymentType only supports Topup or BookingPayment.");
         }
-
         private Task<bool> HasCompletedBookingPaymentAsync(int bookingId)
         {
             return _context.Transactions.AnyAsync(t =>
@@ -571,7 +484,6 @@ namespace AutoWashPro.BLL.Services
                     || t.TransactionType == "BookingPayment"
                     || t.TransactionType == "WalkInPayment"));
         }
-
         private async Task<WebhookData> VerifyPayOsWebhookAsync(WebhookTopUpDTO webhookData)
         {
             var data = new WebhookData
@@ -586,7 +498,6 @@ namespace AutoWashPro.BLL.Services
                 PaymentLinkId = webhookData.Data.PaymentLinkId ?? "",
                 Code = webhookData.Data.Code ?? ""
             };
-
             SetWebhookDataPropertyIfExists(data, "Description2", webhookData.Data.Desc ?? "");
             SetWebhookDataPropertyIfExists(data, "VirtualAccountNumber", webhookData.Data.VirtualAccountNumber ?? "");
             SetWebhookDataPropertyIfExists(data, "CounterAccountBankId", webhookData.Data.CounterAccountBankId ?? "");
@@ -594,7 +505,6 @@ namespace AutoWashPro.BLL.Services
             SetWebhookDataPropertyIfExists(data, "CounterAccountName", webhookData.Data.CounterAccountName ?? "");
             SetWebhookDataPropertyIfExists(data, "CounterAccountNumber", webhookData.Data.CounterAccountNumber ?? "");
             SetWebhookDataPropertyIfExists(data, "VirtualAccountName", webhookData.Data.VirtualAccountName ?? "");
-
             var webhook = new Webhook
             {
                 Code = webhookData.Code,
@@ -603,12 +513,9 @@ namespace AutoWashPro.BLL.Services
                 Signature = webhookData.Signature,
                 Data = data
             };
-
             SetWebhookPropertyIfExists(webhook, "Desc", webhookData.Desc ?? webhookData.Description ?? "");
-
             return await _payOSClient.Webhooks.VerifyAsync(webhook);
         }
-
         private static void SetWebhookPropertyIfExists(Webhook webhook, string propertyName, string value)
         {
             var property = typeof(Webhook).GetProperty(propertyName);
@@ -617,7 +524,6 @@ namespace AutoWashPro.BLL.Services
                 property.SetValue(webhook, value);
             }
         }
-
         private static void SetWebhookDataPropertyIfExists(WebhookData data, string propertyName, string value)
         {
             var property = typeof(WebhookData).GetProperty(propertyName);
@@ -628,5 +534,4 @@ namespace AutoWashPro.BLL.Services
         }
     }
 }
-
 #pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

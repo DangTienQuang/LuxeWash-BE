@@ -9,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
 namespace AutoWashPro.BLL.Services
 {
     public class OperationStaffService : IOperationStaffService
@@ -21,7 +20,6 @@ namespace AutoWashPro.BLL.Services
         private readonly global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService _overloadSuggestionService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
         private readonly global::BLL.Services.Interface.IPhotoService _photoService;
-
         public OperationStaffService(AutoWashDbContext context, IWalletService walletService, IBookingMaterialUsageService bookingMaterialUsageService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, global::AutoWashPro.BLL.Services.Interface.IOverloadSuggestionService overloadSuggestionService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator, global::BLL.Services.Interface.IPhotoService photoService)
         {
             _context = context;
@@ -32,17 +30,14 @@ namespace AutoWashPro.BLL.Services
             _laneCoordinator = laneCoordinator;
             _photoService = photoService;
         }
-
         public async Task<StaffLaneTaskDTO?> GetTodayLaneAssignmentAsync(int staffUserId, DateTime? date = null)
         {
             var targetDate = date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
-
             var assignment = await _context.StaffLaneAssignments
                 .Include(a => a.Lane)
                 .Where(a => a.StaffId == staffUserId && a.AssignedDate.Date == targetDate)
                 .OrderByDescending(a => a.AssignmentId)
                 .FirstOrDefaultAsync();
-
             if (assignment == null)
             {
                 return new StaffLaneTaskDTO
@@ -52,7 +47,6 @@ namespace AutoWashPro.BLL.Services
                     AssignedDate = targetDate
                 };
             }
-
             return new StaffLaneTaskDTO
             {
                 LaneId = assignment.LaneId,
@@ -60,43 +54,32 @@ namespace AutoWashPro.BLL.Services
                 AssignedDate = assignment.AssignedDate
             };
         }
-
         public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null)
         {
             if (checkInImage == null || checkInImage.Length == 0)
             {
                 throw new BadRequestException("Check-in image is required.");
             }
-
             var booking = await _context.Bookings
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
-
             if (booking == null)
             {
                 throw new NotFoundException("Booking information not found.");
             }
-
             if (booking.Status != "Pending")
             {
                 throw new BadRequestException("Can only check in vehicles in Pending status.");
             }
-
             if (!await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))
             {
                 throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
             }
-
-            // Detect stale operational state: booking is Pending but still has a ProcessingLaneId
-            // from a previous (cancelled/failed) session without a valid LaneOccupancy.
-            // Per requirement 6.1: clear stale fields so coordinator runs a clean admission.
             if (booking.ProcessingLaneId != null)
             {
                 var hasValidOccupancy = await _context.LaneOccupancies
                     .AnyAsync(o => o.BookingId == booking.BookingId);
-
                 if (!hasValidOccupancy)
                 {
-                    // Stale assignment — reset all operational fields before re-admission
                     booking.ProcessingLaneId = null;
                     booking.ProcessingStartTime = null;
                     booking.CompletedTime = null;
@@ -107,66 +90,48 @@ namespace AutoWashPro.BLL.Services
                     throw new BadRequestException("INVALID_STATE: Booking is in Pending status but already has a valid LaneOccupancy. Cannot check in again.");
                 }
             }
-
-            // Upload before changing operational state so a failed upload cannot leave
-            // the booking checked in without its required evidence image.
             booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
-
-            // Always run through the coordinator — it owns: lane selection, LaneOccupancy creation,
-            // status transition (Processing/CheckedIn), BarrierCommand, and Outbox events.
             var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
                 booking.LicensePlate ?? "UNKNOWN",
                 booking.BranchId,
                 bookingId: booking.BookingId);
-
-            // Set staff assignment (coordinator does not know the staffId)
             booking.ProcessingStaffId = staffUserId;
-
             await _context.SaveChangesAsync();
-
-            // Await the overload check — do NOT fire-and-forget with a scoped DbContext
             await _overloadSuggestionService.CheckAndTriggerOverloadAsync(booking.BranchId);
-
             return checkInResult;
         }
-
         public async Task<List<StaffBookingDTO>> GetAssignedBookingsAsync(int staffUserId, DateTime? date = null)
         {
             var staffBranchId = await _context.EmployeeProfiles
                 .Where(e => e.EmployeeId == staffUserId)
                 .Select(e => e.BranchId)
                 .FirstOrDefaultAsync();
-
             var query = _context.Bookings
                 .Include(b => b.BookingDetails)
                 .ThenInclude(d => d.Service)
                 .Include(b => b.ActualVehicleType)
+                .Include(b => b.Vehicle).ThenInclude(v => v!.VehicleType)
                 .Include(b => b.User)
                 .ThenInclude(u => u!.CustomerProfile)
                 .ThenInclude(p => p!.Tier)
                 .Include(b => b.ProcessingLane)
                 .Where(b => b.BranchId == staffBranchId
                          && (b.Status == "CheckedIn" || b.Status == "Processing"));
-
             if (date.HasValue)
             {
                 query = query.Where(b => b.ScheduledTime.Date == date.Value.Date);
             }
-
             var bookings = await query
                 .OrderByDescending(b => b.User != null && b.User.CustomerProfile != null && b.User.CustomerProfile.Tier != null
                                          ? b.User.CustomerProfile.Tier.MinAccumulatedPoints
                                          : -1)
                 .ThenBy(b => b.ScheduledTime)
                 .ToListAsync();
-
             if (bookings.Count == 0)
             {
                 return new List<StaffBookingDTO>();
             }
-
             var bookingIds = bookings.Select(b => b.BookingId).Distinct().ToList();
-
             var paymentTransactions = await _context.Transactions
                 .Where(t => t.ReferenceBookingId.HasValue
                     && bookingIds.Contains(t.ReferenceBookingId.Value)
@@ -182,25 +147,40 @@ namespace AutoWashPro.BLL.Services
                     t.OrderCode
                 })
                 .ToListAsync();
-
             var latestPaymentByBooking = paymentTransactions
                 .GroupBy(t => t.BookingId)
                 .ToDictionary(g => g.Key, g => g.First());
-
             return bookings.Select(b =>
             {
                 latestPaymentByBooking.TryGetValue(b.BookingId, out var tx);
-                var paymentStatus = tx != null && string.Equals(tx.Status, "Completed", StringComparison.OrdinalIgnoreCase)
-                    ? "Completed"
-                    : "Unpaid";
+                var paymentStatus = tx == null
+                    ? "Unpaid"
+                    : tx.Status?.ToLowerInvariant() switch
+                    {
+                        "completed" => "Completed",
+                        "pending"   => "Pending",
+                        "expired"   => "Expired",
+                        "failed"    => "Failed",
+                        "cancelled" => "Failed",
+                        _           => "Unpaid"
+                    };
+                var paymentNote = paymentStatus switch
+                {
+                    "Completed" => null,
+                    "Pending"   => "Awaiting QR payment — please remind customer to complete scan",
+                    "Expired"   => "Payment link expired — ask customer to generate a new QR or pay by another method",
+                    "Failed"    => "Payment failed — please collect payment before processing",
+                    _           => b.FinalAmount > 0 ? "Not yet paid — collect payment before processing" : null
+                };
                 return new StaffBookingDTO
                 {
                     BookingId = b.BookingId,
                     LicensePlate = b.LicensePlate,
                     ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName).ToList(),
-                    VehicleTypeName = b.ActualVehicleType?.Name ?? "Unknown",
+                    VehicleTypeName = b.ActualVehicleType?.Name ?? b.Vehicle?.VehicleType?.Name ?? "Unknown",
                     Status = b.Status,
                     PaymentStatus = paymentStatus,
+                    PaymentNote = paymentNote,
                     PaymentMethod = tx?.PaymentMethod,
                     OrderCode = tx?.OrderCode,
                     FinalAmount = b.FinalAmount,
@@ -215,23 +195,19 @@ namespace AutoWashPro.BLL.Services
                 };
             }).ToList();
         }
-
         public async Task<bool> UpdateBookingStatusAsync(int staffUserId, int bookingId, string newStatus, Microsoft.AspNetCore.Http.IFormFile? checkOutImage = null)
         {
             if (newStatus != "Processing" && newStatus != "Completed")
             {
                 throw new BadRequestException("Invalid status update.");
             }
-
             var booking = await _context.Bookings
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
-
             if (booking == null) throw new NotFoundException("Booking not found.");
             if (newStatus == "Processing")
             {
                  if (booking.Status != "CheckedIn" && booking.Status != "Processing")
                      throw new BadRequestException("Can only start processing checked-in vehicles.");
-                     
                  if (booking.FinalAmount > 0)
                  {
                      var hasCompletedPayment = await _context.Transactions
@@ -241,40 +217,32 @@ namespace AutoWashPro.BLL.Services
                          throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
                      }
                  }
-
                  if (booking.ProcessingLaneId == null)
                  {
                      throw new BadRequestException("Booking does not have an assigned lane; cannot start processing.");
                  }
-
                  booking.ProcessingStaffId = staffUserId;
                  booking.ProcessingStartTime = DateTime.UtcNow;
                  booking.CompletedTime = null;
                  booking.ActualDurationMinutes = null;
             }
-
             if (newStatus == "Completed")
             {
                 if (booking.Status != "Processing" && booking.Status != "Completed")
                     throw new BadRequestException("Can only complete processing vehicles.");
-
                 if ((checkOutImage == null || checkOutImage.Length == 0)
                     && string.IsNullOrWhiteSpace(booking.CheckOutImageUrl))
                 {
                     throw new BadRequestException("Check-out image is required to complete the booking.");
                 }
-
                 booking.ProcessingStaffId = staffUserId;
-
                 if (checkOutImage != null && checkOutImage.Length > 0)
                 {
                     booking.CheckOutImageUrl = await _photoService.UploadImageAsync(checkOutImage);
                 }
             }
-
             var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
             booking.Status = newStatus;
-
             if (isCompletingNow)
             {
                 booking.CompletedTime = DateTime.UtcNow;
@@ -284,35 +252,29 @@ namespace AutoWashPro.BLL.Services
                     booking.ActualDurationMinutes = duration < 1 ? 1 : duration;
                 }
             }
-
             if (newStatus == "Completed")
             {
                 await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(booking.BookingId, staffUserId);
             }
-
             if (isCompletingNow && booking.UserId > 0)
             {
                  var userProfile = await _context.CustomerProfiles
                         .Include(cp => cp.Tier)
                         .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
-
                  if (userProfile?.Tier != null && booking.FinalAmount > 0)
                  {
                         int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
-
                         if (pointsEarned > 0)
                         {
                             await _walletService.AwardCompletionPointsAsync(
                                 booking.UserId.Value, pointsEarned, booking.BookingId);
                         }
                  }
-
                  if (userProfile != null)
                  {
                      userProfile.LastVisitDate = DateTime.UtcNow;
                  }
             }
-
             if (isCompletingNow)
             {
                 await _laneCoordinator.CompletePhysicalCheckoutAsync(booking.BookingId, staffUserId);
@@ -321,38 +283,27 @@ namespace AutoWashPro.BLL.Services
             {
                 await _laneCoordinator.ReleaseLaneAsync(booking.BookingId, newStatus);
             }
-
             await _context.SaveChangesAsync();
-
             return true;
         }
-
         public async Task<bool> SwapShiftByPhoneAsync(int currentStaffId, SwapLaneByPhoneDTO dto)
         {
             var targetStaff = await _context.Users
                 .FirstOrDefaultAsync(u => u.PhoneNumber == dto.TargetPhoneNumber && u.Role == "Staff" && u.Status == "Active");
-
             if (targetStaff == null)
             {
                 throw new BadRequestException("Employee with this phone number not found or unavailable.");
             }
-
             var targetDate = dto.Date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
-
             var currentAssignment = await _context.StaffLaneAssignments
                 .FirstOrDefaultAsync(a => a.StaffId == currentStaffId && a.AssignedDate.Date == targetDate);
-
             var targetAssignment = await _context.StaffLaneAssignments
                 .FirstOrDefaultAsync(a => a.StaffId == targetStaff.UserId && a.AssignedDate.Date == targetDate);
-
             if (currentAssignment == null || targetAssignment == null)
             {
                 throw new BadRequestException("One of the two employees does not have a shift assigned on this date to swap.");
             }
-
-            // Swap lane IDs
             (currentAssignment.LaneId, targetAssignment.LaneId) = (targetAssignment.LaneId, currentAssignment.LaneId);
-
             await _context.SaveChangesAsync();
             return true;
         }
@@ -362,7 +313,6 @@ namespace AutoWashPro.BLL.Services
                 .Where(e => e.EmployeeId == staffUserId)
                 .Select(e => e.BranchId)
                 .FirstOrDefaultAsync();
-
             var occupancies = await _context.LaneOccupancies
                 .Where(o => o.BranchId == staffBranchId)
                 .Select(o => new AutoWashPro.BLL.Services.Operations.LaneOccupancyDTO
@@ -374,7 +324,6 @@ namespace AutoWashPro.BLL.Services
                     LaneName = _context.Lanes.Where(l => l.LaneId == o.LaneId).Select(l => l.Name).FirstOrDefault() ?? ""
                 })
                 .ToListAsync();
-
             return occupancies;
         }
     }

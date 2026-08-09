@@ -1,33 +1,27 @@
 using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Exceptions;
-
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
 namespace AutoWashPro.BLL.Services
 {
     public class LaneService : ILaneService
     {
         private readonly AutoWashDbContext _context;
-
         public LaneService(AutoWashDbContext context)
         {
             _context = context;
         }
-
         public async Task<List<LaneDTO>> GetAllLanesAsync(int? branchId = null)
         {
             var query = _context.Lanes.AsQueryable();
-
             if (branchId.HasValue)
             {
                 query = query.Where(l => l.BranchId == branchId.Value);
             }
-
             var lanes = await query.ToListAsync();
             return lanes.Select(l => new LaneDTO
             {
@@ -39,12 +33,10 @@ namespace AutoWashPro.BLL.Services
                 IsVipLane = l.IsVipLane,
             }).ToList();
         }
-
         public async Task<LaneDTO> GetLaneByIdAsync(int laneId)
         {
             var lane = await _context.Lanes.FindAsync(laneId);
             if (lane == null) throw new NotFoundException("Lane not found.");
-
             return new LaneDTO
             {
                 LaneId = lane.LaneId,
@@ -55,12 +47,10 @@ namespace AutoWashPro.BLL.Services
                 IsVipLane = lane.IsVipLane
             };
         }
-
         public async Task<LaneDTO> CreateLaneAsync(CreateLaneDTO createDto)
         {
             var branch = await _context.Branches.FindAsync(createDto.BranchId);
             if (branch == null) throw new NotFoundException("Branch not found.");
-
             var lane = new Lane
             {
                 Name = createDto.Name,
@@ -69,10 +59,8 @@ namespace AutoWashPro.BLL.Services
                 IsBusinessLane = createDto.IsBusinessLane,
                 IsVipLane = createDto.IsVipLane
             };
-
             _context.Lanes.Add(lane);
             await _context.SaveChangesAsync();
-
             return new LaneDTO
             {
                 LaneId = lane.LaneId,
@@ -83,26 +71,21 @@ namespace AutoWashPro.BLL.Services
                 IsVipLane = lane.IsVipLane
             };
         }
-
         public async Task<LaneDTO> UpdateLaneAsync(int laneId, UpdateLaneDTO updateDto)
         {
             var lane = await _context.Lanes.FindAsync(laneId);
             if (lane == null) throw new NotFoundException("Lane not found.");
-
             if (lane.BranchId != updateDto.BranchId)
             {
                 var branch = await _context.Branches.FindAsync(updateDto.BranchId);
                 if (branch == null) throw new NotFoundException("Branch not found.");
             }
-
             lane.Name = updateDto.Name;
             lane.BranchId = updateDto.BranchId;
             lane.IsActive = updateDto.IsActive;
             lane.IsBusinessLane = updateDto.IsBusinessLane;
             lane.IsVipLane = updateDto.IsVipLane;
-
             await _context.SaveChangesAsync();
-
             return new LaneDTO
             {
                 LaneId = lane.LaneId,
