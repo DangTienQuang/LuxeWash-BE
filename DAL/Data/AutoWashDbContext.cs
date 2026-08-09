@@ -79,6 +79,15 @@ namespace AutoWashPro.DAL.Data
         {
             base.OnModelCreating(modelBuilder); modelBuilder.Entity<LaneOccupancy>().HasIndex(lo => lo.LaneId).IsUnique();
 
+            modelBuilder.Entity<Booking>()
+                .HasIndex(b => new { b.LicensePlate, b.Status });
+
+            modelBuilder.Entity<Booking>()
+                .HasIndex(b => new { b.BranchId, b.ScheduledTime, b.Status });
+
+            modelBuilder.Entity<OutboxMessage>()
+                .HasIndex(m => new { m.ProcessedAt, m.NextRetryAt });
+
             modelBuilder.Entity<UserFcmToken>()
                 .HasIndex(t => t.Token)
                 .IsUnique();

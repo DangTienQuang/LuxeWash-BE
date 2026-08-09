@@ -20,7 +20,7 @@ namespace AutoWashPro.BLL.Services
         Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus);
         Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null);
         Task<BookingResponseDTO> AutoCheckOutByLicensePlateAsync(string licensePlate, IFormFile checkOutImage);
-        Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId);
+        Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId, int page = 1, int pageSize = 50);
         Task<List<RelocationProposalCustomerDTO>> GetRelocationProposalsAsync(int userId);
         Task<bool> CancelBookingAsync(int userId, int bookingId);
         Task<bool> UpdateVehicleConditionAsync(int staffId, int bookingId, UpdateVehicleConditionDTO request);

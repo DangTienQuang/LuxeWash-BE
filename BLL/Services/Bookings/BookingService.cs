@@ -73,12 +73,16 @@ namespace AutoWashPro.BLL.Services
             {
                 var vehicleType = await _context.VehicleTypes.FirstOrDefaultAsync(vt => vt.Id == request.VehicleTypeId);
                 var baseWeight = vehicleType?.BaseWeight ?? 0;
+                // FIX #2: Batch load all ServicePrices in 1 query instead of N queries
+                var servicePricesBatch = await _context.ServicePrices
+                    .Where(sp => request.ServiceIds.Contains(sp.ServiceId)
+                              && sp.VehicleTypeId == request.VehicleTypeId
+                              && sp.BranchId == request.BranchId)
+                    .AsNoTracking()
+                    .ToListAsync();
                 foreach (var serviceId in request.ServiceIds)
                 {
-                    var servicePrice = await _context.ServicePrices
-                        .FirstOrDefaultAsync(sp => sp.ServiceId == serviceId
-                                                && sp.VehicleTypeId == request.VehicleTypeId
-                                                && sp.BranchId == request.BranchId);
+                    var servicePrice = servicePricesBatch.FirstOrDefault(sp => sp.ServiceId == serviceId);
                     var actualWeight = servicePrice?.CapacityWeight > 0 ? servicePrice.CapacityWeight : baseWeight;
                     if (actualWeight > totalRequestWeight) totalRequestWeight = actualWeight;
                 }
@@ -160,27 +164,43 @@ namespace AutoWashPro.BLL.Services
             var altBranches = await _context.Branches
                 .Where(b => b.IsActive && b.BranchId != request.BranchId && b.Latitude != null && b.Longitude != null)
                 .ToListAsync();
+
+            var nearbyBranches = altBranches
+                .Select(b => new { 
+                    Branch = b, 
+                    Dist = CalculateHaversineDistanceKm(currentBranch.Latitude.Value, currentBranch.Longitude.Value, b.Latitude!.Value, b.Longitude!.Value) 
+                })
+                .Where(x => x.Dist <= 15.0)
+                .ToList();
+
+            var nearbyBranchIds = nearbyBranches.Select(x => x.Branch.BranchId).ToList();
+            
+            var allAltSlots = nearbyBranchIds.Count > 0
+                ? await _context.TimeSlots.Where(s => nearbyBranchIds.Contains(s.BranchId)).ToListAsync()
+                : new List<TimeSlot>();
+                
+            var allAltDailyCaps = nearbyBranchIds.Count > 0
+                ? await _context.DailySlotCapacities.Where(dc => nearbyBranchIds.Contains(dc.BranchId) && dc.Date == request.TargetDate.Date).ToListAsync()
+                : new List<DailySlotCapacity>();
+
             var candidates = new List<(Branch Branch, double DistanceKm, double OccupancyRate, int AvailableCount)>();
-            foreach (var alt in altBranches)
+            foreach (var nearby in nearbyBranches)
             {
-                double dist = CalculateHaversineDistanceKm(currentBranch.Latitude.Value, currentBranch.Longitude.Value, alt.Latitude!.Value, alt.Longitude!.Value);
-                if (dist <= 15.0) 
+                var alt = nearby.Branch;
+                double dist = nearby.Dist;
+                
+                double altOcc = await _occupancyService.GetBranchOccupancyRateAsync(alt.BranchId, request.TargetDate);
+                var altSlots = allAltSlots.Where(s => s.BranchId == alt.BranchId).ToList();
+                var dailyCaps = allAltDailyCaps.Where(dc => dc.BranchId == alt.BranchId).ToDictionary(dc => dc.SlotId, dc => dc.BookedWeight);
+                int availCount = 0;
+                foreach (var s in altSlots)
                 {
-                    double altOcc = await _occupancyService.GetBranchOccupancyRateAsync(alt.BranchId, request.TargetDate);
-                    var altSlots = await _context.TimeSlots.Where(s => s.BranchId == alt.BranchId).ToListAsync();
-                    var dailyCaps = await _context.DailySlotCapacities
-                        .Where(dc => dc.BranchId == alt.BranchId && dc.Date == request.TargetDate.Date)
-                        .ToDictionaryAsync(dc => dc.SlotId, dc => dc.BookedWeight);
-                    int availCount = 0;
-                    foreach (var s in altSlots)
-                    {
-                        int booked = dailyCaps.TryGetValue(s.SlotId, out int w) ? w : 0;
-                        if (booked < s.MaxCapacity) availCount++;
-                    }
-                    if (availCount > 0 && altOcc < 0.70)
-                    {
-                        candidates.Add((alt, dist, altOcc, availCount));
-                    }
+                    int booked = dailyCaps.TryGetValue(s.SlotId, out int w) ? w : 0;
+                    if (booked < s.MaxCapacity) availCount++;
+                }
+                if (availCount > 0 && altOcc < 0.70)
+                {
+                    candidates.Add((alt, dist, altOcc, availCount));
                 }
             }
             var bestAlt = candidates
@@ -697,15 +717,15 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
             var startTime = DateTime.UtcNow.AddHours(-24);
             var endTime = DateTime.UtcNow.AddHours(24);
-            var query = await _context.Bookings
+            // FIX #1: Filter license plate directly on DB instead of loading all bookings to RAM
+            var matches = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
-                .Where(b => b.ScheduledTime >= startTime && b.ScheduledTime <= endTime)
+                .Where(b => b.ScheduledTime >= startTime && b.ScheduledTime <= endTime
+                    && b.LicensePlate != null
+                    && b.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate)
                 .ToListAsync();
-            var matches = query.Where(b =>
-                NormalizeLicensePlate(b.LicensePlate) == normalizedPlate
-            ).ToList();
             if (matches.Count == 0)
             {
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No recent booking found for vehicle {licensePlate}.");
@@ -1270,13 +1290,17 @@ namespace AutoWashPro.BLL.Services
                 PaymentUrl = result.PaymentUrl
             };
         }
-        public async Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId)
+        public async Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId, int page = 1, int pageSize = 50)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 200) pageSize = 50;
             var nowUtc = DateTime.UtcNow;
             var bookings = await _context.Bookings
                 .Include(b => b.Branch)
                 .Where(b => b.UserId == userId)
                 .OrderByDescending(b => b.ScheduledTime)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(b => new BookingResponseDTO
                 {
                     BookingId = b.BookingId,
@@ -1366,35 +1390,46 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.BookingDetails).ThenInclude(d => d.Service)
                 .Where(b => b.UserId == userId && b.Status == "Pending" && b.ScheduledTime >= now)
                 .ToListAsync();
+            if (pendingBookings.Count == 0) return new List<RelocationProposalCustomerDTO>();
+
+            var voucherCodes = pendingBookings
+                .Select(b => $"SURGE_REL_{b.BranchId}_{b.BookingId}")
+                .ToList();
+
+            var relocationVouchers = await _context.Vouchers
+                .Include(v => v.Branch)
+                .Where(v => voucherCodes.Contains(v.Code)
+                    && v.IsActive
+                    && v.CurrentUsageCount == 0
+                    && v.ExpiryDate > now)
+                .AsNoTracking()
+                .ToDictionaryAsync(v => v.Code);
+
             var proposals = new List<RelocationProposalCustomerDTO>();
             foreach (var booking in pendingBookings)
             {
                 string voucherCodePrefix = $"SURGE_REL_{booking.BranchId}_{booking.BookingId}";
-                var relocationVoucher = await _context.Vouchers
-                    .Include(v => v.Branch)
-                    .FirstOrDefaultAsync(v => v.Code == voucherCodePrefix 
-                        && v.IsActive 
-                        && v.CurrentUsageCount == 0 
-                        && v.ExpiryDate > now);
-                if (relocationVoucher != null && relocationVoucher.Branch != null)
+                if (!relocationVouchers.TryGetValue(voucherCodePrefix, out var relocationVoucher))
+                    continue;
+                if (relocationVoucher.Branch == null)
+                    continue;
+
+                proposals.Add(new RelocationProposalCustomerDTO
                 {
-                    proposals.Add(new RelocationProposalCustomerDTO
-                    {
-                        BookingId = booking.BookingId,
-                        LicensePlate = booking.LicensePlate ?? "",
-                        ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
-                        ScheduledTime = booking.ScheduledTime,
-                        OriginalBranchId = booking.BranchId,
-                        OriginalBranchName = booking.Branch?.Name ?? "",
-                        AlternativeBranchId = relocationVoucher.BranchId.Value,
-                        AlternativeBranchName = relocationVoucher.Branch.Name,
-                        AlternativeBranchAddress = relocationVoucher.Branch.Address ?? "",
-                        AlternativeBranchDistanceKm = 2.8, 
-                        VoucherCode = relocationVoucher.Code,
-                        VoucherDiscountAmount = relocationVoucher.DiscountAmount,
-                        ProposalExpiresAt = relocationVoucher.ExpiryDate
-                    });
-                }
+                    BookingId = booking.BookingId,
+                    LicensePlate = booking.LicensePlate ?? "",
+                    ServiceNames = booking.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
+                    ScheduledTime = booking.ScheduledTime,
+                    OriginalBranchId = booking.BranchId,
+                    OriginalBranchName = booking.Branch?.Name ?? "",
+                    AlternativeBranchId = relocationVoucher.BranchId!.Value,
+                    AlternativeBranchName = relocationVoucher.Branch.Name,
+                    AlternativeBranchAddress = relocationVoucher.Branch.Address ?? "",
+                    AlternativeBranchDistanceKm = 2.8, 
+                    VoucherCode = relocationVoucher.Code,
+                    VoucherDiscountAmount = relocationVoucher.DiscountAmount,
+                    ProposalExpiresAt = relocationVoucher.ExpiryDate
+                });
             }
             return proposals;
         }
@@ -2299,12 +2334,13 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
             var startTime = DateTime.UtcNow.AddHours(-24);
             var endTime = DateTime.UtcNow.AddHours(24);
-            var query = await _context.Bookings
+            var matches = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
-                .Where(b => b.BranchId == branchId && b.ScheduledTime >= startTime && b.ScheduledTime <= endTime)
+                .Where(b => b.BranchId == branchId && b.ScheduledTime >= startTime && b.ScheduledTime <= endTime
+                    && b.LicensePlate != null
+                    && b.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate)
                 .ToListAsync();
-            var matches = query.Where(b => NormalizeLicensePlate(b.LicensePlate) == normalizedPlate).ToList();
             if (matches.Count == 0)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No booking found for vehicle {licensePlate} at this branch.");
             var todayInVN = DateTime.UtcNow.ToVnTime().Date;

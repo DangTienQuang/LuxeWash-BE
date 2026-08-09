@@ -31,20 +31,24 @@ namespace AutoWashPro.BLL.BackgroundServices
             {
                 try
                 {
-                    using var scope = _serviceProvider.CreateScope();
-                    var monitoringService = scope.ServiceProvider.GetRequiredService<IOperationsMonitoringService>();
-                    var context = scope.ServiceProvider.GetRequiredService<AutoWashPro.DAL.Data.AutoWashDbContext>();
-
-                    // Chạy reconciliation cho tất cả branch đang active
-                    var activeBranchIds = await context.Branches
-                        .Where(b => b.IsActive)
-                        .Select(b => b.BranchId)
-                        .ToListAsync(stoppingToken);
+                    List<int> activeBranchIds;
+                    using (var scope = _serviceProvider.CreateScope())
+                    {
+                        var context = scope.ServiceProvider.GetRequiredService<AutoWashPro.DAL.Data.AutoWashDbContext>();
+                        // Chạy reconciliation cho tất cả branch đang active
+                        activeBranchIds = await context.Branches
+                            .Where(b => b.IsActive)
+                            .Select(b => b.BranchId)
+                            .ToListAsync(stoppingToken);
+                    }
 
                     foreach (var branchId in activeBranchIds)
                     {
                         // Dừng ngay nếu app đang shutdown
                         if (stoppingToken.IsCancellationRequested) break;
+
+                        using var branchScope = _serviceProvider.CreateScope();
+                        var monitoringService = branchScope.ServiceProvider.GetRequiredService<IOperationsMonitoringService>();
 
                         try
                         {
