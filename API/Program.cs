@@ -211,6 +211,7 @@ builder.Services.AddScoped<IVoucherCampaignService, VoucherCampaignService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITimeSlotService, TimeSlotService>();
 builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
+builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
 builder.Services.AddScoped<IOverloadSuggestionService, OverloadSuggestionService>();
 builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
 builder.Services.AddScoped<IAIModerationService, AIModerationService>();
@@ -352,6 +353,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<AutoWashPro.BLL.Hubs.LaneDisplayHub>("/hubs/lane-display");
+app.MapHub<AutoWashPro.BLL.Hubs.NotificationHub>("/hubs/notification");
 
 // ==============================================================================
 // 10. DATABASE MIGRATION ON STARTUP

@@ -11,11 +11,13 @@ namespace AutoWashPro.BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly IWalletService _walletService;
+        private readonly AutoWashPro.BLL.Services.Interface.IUserNotificationService _userNotificationService;
 
-        public VoucherService(AutoWashDbContext context, IWalletService walletService)
+        public VoucherService(AutoWashDbContext context, IWalletService walletService, AutoWashPro.BLL.Services.Interface.IUserNotificationService userNotificationService)
         {
             _context = context;
             _walletService = walletService;
+            _userNotificationService = userNotificationService;
         }
 
         public async Task<List<VoucherResponseDTO>> GetMyVouchersAsync(int userId)
@@ -93,6 +95,15 @@ namespace AutoWashPro.BLL.Services
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                await _userNotificationService.CreateNotificationAsync(
+                    userId,
+                    "Đổi voucher thành công",
+                    $"Bạn đã đổi thành công voucher {voucher.Code} bằng điểm.",
+                    "Voucher",
+                    voucher.VoucherId.ToString()
+                );
+
             }
             catch (DbUpdateException)
             {
@@ -144,6 +155,17 @@ namespace AutoWashPro.BLL.Services
 
             _context.UserVouchers.AddRange(userVouchers);
             await _context.SaveChangesAsync();
+            
+            foreach (var userId in userIdsToGrant)
+            {
+                await _userNotificationService.CreateNotificationAsync(
+                    userId,
+                    "Bạn nhận được Voucher mới!",
+                    $"Chúc mừng! Bạn vừa được tặng voucher {voucher.Code}. Hãy kiểm tra ví voucher của bạn ngay.",
+                    "Voucher",
+                    voucher.VoucherId.ToString()
+                );
+            }
         }
 
         public async Task<AdminVoucherDTO> CreateVoucherAsync(CreateOrUpdateVoucherDTO request)

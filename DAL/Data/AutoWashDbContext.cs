@@ -74,6 +74,8 @@ namespace AutoWashPro.DAL.Data
         public DbSet<UserFcmToken> UserFcmTokens { get; set; }
         public DbSet<OverloadSuggestion> OverloadSuggestions { get; set; }
         public DbSet<VehicleVisionFeedback> VehicleVisionFeedbacks { get; set; }
+        public DbSet<UserNotification> UserNotifications { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -91,6 +93,9 @@ namespace AutoWashPro.DAL.Data
             modelBuilder.Entity<UserFcmToken>()
                 .HasIndex(t => t.Token)
                 .IsUnique();
+
+            modelBuilder.Entity<UserNotification>()
+                .HasIndex(n => new { n.UserId, n.CreatedAt });
 
             modelBuilder.Entity<Vehicle>()
                 .HasIndex(v => v.LicensePlate)

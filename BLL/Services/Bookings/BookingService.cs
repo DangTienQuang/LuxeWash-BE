@@ -27,6 +27,8 @@ namespace AutoWashPro.BLL.Services
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
         private readonly global::BLL.Services.Interface.IPhotoService _photoService;
+        private readonly IUserNotificationService _userNotificationService;
+
         public BookingService(
             AutoWashDbContext context,
             IWalletService walletService,
@@ -39,7 +41,8 @@ namespace AutoWashPro.BLL.Services
             IOccupancyService occupancyService,
             global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService,
             AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator,
-            global::BLL.Services.Interface.IPhotoService photoService)
+            global::BLL.Services.Interface.IPhotoService photoService,
+            IUserNotificationService userNotificationService)
         {
             _context = context;
             _walletService = walletService;
@@ -53,6 +56,7 @@ namespace AutoWashPro.BLL.Services
             _laneSchedulerService = laneSchedulerService;
             _laneCoordinator = laneCoordinator;
             _photoService = photoService;
+            _userNotificationService = userNotificationService;
         }
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
         {
@@ -1294,6 +1298,15 @@ namespace AutoWashPro.BLL.Services
                     }
                 }
                 var serviceNames = await _context.Services.Where(s => request.ServiceIds.Contains(s.ServiceId)).Select(s => s.ServiceName).ToListAsync();
+                
+                await _userNotificationService.CreateNotificationAsync(
+                    userId,
+                    "Đặt lịch thành công",
+                    $"Lịch đặt rửa xe cho biển số {request.LicensePlate} vào lúc {targetDateTime:dd/MM/yyyy HH:mm} đã được ghi nhận.",
+                    "Booking",
+                    booking.BookingId.ToString()
+                );
+
                 return new BookingResponseDTO
                 {
                     BookingId = booking.BookingId,

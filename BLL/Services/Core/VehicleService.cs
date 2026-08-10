@@ -16,12 +16,16 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashDbContext _context;
         private readonly IEmailService _emailService;
         private readonly IPhotoService _photoService;
-        public VehicleService(AutoWashDbContext context, IPhotoService photoService, IEmailService emailService)
+        private readonly AutoWashPro.BLL.Services.Interface.IUserNotificationService _userNotificationService;
+
+        public VehicleService(AutoWashDbContext context, IPhotoService photoService, IEmailService emailService, AutoWashPro.BLL.Services.Interface.IUserNotificationService userNotificationService)
         {
             _context = context;
             _photoService = photoService;
             _emailService = emailService;
+            _userNotificationService = userNotificationService;
         }
+
         public async Task<List<VehicleDTO>> GetMyVehiclesAsync(int userId)
         {
             return await _context.Vehicles
@@ -130,6 +134,15 @@ namespace AutoWashPro.BLL.Services
                 _context.Vehicles.Add(vehicle);
             }
             await _context.SaveChangesAsync();
+
+            await _userNotificationService.CreateNotificationAsync(
+                userId,
+                "Thêm xe thành công",
+                $"Biển số xe {normalizedPlate} đã được thêm vào tài khoản của bạn.",
+                "Vehicle",
+                normalizedPlate
+            );
+
             return true;
         }
         public async Task<List<AdminOtherVehicleDTO>> GetOtherVehiclesAsync()

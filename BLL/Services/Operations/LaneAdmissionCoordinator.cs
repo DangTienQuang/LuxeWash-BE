@@ -16,10 +16,12 @@ namespace AutoWashPro.BLL.Services.Operations
     public class LaneAdmissionCoordinator : ILaneAdmissionCoordinator
     {
         private readonly AutoWashDbContext _context;
+        private readonly AutoWashPro.BLL.Services.Interface.IUserNotificationService _userNotificationService;
 
-        public LaneAdmissionCoordinator(AutoWashDbContext context)
+        public LaneAdmissionCoordinator(AutoWashDbContext context, AutoWashPro.BLL.Services.Interface.IUserNotificationService userNotificationService)
         {
             _context = context;
+            _userNotificationService = userNotificationService;
         }
 
         private IQueryable<Lane> BuildCompatibleLaneQuery(int branchId, bool isBusiness)
@@ -458,6 +460,21 @@ namespace AutoWashPro.BLL.Services.Operations
                 _context.OutboxMessages.Add(outboxClear);
                 
                 await _context.SaveChangesAsync(cancellationToken);
+                
+                if (mode == LaneReleaseMode.PhysicalCheckout && occupancy.BookingId.HasValue)
+                {
+                    var b = await _context.Bookings.FindAsync(new object[] { occupancy.BookingId.Value }, cancellationToken);
+                    if (b != null && b.UserId != null)
+                    {
+                        await _userNotificationService.CreateNotificationAsync(
+                            b.UserId.Value,
+                            "Hoàn thành dịch vụ",
+                            $"Cảm ơn bạn đã sử dụng dịch vụ tại SmartWash cho biển số {b.LicensePlate}. Hẹn gặp lại bạn!",
+                            "Booking",
+                            b.BookingId.ToString()
+                        );
+                    }
+                }
 
                 var result = new CheckOutResult
                 {

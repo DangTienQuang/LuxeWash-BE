@@ -12,11 +12,13 @@ namespace AutoWashPro.BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly IEmailService _emailService;
+        private readonly AutoWashPro.BLL.Services.Interface.IUserNotificationService _userNotificationService;
 
-        public VoucherCampaignService(AutoWashDbContext context, IEmailService emailService)
+        public VoucherCampaignService(AutoWashDbContext context, IEmailService emailService, AutoWashPro.BLL.Services.Interface.IUserNotificationService userNotificationService)
         {
             _context = context;
             _emailService = emailService;
+            _userNotificationService = userNotificationService;
         }
 
         public async Task<CampaignVoucherResponseDTO> CreateBirthdayVouchersAsync(CreateBirthdayVouchersDTO request)
@@ -186,6 +188,14 @@ namespace AutoWashPro.BLL.Services
             foreach (var item in emailItems)
             {
                 await SendVoucherEmailAsync(item.User, campaign, item.ExpiryDate);
+                
+                await _userNotificationService.CreateNotificationAsync(
+                    item.User.UserId,
+                    "Bạn nhận được Voucher mới!",
+                    $"Chúc mừng! Bạn vừa được tặng voucher {campaign.Code} từ hệ thống. Hãy kiểm tra ví voucher của bạn ngay.",
+                    "Voucher",
+                    campaign.VoucherId.ToString()
+                );
             }
 
             result.SkippedCount = result.ScannedUsers - result.GrantedCount;
