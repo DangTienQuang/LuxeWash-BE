@@ -137,23 +137,33 @@ namespace AutoWashPro.BLL.Services
                     && bookingIds.Contains(t.ReferenceBookingId.Value)
                     && (t.TransactionType == "Payment"
                         || t.TransactionType == "BookingPayment"
-                        || t.TransactionType == "WalkInPayment"))
+                        || t.TransactionType == "WalkInPayment"
+                        || t.TransactionType == "Refund"))
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => new
                 {
                     BookingId = t.ReferenceBookingId!.Value,
                     t.Status,
                     t.PaymentMethod,
-                    t.OrderCode
+                    t.OrderCode,
+                    t.TransactionType
                 })
                 .ToListAsync();
             var latestPaymentByBooking = paymentTransactions
                 .GroupBy(t => t.BookingId)
-                .ToDictionary(g => g.Key, g => g.First());
+                .ToDictionary(g => g.Key, g => new
+                {
+                    Tx = g.FirstOrDefault(x => x.TransactionType != "Refund"),
+                    IsRefunded = g.Any(x => x.TransactionType == "Refund")
+                });
             return bookings.Select(b =>
             {
-                latestPaymentByBooking.TryGetValue(b.BookingId, out var tx);
-                var paymentStatus = tx == null
+                latestPaymentByBooking.TryGetValue(b.BookingId, out var paymentData);
+                var isRefunded = paymentData?.IsRefunded ?? false;
+                var tx = paymentData?.Tx;
+                var paymentStatus = isRefunded
+                    ? "Refunded"
+                    : tx == null
                     ? "Unpaid"
                     : tx.Status?.ToLowerInvariant() switch
                     {
@@ -167,6 +177,7 @@ namespace AutoWashPro.BLL.Services
                 var paymentNote = paymentStatus switch
                 {
                     "Completed" => null,
+                    "Refunded"  => "Payment has been refunded to customer",
                     "Pending"   => "Awaiting QR payment — please remind customer to complete scan",
                     "Expired"   => "Payment link expired — ask customer to generate a new QR or pay by another method",
                     "Failed"    => "Payment failed — please collect payment before processing",

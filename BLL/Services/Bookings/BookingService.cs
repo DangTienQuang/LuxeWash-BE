@@ -299,32 +299,53 @@ namespace AutoWashPro.BLL.Services
                     && adminBookingIds.Contains(t.ReferenceBookingId.Value)
                     && (t.TransactionType == "Payment"
                         || t.TransactionType == "BookingPayment"
-                        || t.TransactionType == "WalkInPayment"))
+                        || t.TransactionType == "WalkInPayment"
+                        || t.TransactionType == "Refund"))
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => new
                 {
                     BookingId = t.ReferenceBookingId!.Value,
                     t.Status,
-                    t.PaymentMethod
+                    t.PaymentMethod,
+                    t.TransactionType
                 })
                 .ToListAsync();
+
             var latestAdminTxByBooking = adminPaymentTxs
                 .GroupBy(t => t.BookingId)
-                .ToDictionary(g => g.Key, g => g.First());
+                .ToDictionary(g => g.Key, g => new
+                {
+                    Tx = g.FirstOrDefault(x => x.TransactionType != "Refund"),
+                    IsRefunded = g.Any(x => x.TransactionType == "Refund")
+                });
+
             foreach (var booking in bookings)
             {
-                if (latestAdminTxByBooking.TryGetValue(booking.BookingId, out var tx))
+                if (latestAdminTxByBooking.TryGetValue(booking.BookingId, out var paymentData))
                 {
-                    booking.PaymentStatus = tx.Status?.ToLowerInvariant() switch
+                    if (paymentData.IsRefunded)
                     {
-                        "completed" => "Completed",
-                        "pending"   => "Pending",
-                        "expired"   => "Expired",
-                        "failed"    => "Failed",
-                        "cancelled" => "Failed",
-                        _           => "Unpaid"
-                    };
-                    booking.PaymentMethod = tx.PaymentMethod;
+                        booking.PaymentStatus = "Refunded";
+                        booking.PaymentMethod = paymentData.Tx?.PaymentMethod;
+                    }
+                    else if (paymentData.Tx != null)
+                    {
+                        booking.PaymentStatus = paymentData.Tx.Status?.ToLowerInvariant() switch
+                        {
+                            "completed" => "Completed",
+                            "pending"   => "Pending",
+                            "expired"   => "Expired",
+                            "failed"    => "Failed",
+                            "cancelled" => "Failed",
+                            _           => "Unpaid"
+                        };
+                        booking.PaymentMethod = paymentData.Tx.PaymentMethod;
+                    }
+                    else
+                    {
+                        booking.PaymentStatus = "Unpaid";
+                        booking.PaymentMethod = null;
+                    }
                 }
                 else
                 {
@@ -350,16 +371,23 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
             if (booking == null)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking details not found or you do not have permission to view.");
-            var tx = await _context.Transactions
+            var txList = await _context.Transactions
                 .AsNoTracking()
                 .Where(t => t.ReferenceBookingId == bookingId
                     && (t.TransactionType == "BookingPayment"
                         || t.TransactionType == "WalkInPayment"
-                        || t.TransactionType == "Payment"))
+                        || t.TransactionType == "Payment"
+                        || t.TransactionType == "Refund"))
                 .OrderByDescending(t => t.CreatedAt)
-                .Select(t => new { t.Status, t.PaymentMethod })
-                .FirstOrDefaultAsync();
-            var paymentStatus = tx == null
+                .Select(t => new { t.Status, t.PaymentMethod, t.TransactionType })
+                .ToListAsync();
+
+            var isRefunded = txList.Any(t => t.TransactionType == "Refund");
+            var tx = txList.FirstOrDefault(t => t.TransactionType != "Refund");
+
+            var paymentStatus = isRefunded
+                ? "Refunded"
+                : tx == null
                 ? "Unpaid"
                 : tx.Status?.ToLowerInvariant() switch
                 {
@@ -588,7 +616,8 @@ namespace AutoWashPro.BLL.Services
                     && ids.Contains(t.ReferenceBookingId.Value)
                     && (EF.Property<string?>(t, nameof(Transaction.TransactionType)) == "Payment"
                         || EF.Property<string?>(t, nameof(Transaction.TransactionType)) == "BookingPayment"
-                        || EF.Property<string?>(t, nameof(Transaction.TransactionType)) == "WalkInPayment"))
+                        || EF.Property<string?>(t, nameof(Transaction.TransactionType)) == "WalkInPayment"
+                        || EF.Property<string?>(t, nameof(Transaction.TransactionType)) == "Refund"))
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => new
                 {
@@ -603,7 +632,10 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
             return paymentTransactions
                 .GroupBy(t => t.BookingId)
-                .ToDictionary(g => g.Key, g => g.First().Status);
+                .ToDictionary(
+                    g => g.Key, 
+                    g => g.Any(x => x.TransactionType == "Refund") ? "Refunded" : g.FirstOrDefault(x => x.TransactionType != "Refund")?.Status ?? ""
+                );
         }
         private static string GetPaymentStatus(Dictionary<int, string> paymentStatuses, int bookingId)
         {
@@ -612,6 +644,7 @@ namespace AutoWashPro.BLL.Services
             {
                 return "Unpaid";
             }
+            if (paymentStatus == "Refunded") return "Refunded";
             return paymentStatus.ToLowerInvariant() switch
             {
                 "completed" => "Completed",
@@ -630,20 +663,30 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Booking #{bookingId} not found.");
-            var tx = await _context.Transactions
+            var txList = await _context.Transactions
                 .AsNoTracking()
                 .Where(t => t.ReferenceBookingId == bookingId
                     && (t.TransactionType == "BookingPayment"
                         || t.TransactionType == "WalkInPayment"
-                        || t.TransactionType == "Payment"))
+                        || t.TransactionType == "Payment"
+                        || t.TransactionType == "Refund"))
                 .OrderByDescending(t => t.CreatedAt)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+
+            var isRefunded = txList.Any(t => t.TransactionType == "Refund");
+            var tx = txList.FirstOrDefault(t => t.TransactionType != "Refund");
+
             string paymentStatus;
             string? paymentMethod = tx?.PaymentMethod;
             string? orderCode = tx?.OrderCode;
             decimal? amount = tx?.Amount;
             DateTime? paidAt = null;
-            if (tx == null)
+            
+            if (isRefunded)
+            {
+                paymentStatus = "Refunded";
+            }
+            else if (tx == null)
             {
                 paymentStatus = "Unpaid";
             }
@@ -1335,32 +1378,51 @@ namespace AutoWashPro.BLL.Services
                     && bookingIds.Contains(t.ReferenceBookingId.Value)
                     && (t.TransactionType == "Payment"
                         || t.TransactionType == "BookingPayment"
-                        || t.TransactionType == "WalkInPayment"))
+                        || t.TransactionType == "WalkInPayment"
+                        || t.TransactionType == "Refund"))
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => new
                 {
                     BookingId = t.ReferenceBookingId!.Value,
                     t.Status,
-                    t.PaymentMethod
+                    t.PaymentMethod,
+                    t.TransactionType
                 })
                 .ToListAsync();
             var latestTxByBooking = paymentTransactions
                 .GroupBy(t => t.BookingId)
-                .ToDictionary(g => g.Key, g => g.First());
+                .ToDictionary(g => g.Key, g => new
+                {
+                    Tx = g.FirstOrDefault(x => x.TransactionType != "Refund"),
+                    IsRefunded = g.Any(x => x.TransactionType == "Refund")
+                });
             foreach (var b in bookings)
             {
-                if (latestTxByBooking.TryGetValue(b.BookingId, out var tx))
+                if (latestTxByBooking.TryGetValue(b.BookingId, out var paymentData))
                 {
-                    b.PaymentStatus = tx.Status?.ToLowerInvariant() switch
+                    if (paymentData.IsRefunded)
                     {
-                        "completed" => "Completed",
-                        "pending"   => "Pending",
-                        "expired"   => "Expired",
-                        "failed"    => "Failed",
-                        "cancelled" => "Failed",
-                        _           => "Unpaid"
-                    };
-                    b.PaymentMethod = tx.PaymentMethod;
+                        b.PaymentStatus = "Refunded";
+                        b.PaymentMethod = paymentData.Tx?.PaymentMethod;
+                    }
+                    else if (paymentData.Tx != null)
+                    {
+                        b.PaymentStatus = paymentData.Tx.Status?.ToLowerInvariant() switch
+                        {
+                            "completed" => "Completed",
+                            "pending"   => "Pending",
+                            "expired"   => "Expired",
+                            "failed"    => "Failed",
+                            "cancelled" => "Failed",
+                            _           => "Unpaid"
+                        };
+                        b.PaymentMethod = paymentData.Tx.PaymentMethod;
+                    }
+                    else
+                    {
+                        b.PaymentStatus = "Unpaid";
+                        b.PaymentMethod = null;
+                    }
                 }
                 else
                 {
@@ -1986,110 +2048,95 @@ namespace AutoWashPro.BLL.Services
                 }
                 else 
                 {
+                    var (voucherDiscount, pointDiscount, pointsUsed, finalAmount, userVoucher) =
+                        await CalculateBookingPricingAsync(customerUserId.Value, totalOriginalPrice, request.VoucherId, request.PointsToUse, targetDateTime, vehicleTypeQuery.VehicleTypeId, request.BranchId);
+
+                    if (userVoucher != null)
+                    {
+                        userVoucher.UsageCount += 1;
+                        userVoucher.IsUsed = userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser;
+                        userVoucher.UsedDate = DateTime.UtcNow;
+                        userVoucher.LastUsedDate = DateTime.UtcNow;
+                        userVoucher.Voucher.CurrentUsageCount += 1;
+                    }
+                    if (pointsUsed > 0)
+                    {
+                        await _walletService.DeductSpendablePointsAsync(customerUserId.Value, pointsUsed, "Use points for walk-in booking discount");
+                    }
+
+                    booking = new Booking
+                    {
+                        UserId = customerUserId,
+                        VehicleId = vehicleTypeQuery.VehicleId,
+                        ActualVehicleTypeId = vehicleTypeQuery.VehicleTypeId,
+                        LicensePlate = normalizedPlate,
+                        CapacityWeight = maxCapacityWeight,
+                        VehicleCondition = VehicleCondition.Clean,
+                        BranchId = request.BranchId,
+                        ScheduledTime = targetDateTime,
+                        Status = "CheckedIn",
+                        OriginalPrice = totalOriginalPrice,
+                        PointsUsed = pointsUsed,
+                        PointDiscountAmount = pointDiscount,
+                        AppliedVoucherId = request.VoucherId,
+                        VoucherDiscountAmount = voucherDiscount,
+                        FinalAmount = finalAmount,
+                        BookingDetails = pendingDetails,
+                        FallbackQrCode = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper()
+                    };
+                    _context.Bookings.Add(booking);
+                    await _context.SaveChangesAsync();
+
                     if (isWalletPayment)
                     {
-                        var (voucherDiscount, pointDiscount, pointsUsed, finalAmount, userVoucher) =
-                            await CalculateBookingPricingAsync(customerUserId.Value, totalOriginalPrice, request.VoucherId, request.PointsToUse, targetDateTime, vehicleTypeQuery.VehicleTypeId, request.BranchId);
                         var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == customerUserId);
                         if (wallet == null || wallet.Balance < finalAmount)
                             throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Customer wallet balance is insufficient for payment. Needed: {finalAmount:N0} VND");
                         wallet.Balance -= finalAmount;
+                        
                         paymentTx = new Transaction
                         {
                             WalletId = wallet.WalletId,
                             Amount = -finalAmount,
                             TransactionType = "Payment",
                             Description = $"Walk-in customer (with account) payment at {targetDateTime:dd/MM/yyyy HH:mm}",
-                            PaymentMethod = paymentMethod
+                            PaymentMethod = paymentMethod,
+                            ReferenceBookingId = booking.BookingId
                         };
                         _context.Transactions.Add(paymentTx);
-                        if (userVoucher != null)
-                        {
-                            userVoucher.UsageCount += 1;
-                            userVoucher.IsUsed = userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser;
-                            userVoucher.UsedDate = DateTime.UtcNow;
-                            userVoucher.LastUsedDate = DateTime.UtcNow;
-                            userVoucher.Voucher.CurrentUsageCount += 1;
-                        }
-                        if (pointsUsed > 0)
-                        {
-                            await _walletService.DeductSpendablePointsAsync(customerUserId.Value, pointsUsed, "Use points for walk-in booking discount");
-                        }
-                        booking = new Booking
-                        {
-                            UserId = customerUserId,
-                            VehicleId = vehicleTypeQuery.VehicleId,
-                            ActualVehicleTypeId = vehicleTypeQuery.VehicleTypeId,
-                            LicensePlate = normalizedPlate,
-                            CapacityWeight = maxCapacityWeight,
-                            VehicleCondition = VehicleCondition.Clean,
-                            BranchId = request.BranchId,
-                            ScheduledTime = targetDateTime,
-                            Status = "CheckedIn",
-                            OriginalPrice = totalOriginalPrice,
-                            PointsUsed = pointsUsed,
-                            PointDiscountAmount = pointDiscount,
-                            AppliedVoucherId = request.VoucherId,
-                            VoucherDiscountAmount = voucherDiscount,
-                            FinalAmount = finalAmount,
-                            BookingDetails = pendingDetails,
-                            FallbackQrCode = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper()
-                        };
-                        _context.Bookings.Add(booking);
-                        await _context.SaveChangesAsync();
-                        paymentTx.ReferenceBookingId = booking.BookingId;
                         await _context.SaveChangesAsync();
                     }
                     else
                     {
-                        decimal finalAmount = totalOriginalPrice;
-                        booking = new Booking
-                        {
-                            UserId = customerUserId,
-                            VehicleId = vehicleTypeQuery.VehicleId,
-                            ActualVehicleTypeId = vehicleTypeQuery.VehicleTypeId,
-                            LicensePlate = normalizedPlate,
-                            CapacityWeight = maxCapacityWeight,
-                            VehicleCondition = VehicleCondition.Clean,
-                            BranchId = request.BranchId,
-                            ScheduledTime = targetDateTime,
-                            Status = "CheckedIn",
-                            OriginalPrice = totalOriginalPrice,
-                            PointsUsed = 0,
-                            PointDiscountAmount = 0,
-                            AppliedVoucherId = null,
-                            VoucherDiscountAmount = 0,
-                            FinalAmount = finalAmount,
-                            BookingDetails = pendingDetails,
-                            FallbackQrCode = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper()
-                        };
-                        _context.Bookings.Add(booking);
-                        await _context.SaveChangesAsync();
-                        string? payOsOrderCode = null;
+                        long? payOsOrderCode = null;
+                        int? payOsAmount = null;
                         if (isPayOsPayment)
                         {
                             if (finalAmount <= 0)
                                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Could not create PayOS payment link because total service amount is {finalAmount:N0} VND. Please check the service price list for this vehicle type at the branch.");
-                            payOsOrderCode = DateTime.UtcNow.ToString("yyMMddHHmmssfff");
+                            payOsAmount = ToPayOsAmount(finalAmount);
+                            payOsOrderCode = GeneratePayOsOrderCode();
                         }
+                        
                         paymentTx = new Transaction
                         {
                             WalletId = null,
-                            Amount = finalAmount,
+                            Amount = payOsAmount ?? finalAmount,
                             TransactionType = "WalkInPayment",
                             Description = $"Walk-in payment via {paymentMethod}",
                             PaymentMethod = paymentMethod,
                             ReferenceBookingId = booking.BookingId,
-                            OrderCode = payOsOrderCode,
+                            OrderCode = payOsOrderCode?.ToString(),
                             Status = payOsOrderCode != null ? "Pending" : "Completed"
                         };
                         _context.Transactions.Add(paymentTx);
                         await _context.SaveChangesAsync();
+
                         if (isPayOsPayment)
                         {
                             var payOsResult = await _payOsService.CreatePaymentLinkAsync(
-                                long.Parse(payOsOrderCode!),
-                                (int)finalAmount,
+                                payOsOrderCode!.Value,
+                                payOsAmount!.Value,
                                 $"Thanh toan #{booking.BookingId}",
                                 "WalkIn",
                                 string.IsNullOrWhiteSpace(request.ReturnUrl) ? null : request.ReturnUrl,
