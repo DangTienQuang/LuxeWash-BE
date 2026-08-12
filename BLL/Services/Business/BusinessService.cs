@@ -60,7 +60,7 @@ namespace BLL.Services
                     BusinessLicenseFileUrl = businessLicenseUrl,
                     AuthorizationLetterFileUrl = authorizationLetterUrl,
                     CreatedAt = DateTime.UtcNow,
-                    MonthlyCreditLimit = 0,
+                    MonthlyCreditLimit = request.MonthlyCreditLimit,
                     CurrentMonthUsage = 0,
                     DiscountPercent = 0,
                     ContractStartDate = DateTime.UtcNow,
@@ -90,7 +90,7 @@ namespace BLL.Services
         }
         public async Task<BusinessProfileResponseDTO?> GetByUserIdAsync(int userId)
         {
-            return await _context.BusinessProfiles
+            var profile = await _context.BusinessProfiles
                 .Where(x => x.UserId == userId)
                 .Select(x => new BusinessProfileResponseDTO
                 {
@@ -98,11 +98,33 @@ namespace BLL.Services
                     CompanyName = x.CompanyName,
                     TaxCode = x.TaxCode,
                     BusinessAddress = x.BusinessAddress,
+                    BillingEmail = x.BillingEmail,
+                    RepresentativeName = x.RepresentativeName,
+                    PaymentTermDays = x.PaymentTermDays,
                     ApprovalStatus = x.ApprovalStatus,
                     BusinessLicenseFileUrl = x.BusinessLicenseFileUrl,
-                    AuthorizationLetterFileUrl = x.AuthorizationLetterFileUrl
+                    AuthorizationLetterFileUrl = x.AuthorizationLetterFileUrl,
+                    MonthlyCreditLimit = x.MonthlyCreditLimit,
+                    DiscountPercent = x.DiscountPercent,
+                    ContractStartDate = x.ContractStartDate,
+                    ContractEndDate = x.ContractEndDate,
+                    IsContractActive = x.IsContractActive
                 })
                 .FirstOrDefaultAsync();
+
+            if (profile == null) return null;
+
+            var startOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var startOfNextMonth = startOfMonth.AddMonths(1);
+            profile.CurrentMonthUsage = await _context.FleetWashLogs
+                .Where(log =>
+                    log.FleetVehicle.BusinessProfileId == profile.BusinessProfileId &&
+                    log.CheckInTime >= startOfMonth &&
+                    log.CheckInTime < startOfNextMonth &&
+                    log.Status != "Cancelled")
+                .SumAsync(log => (decimal?)log.WashCost) ?? 0;
+
+            return profile;
         }
         public async Task ReviewBusinessProfileAsync(int reviewerId, ReviewBusinessProfileDTO dto)
         {
@@ -123,6 +145,7 @@ namespace BLL.Services
             if (dto.IsApproved)
             {
                 profile.ApprovalStatus = "Approved";
+                profile.IsContractActive = true;
                 profile.User.Role = "Business";
             }
             else
@@ -146,6 +169,8 @@ namespace BLL.Services
                     RepresentativeName = x.RepresentativeName,
                     BusinessLicenseFileUrl = x.BusinessLicenseFileUrl,
                     AuthorizationLetterFileUrl = x.AuthorizationLetterFileUrl,
+                    PaymentTermDays = x.PaymentTermDays,
+                    MonthlyCreditLimit = x.MonthlyCreditLimit,
                     CreatedAt = x.CreatedAt
                 })
                 .ToListAsync();
@@ -170,6 +195,8 @@ namespace BLL.Services
                 RejectionReason = profile.RejectionReason,
                 BusinessLicenseFileUrl = profile.BusinessLicenseFileUrl,
                 AuthorizationLetterFileUrl = profile.AuthorizationLetterFileUrl,
+                PaymentTermDays = profile.PaymentTermDays,
+                MonthlyCreditLimit = profile.MonthlyCreditLimit,
                 CreatedAt = profile.CreatedAt
             };
         }
@@ -222,8 +249,29 @@ namespace BLL.Services
                     .ToList()
             };
         }
+        public async Task<List<BillingBusinessDTO>> GetBillingBusinessesAsync()
+        {
+            return await _context.BusinessProfiles
+                .AsNoTracking()
+                .Where(x => x.ApprovalStatus == "Approved" && x.IsContractActive)
+                .OrderBy(x => x.CompanyName)
+                .Select(x => new BillingBusinessDTO
+                {
+                    BusinessProfileId = x.BusinessProfileId,
+                    CompanyName = x.CompanyName,
+                    BillingEmail = x.BillingEmail ?? string.Empty,
+                    TaxCode = x.TaxCode ?? string.Empty,
+                    ApprovalStatus = x.ApprovalStatus
+                })
+                .ToListAsync();
+        }
         public async Task<int> GenerateMonthlyInvoiceAsync(int businessProfileId, int year, int month)
         {
+            if (month < 1 || month > 12)
+                throw new BadRequestException("Billing month is invalid.");
+            if (year < 2000 || year > 9999)
+                throw new BadRequestException("Billing year is invalid.");
+
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x =>
                     x.BusinessProfileId == businessProfileId);
@@ -231,16 +279,18 @@ namespace BLL.Services
             {
                 throw new NotFoundException("Business profile not found.");
             }
-            var invoiceCode = $"MONTHLY-{businessProfileId}-{year}{month:00}";
-            var existingInvoice = await _context.Invoices
-                .FirstOrDefaultAsync(x =>
-                    x.InvoiceCode == invoiceCode);
-            if (existingInvoice != null)
-            {
-                throw new BadRequestException("Monthly invoice has already been created.");
-            }
+            // Multiple statements can intentionally be issued for the same
+            // business and month. Each new statement only includes completed
+            // washes that have not appeared on an earlier monthly statement.
+            var invoiceCode =
+                $"MONTHLY-{businessProfileId}-{year}{month:00}-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Random.Shared.Next(100, 999)}";
             var startDate = new DateTime(year, month, 1);
             var endDate = startDate.AddMonths(1);
+            var alreadyInvoicedBookingIds = _context.InvoiceItems
+                .Where(x =>
+                    x.Invoice.BusinessProfileId == businessProfileId &&
+                    x.Invoice.InvoiceType == "MonthlyStatement")
+                .Select(x => x.BookingDetail.BookingId);
             var completedWashes = await _context.FleetWashLogs
                 .Include(x => x.Booking)
                 .ThenInclude(x => x.BookingDetails)
@@ -250,11 +300,15 @@ namespace BLL.Services
                     x.Booking != null &&
                     x.Booking.BusinessProfileId == businessProfileId &&
                     x.CompletedTime >= startDate &&
-                    x.CompletedTime < endDate)
+                    x.CompletedTime < endDate &&
+                    x.BookingId.HasValue &&
+                    !alreadyInvoicedBookingIds.Contains(x.BookingId.Value))
                     .ToListAsync();
             if (!completedWashes.Any())
             {
-                throw new BadRequestException("No completed washes found in this time period.");
+                throw new BadRequestException(
+                    "Không có lượt rửa đã hoàn thành nào chưa được xuất hóa đơn trong kỳ đã chọn.",
+                    "NO_UNINVOICED_COMPLETED_WASHES");
             }
             var invoice = new Invoice
             {
@@ -291,7 +345,7 @@ namespace BLL.Services
             }
             await _context.InvoiceItems.AddRangeAsync(invoiceItems);
             invoice.Subtotal = invoiceItems.Sum(x => x.Amount);
-            invoice.TaxAmount = 0;
+            invoice.TaxAmount = Math.Round(invoice.Subtotal * 0.08m, 0, MidpointRounding.AwayFromZero);
             invoice.TotalAmount = invoice.Subtotal + invoice.TaxAmount;
             await _context.SaveChangesAsync();
             return invoice.InvoiceId;

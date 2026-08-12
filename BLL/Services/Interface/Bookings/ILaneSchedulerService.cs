@@ -12,6 +12,11 @@ namespace BLL.Services.Interface
         Task<int> GetBestAvailableLaneAsync(int branchId, bool isBusinessLane = false);
         Task<int> AssignBestAvailableLaneAtomicAsync(int bookingId);
         Task<bool> AssignNextVehicleInQueueAsync(int laneId);
-        Task<LaneScheduleResult> ScheduleFleetAsync(int branchId, DateTime slotStart, TimeSpan slotDuration, List<VehicleScheduleRequest> vehicles);
+        Task<LaneScheduleResult> ScheduleFleetAcrossSlotsAsync(
+            int branchId,
+            DateTime targetDate,
+            int startingSlotId,
+            List<VehicleScheduleRequest> vehicles,
+            int? excludedBookingId = null);
     }
 }

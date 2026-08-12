@@ -4,6 +4,7 @@ using AutoWashPro.BLL.Exceptions;
 using BLL.Helpers;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
+using DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -54,12 +55,8 @@ namespace AutoWashPro.BLL.Services
                 AssignedDate = assignment.AssignedDate
             };
         }
-        public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null)
+        public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null, bool allowOutsideScheduledTime = false)
         {
-            if (checkInImage == null || checkInImage.Length == 0)
-            {
-                throw new BadRequestException("Check-in image is required.");
-            }
             var booking = await _context.Bookings
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null)
@@ -70,6 +67,10 @@ namespace AutoWashPro.BLL.Services
             {
                 throw new BadRequestException("Can only check in vehicles in Pending status.");
             }
+            await BookingCheckInPolicy.ValidateAsync(
+                _context,
+                booking,
+                allowOutsideScheduledTime);
             if (!await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))
             {
                 throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
@@ -90,11 +91,51 @@ namespace AutoWashPro.BLL.Services
                     throw new BadRequestException("INVALID_STATE: Booking is in Pending status but already has a valid LaneOccupancy. Cannot check in again.");
                 }
             }
-            booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
+            // Manual Staff check-in does not depend on the entrance camera.
+            // Camera-driven check-in still sends and stores a frame when one is available.
+            if (checkInImage != null && checkInImage.Length > 0)
+            {
+                booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
+            }
+
+            int? fleetWashLogId = null;
+            var isBusinessBooking = booking.FleetVehicleId.HasValue &&
+                (booking.BusinessProfileId.HasValue ||
+                 string.Equals(booking.BookingType, "Business", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(booking.BookingType, "Fleet", StringComparison.OrdinalIgnoreCase));
+
+            if (isBusinessBooking)
+            {
+                var fleetWashLog = await _context.FleetWashLogs
+                    .FirstOrDefaultAsync(log =>
+                        log.BookingId == booking.BookingId &&
+                        log.Status != "Completed" &&
+                        log.Status != "Cancelled");
+
+                if (fleetWashLog == null)
+                {
+                    fleetWashLog = new FleetWashLog
+                    {
+                        FleetVehicleId = booking.FleetVehicleId!.Value,
+                        BranchId = booking.BranchId,
+                        BookingId = booking.BookingId,
+                        CheckInTime = DateTime.UtcNow,
+                        Status = "CheckedIn",
+                        WashCost = booking.FinalAmount,
+                        CheckInImageUrl = booking.CheckInImageUrl
+                    };
+                    _context.FleetWashLogs.Add(fleetWashLog);
+                    await _context.SaveChangesAsync();
+                }
+
+                fleetWashLogId = fleetWashLog.FleetWashLogId;
+            }
+
             var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
                 booking.LicensePlate ?? "UNKNOWN",
                 booking.BranchId,
-                bookingId: booking.BookingId);
+                bookingId: booking.BookingId,
+                fleetWashLogId: fleetWashLogId);
             booking.ProcessingStaffId = staffUserId;
             await _context.SaveChangesAsync();
             await _overloadSuggestionService.CheckAndTriggerOverloadAsync(booking.BranchId);
@@ -114,6 +155,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.User)
                 .ThenInclude(u => u!.CustomerProfile)
                 .ThenInclude(p => p!.Tier)
+                .Include(b => b.BusinessProfile)
                 .Include(b => b.ProcessingLane)
                 .Where(b => b.BranchId == staffBranchId
                          && (b.Status == "CheckedIn" || b.Status == "Processing"));
@@ -161,7 +203,12 @@ namespace AutoWashPro.BLL.Services
                 latestPaymentByBooking.TryGetValue(b.BookingId, out var paymentData);
                 var isRefunded = paymentData?.IsRefunded ?? false;
                 var tx = paymentData?.Tx;
-                var paymentStatus = isRefunded
+                var isBusinessBooking = b.BusinessProfileId.HasValue ||
+                    string.Equals(b.BookingType, "Business", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(b.BookingType, "Fleet", StringComparison.OrdinalIgnoreCase);
+                var paymentStatus = isBusinessBooking
+                    ? "Completed"
+                    : isRefunded
                     ? "Refunded"
                     : tx == null
                     ? "Unpaid"
@@ -192,15 +239,20 @@ namespace AutoWashPro.BLL.Services
                     Status = b.Status,
                     PaymentStatus = paymentStatus,
                     PaymentNote = paymentNote,
-                    PaymentMethod = tx?.PaymentMethod,
+                    PaymentMethod = isBusinessBooking ? "Business account" : tx?.PaymentMethod,
                     OrderCode = tx?.OrderCode,
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
                     CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                     ActualDurationMinutes = b.ActualDurationMinutes,
-                    CustomerTierName = b.User?.CustomerProfile?.Tier?.TierName ?? "WalkIn / Standard",
+                    CustomerTierName = isBusinessBooking
+                        ? "Business account"
+                        : b.User?.CustomerProfile?.Tier?.TierName ?? "WalkIn / Standard",
                     CustomerTierPoints = b.User?.CustomerProfile?.Tier?.MinAccumulatedPoints ?? 0,
                     UserId = b.UserId,
+                    CustomerName = b.BusinessProfile?.CompanyName ?? b.User?.CustomerProfile?.FullName,
+                    CustomerPhone = b.User?.PhoneNumber,
+                    BookingType = b.BookingType,
                     ProcessingLaneId = b.ProcessingLaneId,
                     ProcessingLaneName = b.ProcessingLane?.Name
                 };
@@ -219,33 +271,46 @@ namespace AutoWashPro.BLL.Services
             {
                  if (booking.Status != "CheckedIn" && booking.Status != "Processing")
                      throw new BadRequestException("Can only start processing checked-in vehicles.");
-                 if (booking.FinalAmount > 0)
+                 // Use the shared payment policy here as well. Business/Fleet
+                 // bookings are settled against the approved company account
+                 // and intentionally do not have an individual payment
+                 // transaction for every vehicle.
+                 if (!await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))
                  {
-                     var hasCompletedPayment = await _context.Transactions
-                         .AnyAsync(t => t.ReferenceBookingId == bookingId && t.Status == "Completed");
-                     if (!hasCompletedPayment)
-                     {
-                         throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
-                     }
+                     throw new BadRequestException("BOOKING_PAYMENT_REQUIRED");
                  }
                  if (booking.ProcessingLaneId == null)
                  {
                      throw new BadRequestException("Booking does not have an assigned lane; cannot start processing.");
                  }
+                 var startedAt = DateTime.UtcNow;
                  booking.ProcessingStaffId = staffUserId;
-                 booking.ProcessingStartTime = DateTime.UtcNow;
+                 booking.ProcessingStartTime = startedAt;
                  booking.CompletedTime = null;
                  booking.ActualDurationMinutes = null;
+
+                 var linkedFleetWashLog = await _context.FleetWashLogs
+                     .FirstOrDefaultAsync(log =>
+                         log.BookingId == booking.BookingId &&
+                         log.Status != "Completed" &&
+                         log.Status != "Cancelled");
+                 if (linkedFleetWashLog != null)
+                 {
+                     linkedFleetWashLog.Status = "Processing";
+                     linkedFleetWashLog.LaneId = booking.ProcessingLaneId;
+                 }
+
+                 var occupancy = await _context.LaneOccupancies
+                     .FirstOrDefaultAsync(item => item.BookingId == booking.BookingId);
+                 if (occupancy != null)
+                 {
+                     occupancy.OccupiedAt = startedAt;
+                 }
             }
             if (newStatus == "Completed")
             {
                 if (booking.Status != "Processing" && booking.Status != "Completed")
                     throw new BadRequestException("Can only complete processing vehicles.");
-                if ((checkOutImage == null || checkOutImage.Length == 0)
-                    && string.IsNullOrWhiteSpace(booking.CheckOutImageUrl))
-                {
-                    throw new BadRequestException("Check-out image is required to complete the booking.");
-                }
                 booking.ProcessingStaffId = staffUserId;
                 if (checkOutImage != null && checkOutImage.Length > 0)
                 {
@@ -325,17 +390,56 @@ namespace AutoWashPro.BLL.Services
                 .Select(e => e.BranchId)
                 .FirstOrDefaultAsync();
             var occupancies = await _context.LaneOccupancies
-                .Where(o => o.BranchId == staffBranchId)
-                .Select(o => new AutoWashPro.BLL.Services.Operations.LaneOccupancyDTO
+                .AsNoTracking()
+                .Include(o => o.Lane)
+                .Include(o => o.Booking)
+                .Include(o => o.FleetWashLog)
+                    .ThenInclude(f => f!.FleetVehicle)
+                        .ThenInclude(v => v.BusinessProfile)
+                .Include(o => o.FleetWashLog)
+                    .ThenInclude(f => f!.FleetVehicle)
+                        .ThenInclude(v => v.VehicleType)
+                .Include(o => o.FleetWashLog)
+                    .ThenInclude(f => f!.Booking)
+                        .ThenInclude(b => b!.BookingDetails)
+                            .ThenInclude(d => d.Service)
+                .Where(o =>
+                    o.BranchId == staffBranchId &&
+                    (!o.BookingId.HasValue ||
+                        (o.Booking != null &&
+                         (o.Booking.Status == "CheckedIn" || o.Booking.Status == "Processing"))) &&
+                    (!o.FleetWashLogId.HasValue ||
+                        (o.FleetWashLog != null &&
+                         (o.FleetWashLog.Status == "CheckedIn" ||
+                          o.FleetWashLog.Status == "Assigned" ||
+                          o.FleetWashLog.Status == "Processing"))))
+                .ToListAsync();
+
+            return occupancies.Select(o =>
+            {
+                var fleetLog = o.FleetWashLog;
+                var fleetBooking = fleetLog?.Booking;
+                return new AutoWashPro.BLL.Services.Operations.LaneOccupancyDTO
                 {
                     LaneId = o.LaneId,
                     LicensePlate = o.LicensePlate,
                     BookingId = o.BookingId,
-                    OccupiedAt = o.OccupiedAt,
-                    LaneName = _context.Lanes.Where(l => l.LaneId == o.LaneId).Select(l => l.Name).FirstOrDefault() ?? ""
-                })
-                .ToListAsync();
-            return occupancies;
+                    FleetWashLogId = o.FleetWashLogId,
+                    Status = fleetLog?.Status ?? fleetBooking?.Status ?? o.Booking?.Status ?? "CheckedIn",
+                    // Database timestamps are UTC. Staff APIs expose wall-clock Vietnam time,
+                    // so convert here as well to avoid a seven-hour live-duration offset.
+                    OccupiedAt = o.OccupiedAt.ToVnTime(),
+                    LaneName = o.Lane?.Name ?? "",
+                    CustomerName = fleetLog?.FleetVehicle?.BusinessProfile?.CompanyName,
+                    DriverName = fleetLog?.FleetVehicle?.DriverName,
+                    VehicleTypeName = fleetLog?.FleetVehicle?.VehicleType?.Name,
+                    ServiceNames = fleetBooking?.BookingDetails
+                        .Select(d => d.Service.ServiceName)
+                        .ToList() ?? new List<string>(),
+                    FinalAmount = fleetLog?.WashCost ?? 0,
+                    BookingType = fleetLog != null ? "Fleet" : null
+                };
+            }).ToList();
         }
     }
 }

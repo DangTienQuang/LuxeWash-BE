@@ -167,10 +167,10 @@ namespace AutoWashPro.BLL.Services.Operations
                             shouldDelete = true;
                             reason = $"Booking {occupancy.BookingId} is in terminal status '{bk.Status}'";
                         }
-                        else if (bk.Status != "Processing" && bk.Status != "Assigned")
+                        else if (bk.Status != "CheckedIn" && bk.Status != "Processing" && bk.Status != "Assigned")
                         {
                             shouldDelete = true;
-                            reason = $"Booking {occupancy.BookingId} status '{bk.Status}' is not Processing or Assigned";
+                            reason = $"Booking {occupancy.BookingId} status '{bk.Status}' is not CheckedIn, Processing, or Assigned";
                         }
                         else if (bk.ProcessingLaneId.HasValue && bk.ProcessingLaneId.Value != occupancy.LaneId)
                         {

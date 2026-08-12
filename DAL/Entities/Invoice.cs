@@ -34,5 +34,7 @@ namespace DAL.Entities
         public BusinessProfile? BusinessProfile { get; set; }
 
         public ICollection<InvoiceItem> InvoiceItems { get; set; } = new List<InvoiceItem>();
+
+        public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
     }
 }

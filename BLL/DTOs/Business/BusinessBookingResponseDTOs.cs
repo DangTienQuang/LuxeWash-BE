@@ -46,14 +46,15 @@ namespace BLL.DTOs.Business
         public bool IsAvailable { get; set; }
         public string Reason { get; set; } = string.Empty;
         public int? EstimatedLastEndMinutesIntoSlot { get; set; }
+        public int OverflowSlotCount { get; set; }
         public List<VehicleSlotProjectionDTO> VehicleProjections { get; set; } = new();
     }
 
     public class VehicleSlotProjectionDTO
     {
         public int FleetVehicleId { get; set; }
+        public int SlotId { get; set; }
         public DateTime EstimatedStart { get; set; }
         public DateTime EstimatedEnd { get; set; }
-        public string LaneName { get; set; } = string.Empty;
     }
 }

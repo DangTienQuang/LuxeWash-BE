@@ -65,8 +65,8 @@ namespace AutoWashPro.BLL.Services
             TimeZoneInfo vnTimeZone;
             try { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
             catch (TimeZoneNotFoundException) { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
-            DateTime todayInVN = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone).Date;
-            TimeSpan currentTimeInVN = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone).TimeOfDay;
+            DateTime currentDateTimeInVN = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone);
+            DateTime todayInVN = currentDateTimeInVN.Date;
             var maxDate = todayInVN.AddDays(userProfile.Tier.BookingWindowDays);
             if (request.TargetDate.Date < todayInVN || request.TargetDate.Date > maxDate)
             {
@@ -113,7 +113,7 @@ namespace AutoWashPro.BLL.Services
                     slotDto.IsAvailable = false;
                     slotDto.Reason = "VIP only";
                 }
-                if (request.TargetDate.Date == todayInVN && slot.StartTime < currentTimeInVN)
+                if (GetSlotEndDateTime(request.TargetDate, slot.StartTime, slot.EndTime) <= currentDateTimeInVN)
                 {
                     slotDto.IsAvailable = false;
                     slotDto.Reason = "Past time";
@@ -127,6 +127,19 @@ namespace AutoWashPro.BLL.Services
                 response.Add(slotDto);
             }
             return response;
+        }
+        private static DateTime GetSlotEndDateTime(DateTime targetDate, TimeSpan startTime, TimeSpan endTime)
+        {
+            var slotStartDateTime = targetDate.Date.Add(startTime);
+            var slotEndDateTime = targetDate.Date.Add(endTime);
+
+            // A slot whose end time is not after its start time crosses midnight.
+            if (slotEndDateTime <= slotStartDateTime)
+            {
+                slotEndDateTime = slotEndDateTime.AddDays(1);
+            }
+
+            return slotEndDateTime;
         }
         private double CalculateHaversineDistanceKm(double lat1, double lon1, double lat2, double lon2)
         {
@@ -280,7 +293,17 @@ namespace AutoWashPro.BLL.Services
                 .Select(b => new AdminBookingResponseDTO
                 {
                     BookingId = b.BookingId,
+                    UserId = b.UserId,
                     LicensePlate = b.LicensePlate ?? "",
+                    CustomerName = b.BusinessProfile != null
+                        ? b.BusinessProfile.CompanyName
+                        : b.User != null && b.User.CustomerProfile != null
+                            ? b.User.CustomerProfile.FullName
+                            : null,
+                    CustomerPhone = b.User != null ? b.User.PhoneNumber : null,
+                    BookingType = b.BookingType,
+                    BusinessProfileId = b.BusinessProfileId,
+                    FleetVehicleId = b.FleetVehicleId,
                     ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
                     ScheduledTime = b.ScheduledTime,
                     Status = b.Status ?? "",
@@ -440,7 +463,17 @@ namespace AutoWashPro.BLL.Services
                 .Select(b => new AdminBookingResponseDTO
                 {
                     BookingId = b.BookingId,
+                    UserId = b.UserId,
                     LicensePlate = b.LicensePlate ?? "",
+                    CustomerName = b.BusinessProfile != null
+                        ? b.BusinessProfile.CompanyName
+                        : b.User != null && b.User.CustomerProfile != null
+                            ? b.User.CustomerProfile.FullName
+                            : null,
+                    CustomerPhone = b.User != null ? b.User.PhoneNumber : null,
+                    BookingType = b.BookingType,
+                    BusinessProfileId = b.BusinessProfileId,
+                    FleetVehicleId = b.FleetVehicleId,
                     ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
                     ScheduledTime = b.ScheduledTime,
                     Status = b.Status ?? "",
@@ -462,8 +495,17 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefault();
             if (activeBooking != null)
             {
-                var paymentStatuses = await GetPaymentStatusesByBookingIdsAsync(new List<int> { activeBooking.BookingId });
-                activeBooking.PaymentStatus = GetPaymentStatus(paymentStatuses, activeBooking.BookingId);
+                var isBusinessBooking = IsBusinessBooking(activeBooking);
+                if (isBusinessBooking)
+                {
+                    activeBooking.PaymentStatus = "Completed";
+                    activeBooking.PaymentMethod = "Business account";
+                }
+                else
+                {
+                    var paymentStatuses = await GetPaymentStatusesByBookingIdsAsync(new List<int> { activeBooking.BookingId });
+                    activeBooking.PaymentStatus = GetPaymentStatus(paymentStatuses, activeBooking.BookingId);
+                }
                 if (activeBooking.ProcessingStartTime.HasValue)
                     activeBooking.ProcessingStartTime = activeBooking.ProcessingStartTime.Value.ToVnTime();
                 if (activeBooking.CompletedTime.HasValue)
@@ -473,21 +515,30 @@ namespace AutoWashPro.BLL.Services
                 {
                     CustomerType = "PreBooked",
                     Data = activeBooking,
-                    CustomerTierName = vipInfo.TierName,
-                    CustomerTierPoints = vipInfo.TotalPoint,
-                    IsVip = vipInfo.IsVip
+                    CustomerTierName = isBusinessBooking ? "Business account" : vipInfo.TierName,
+                    CustomerTierPoints = isBusinessBooking ? 0 : vipInfo.TotalPoint,
+                    IsVip = !isBusinessBooking && vipInfo.IsVip
                 };
             }
-            var preBooked = await _context.Bookings
+            var preBookedCandidates = await _context.Bookings
                 .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
                          && b.BranchId == branchId
-                         && b.ScheduledTime.Date == todayInVN
                          && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .OrderBy(b => b.ScheduledTime)
                 .Select(b => new AdminBookingResponseDTO
                 {
                     BookingId = b.BookingId,
+                    UserId = b.UserId,
                     LicensePlate = b.LicensePlate ?? "",
+                    CustomerName = b.BusinessProfile != null
+                        ? b.BusinessProfile.CompanyName
+                        : b.User != null && b.User.CustomerProfile != null
+                            ? b.User.CustomerProfile.FullName
+                            : null,
+                    CustomerPhone = b.User != null ? b.User.PhoneNumber : null,
+                    BookingType = b.BookingType,
+                    BusinessProfileId = b.BusinessProfileId,
+                    FleetVehicleId = b.FleetVehicleId,
                     ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName ?? "").ToList(),
                     ScheduledTime = b.ScheduledTime,
                     Status = b.Status ?? "",
@@ -502,11 +553,24 @@ namespace AutoWashPro.BLL.Services
                     ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null
                 })
                 .AsNoTracking()
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+            var preBooked = preBookedCandidates
+                .OrderBy(b => b.ScheduledTime.Date == todayInVN ? 0 : 1)
+                .ThenBy(b => Math.Abs((b.ScheduledTime - DateTime.UtcNow.ToVnTime()).Ticks))
+                .FirstOrDefault();
             if (preBooked != null)
             {
-                var paymentStatuses = await GetPaymentStatusesByBookingIdsAsync(new List<int> { preBooked.BookingId });
-                preBooked.PaymentStatus = GetPaymentStatus(paymentStatuses, preBooked.BookingId);
+                var isBusinessBooking = IsBusinessBooking(preBooked);
+                if (isBusinessBooking)
+                {
+                    preBooked.PaymentStatus = "Completed";
+                    preBooked.PaymentMethod = "Business account";
+                }
+                else
+                {
+                    var paymentStatuses = await GetPaymentStatusesByBookingIdsAsync(new List<int> { preBooked.BookingId });
+                    preBooked.PaymentStatus = GetPaymentStatus(paymentStatuses, preBooked.BookingId);
+                }
                 if (preBooked.ProcessingStartTime.HasValue)
                     preBooked.ProcessingStartTime = preBooked.ProcessingStartTime.Value.ToVnTime();
                 if (preBooked.CompletedTime.HasValue)
@@ -516,9 +580,9 @@ namespace AutoWashPro.BLL.Services
                 {
                     CustomerType = "PreBooked",
                     Data = preBooked,
-                    CustomerTierName = vipInfo.TierName,
-                    CustomerTierPoints = vipInfo.TotalPoint,
-                    IsVip = vipInfo.IsVip
+                    CustomerTierName = isBusinessBooking ? "Business account" : vipInfo.TierName,
+                    CustomerTierPoints = isBusinessBooking ? 0 : vipInfo.TotalPoint,
+                    IsVip = !isBusinessBooking && vipInfo.IsVip
                 };
             }
             var fleetVehicle = await _context.FleetVehicles
@@ -532,6 +596,8 @@ namespace AutoWashPro.BLL.Services
                 .Select(fv => new global::BLL.DTOs.Fleet.FleetVehicleDTO
                 {
                     FleetVehicleId = fv.FleetVehicleId,
+                    BusinessProfileId = fv.BusinessProfileId,
+                    CompanyName = fv.BusinessProfile!.CompanyName,
                     LicensePlate = fv.LicensePlate,
                     VehicleType = fv.VehicleType.Name,
                     VehicleTypeName = fv.VehicleType.Name,
@@ -586,6 +652,12 @@ namespace AutoWashPro.BLL.Services
                 CustomerType = "WalkIn",
                 Data = null
             };
+        }
+        private static bool IsBusinessBooking(AdminBookingResponseDTO booking)
+        {
+            return booking.BusinessProfileId.HasValue ||
+                   string.Equals(booking.BookingType, "Business", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(booking.BookingType, "Fleet", StringComparison.OrdinalIgnoreCase);
         }
         private async Task<(string? TierName, int TotalPoint, bool IsVip)> GetVipInfoByBookingIdAsync(int bookingId)
         {
@@ -754,7 +826,7 @@ namespace AutoWashPro.BLL.Services
                 ProcessingLaneName = booking.ProcessingLane?.Name
             };
         }
-        public async Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null)
+        public async Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null, bool allowOutsideScheduledTime = false)
         {
             var allowedStatuses = new[] { "Pending", "CheckedIn", "Processing", "Completed", "Cancelled", "Delayed", "CancelledBySystem" };
             if (!allowedStatuses.Contains(newStatus))
@@ -762,15 +834,11 @@ namespace AutoWashPro.BLL.Services
             var normalizedPlate = NormalizeLicensePlate(licensePlate);
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
-            var startTime = DateTime.UtcNow.AddHours(-24);
-            var endTime = DateTime.UtcNow.AddHours(24);
-            // FIX #1: Filter license plate directly on DB instead of loading all bookings to RAM
             var matches = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
-                .Where(b => b.ScheduledTime >= startTime && b.ScheduledTime <= endTime
-                    && b.LicensePlate != null
+                .Where(b => b.LicensePlate != null
                     && b.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate)
                 .ToListAsync();
             if (matches.Count == 0)
@@ -778,9 +846,32 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No recent booking found for vehicle {licensePlate}.");
             }
             var todayInVN = DateTime.UtcNow.ToVnTime().Date;
-            var todaysBookings = matches.Where(b => b.ScheduledTime.ToVnTime().Date == todayInVN).ToList();
+            var todaysBookings = matches
+                .Where(b => b.ScheduledTime.Date == todayInVN &&
+                    (newStatus == "CheckedIn"
+                        ? b.Status == "Pending" || b.Status == "Confirmed"
+                        : newStatus == "Processing"
+                            ? b.Status == "CheckedIn"
+                            : newStatus == "Completed"
+                                ? b.Status == "CheckedIn" || b.Status == "Processing"
+                                : true))
+                .ToList();
             if (todaysBookings.Count == 0)
             {
+                if (newStatus == "CheckedIn")
+                {
+                    var nearestBooking = matches
+                        .Where(b => b.Status == "Pending" || b.Status == "Confirmed")
+                        .OrderBy(b => Math.Abs((b.ScheduledTime - DateTime.UtcNow.ToVnTime()).Ticks))
+                        .FirstOrDefault();
+                    if (nearestBooking != null)
+                    {
+                        await BookingCheckInPolicy.ValidateAsync(
+                            _context,
+                            nearestBooking,
+                            allowOutsideScheduledTime);
+                    }
+                }
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Vehicle {licensePlate} has a booking, but it is not scheduled for today ({todayInVN:dd/MM/yyyy}).");
             }
             if (todaysBookings.Count > 1)
@@ -793,7 +884,7 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"The current status of the order is already '{newStatus}'.");
             }
             bool isStatusValid = false;
-            if (newStatus == "CheckedIn" && booking.Status == "Pending") isStatusValid = true;
+            if (newStatus == "CheckedIn" && (booking.Status == "Pending" || booking.Status == "Confirmed")) isStatusValid = true;
             else if (newStatus == "Processing" && booking.Status == "CheckedIn") isStatusValid = true;
             else if (newStatus == "Completed" && (booking.Status == "CheckedIn" || booking.Status == "Processing")) isStatusValid = true;
             else if ((newStatus == "Cancelled" || newStatus == "Delayed") && (booking.Status == "Pending" || booking.Status == "CheckedIn")) isStatusValid = true;
@@ -803,13 +894,20 @@ namespace AutoWashPro.BLL.Services
             }
             if (newStatus == "CheckedIn")
             {
+                await BookingCheckInPolicy.ValidateAsync(
+                    _context,
+                    booking,
+                    allowOutsideScheduledTime);
                 if (checkInImage == null || checkInImage.Length == 0)
                 {
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Check-in image is required.");
                 }
                 booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
             }
-            var (isUpdated, checkInResult, checkOutResult) = await UpdateBookingStatusAsync(booking.BookingId, newStatus);
+            var (isUpdated, checkInResult, checkOutResult) = await UpdateBookingStatusAsync(
+                booking.BookingId,
+                newStatus,
+                allowOutsideScheduledTime);
             if (!isUpdated)
             {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Status update failed due to system error.");
@@ -954,12 +1052,19 @@ namespace AutoWashPro.BLL.Services
             }
             throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No active wash session found for vehicle {licensePlate}.");
         }
-        public async Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus)
+        public async Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus, bool allowOutsideScheduledTime = false)
         {
             var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
             var allowedStatuses = new[] { "Pending", "CheckedIn", "Processing", "Completed", "Cancelled", "Delayed", "CancelledBySystem" };
             if (!allowedStatuses.Contains(newStatus)) throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid status.");
+            if (newStatus == "CheckedIn")
+            {
+                await BookingCheckInPolicy.ValidateAsync(
+                    _context,
+                    booking,
+                    allowOutsideScheduledTime);
+            }
             if ((newStatus == "CheckedIn" || newStatus == "Processing" || newStatus == "Completed")
                 && !await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("BOOKING_PAYMENT_REQUIRED", "BOOKING_PAYMENT_REQUIRED");
@@ -983,6 +1088,19 @@ namespace AutoWashPro.BLL.Services
                 isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
                 booking.Status = newStatus;
                 booking.UpdatedAt = DateTime.UtcNow;
+                if (newStatus == "Processing" && booking.BusinessProfileId.HasValue)
+                {
+                    var fleetWashLog = await _context.FleetWashLogs
+                        .FirstOrDefaultAsync(log =>
+                            log.BookingId == booking.BookingId &&
+                            log.Status != "Completed" &&
+                            log.Status != "Cancelled");
+                    if (fleetWashLog != null)
+                    {
+                        fleetWashLog.Status = "Processing";
+                        fleetWashLog.LaneId = booking.ProcessingLaneId;
+                    }
+                }
                 if (newStatus == "Completed")
                 {
                     await _bookingMaterialUsageService.ConsumeForCompletedBookingAsync(booking.BookingId);
@@ -1050,7 +1168,8 @@ namespace AutoWashPro.BLL.Services
                 }
             }
             var targetDateTime = targetDate.Date.Add(slot.StartTime);
-            if (targetDateTime < DateTime.UtcNow)
+            var slotEndDateTime = GetSlotEndDateTime(targetDate, slot.StartTime, slot.EndTime);
+            if (slotEndDateTime <= DateTime.UtcNow.ToVnTime())
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot book a time slot in the past.");
             int totalCapacityWeight = 0;
             var vehicle = await _context.Vehicles.Include(v => v.VehicleType).FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
@@ -1601,6 +1720,21 @@ namespace AutoWashPro.BLL.Services
         private async Task<(decimal voucherDiscount, decimal pointDiscount, int pointsUsed, decimal finalAmount, UserVoucher? userVoucher)>
             CalculateBookingPricingAsync(int userId, decimal originalPrice, int? voucherId, int pointsToUseRequest, DateTime scheduledTime, int vehicleTypeId, int branchId)
         {
+            var customerProfile = await _context.CustomerProfiles
+                .Include(cp => cp.Tier)
+                .FirstOrDefaultAsync(cp => cp.UserId == userId);
+            if (customerProfile == null)
+                throw new AutoWashPro.BLL.Exceptions.NotFoundException("Customer profile not found.");
+
+            // Membership pricing is a server-side rule. The client may preview
+            // the discount, but wallet deductions and PayOS must use this value.
+            var membershipDiscountRate = GetMembershipDiscountRate(customerProfile.Tier?.TierName);
+            var membershipDiscount = decimal.Round(
+                originalPrice * membershipDiscountRate,
+                0,
+                MidpointRounding.AwayFromZero);
+            var priceAfterMembership = Math.Max(0, originalPrice - membershipDiscount);
+
             decimal voucherDiscount = 0;
             UserVoucher? userVoucher = null;
             if (voucherId.HasValue)
@@ -1623,7 +1757,7 @@ namespace AutoWashPro.BLL.Services
                 if (userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser) throw new AutoWashPro.BLL.Exceptions.BadRequestException("You have reached your usage limit for this voucher.");
                 if (userVoucher.Voucher.MaxUsages > 0 && userVoucher.Voucher.CurrentUsageCount >= userVoucher.Voucher.MaxUsages) throw new AutoWashPro.BLL.Exceptions.BadRequestException("This voucher has reached its total usage limit.");
                 if (userVoucher.ExpiryDate < DateTime.UtcNow) throw new AutoWashPro.BLL.Exceptions.BadRequestException("This voucher has expired.");
-                if (userVoucher.Voucher.MinOrderAmount > 0 && originalPrice < userVoucher.Voucher.MinOrderAmount)
+                if (userVoucher.Voucher.MinOrderAmount > 0 && priceAfterMembership < userVoucher.Voucher.MinOrderAmount)
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException($"This voucher only applies to orders from {userVoucher.Voucher.MinOrderAmount:N0} VND.");
                 if (userVoucher.Voucher.VoucherType == AutoWashPro.DAL.Enums.VoucherType.PhysicalGift)
                 {
@@ -1648,16 +1782,14 @@ namespace AutoWashPro.BLL.Services
                         throw new AutoWashPro.BLL.Exceptions.BadRequestException($"This Happy Hour voucher is only valid during the time slot from {startTime:hh\\:mm} to {endTime:hh\\:mm}.");
                     }
                 }
-                voucherDiscount = Math.Min(userVoucher.Voucher.DiscountAmount, originalPrice);
+                voucherDiscount = Math.Min(userVoucher.Voucher.DiscountAmount, priceAfterMembership);
             }
-            decimal remainingAfterVoucher = originalPrice - voucherDiscount;
+            decimal remainingAfterVoucher = priceAfterMembership - voucherDiscount;
             int pointsUsed = 0;
             decimal pointDiscount = 0;
             if (pointsToUseRequest > 0)
             {
-                var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(cp => cp.UserId == userId);
-                if (profile == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Customer profile not found.");
-                int maxPointsByBalance = profile.TotalPoint;
+                int maxPointsByBalance = customerProfile.TotalPoint;
                 int maxPointsByMoney = (int)(remainingAfterVoucher / PointConstants.VndPerSpendPoint);
                 int pointsToApply = Math.Min(pointsToUseRequest, Math.Min(maxPointsByBalance, maxPointsByMoney));
                 if (pointsToApply < pointsToUseRequest && pointsToApply == 0)
@@ -1668,6 +1800,18 @@ namespace AutoWashPro.BLL.Services
             decimal finalAmount = remainingAfterVoucher - pointDiscount;
             if (finalAmount < 0) finalAmount = 0;
             return (voucherDiscount, pointDiscount, pointsUsed, finalAmount, userVoucher);
+        }
+
+        private static decimal GetMembershipDiscountRate(string? tierName)
+        {
+            return tierName?.Trim().ToLowerInvariant() switch
+            {
+                "silver" => 0.05m,
+                "gold" => 0.10m,
+                "platinum" => 0.15m,
+                "diamond" => 0.20m,
+                _ => 0m
+            };
         }
         public async Task<bool> UpdateVehicleConditionAsync(int staffId, int bookingId, UpdateVehicleConditionDTO request)
         {
@@ -2308,7 +2452,8 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("The new time slot is invalid or does not belong to the same branch.");
             }
             var newTargetDateTime = request.NewScheduledDate.Date.Add(newSlot.StartTime);
-            if (newTargetDateTime <= DateTime.UtcNow)
+            var newSlotEndDateTime = GetSlotEndDateTime(request.NewScheduledDate, newSlot.StartTime, newSlot.EndTime);
+            if (newSlotEndDateTime <= DateTime.UtcNow.ToVnTime())
             {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot book a time slot in the past.");
             }
@@ -2392,22 +2537,37 @@ namespace AutoWashPro.BLL.Services
             var normalizedPlate = NormalizeLicensePlate(licensePlate);
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
-            var startTime = DateTime.UtcNow.AddHours(-24);
-            var endTime = DateTime.UtcNow.AddHours(24);
             var matches = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
-                .Where(b => b.BranchId == branchId && b.ScheduledTime >= startTime && b.ScheduledTime <= endTime
+                .Where(b => b.BranchId == branchId
                     && b.LicensePlate != null
                     && b.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate)
                 .ToListAsync();
             if (matches.Count == 0)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No booking found for vehicle {licensePlate} at this branch.");
             var todayInVN = DateTime.UtcNow.ToVnTime().Date;
-            var todaysBookings = matches.Where(b => b.ScheduledTime.ToVnTime().Date == todayInVN && (b.Status == "Pending" || b.Status == "Confirmed" || b.Status == "CheckedIn")).ToList();
+            var todaysBookings = matches
+                .Where(b => b.ScheduledTime.Date == todayInVN &&
+                    (b.Status == "Pending" || b.Status == "Confirmed" || b.Status == "CheckedIn"))
+                .ToList();
             if (todaysBookings.Count == 0)
+            {
+                var nearestBooking = matches
+                    .Where(b => b.Status == "Pending" || b.Status == "Confirmed")
+                    .OrderBy(b => Math.Abs((b.ScheduledTime - DateTime.UtcNow.ToVnTime()).Ticks))
+                    .FirstOrDefault();
+                if (nearestBooking != null)
+                {
+                    await BookingCheckInPolicy.ValidateAsync(_context, nearestBooking);
+                }
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Vehicle {licensePlate} has no valid booking scheduled for today in pending wash status.");
+            }
             var booking = todaysBookings.First();
+            if (booking.Status == "Pending" || booking.Status == "Confirmed")
+            {
+                await BookingCheckInPolicy.ValidateAsync(_context, booking);
+            }
             if (booking.Status == "Pending" || booking.Status == "Confirmed")
             {
                 if (!await global::BLL.Helpers.PaymentHelper.IsBookingPaidAsync(_context, booking))

@@ -8,6 +8,9 @@ namespace BLL.DTOs.Business
     public class CheckBusinessSlotsRequestDTO
     {
         public int BranchId { get; set; }
+        public List<VehicleBookingItemDTO> Vehicles { get; set; } = new();
+
+        // Legacy GET parameters. Keep these fields so older clients remain compatible.
         public int FleetVehicleId { get; set; }
         public List<int> ServiceIds { get; set; } = new();
         public DateTime TargetDate { get; set; }

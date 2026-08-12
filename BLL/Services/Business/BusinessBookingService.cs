@@ -7,6 +7,7 @@ using AutoWashPro.DAL.Entities;
 using BLL.DTOs;
 using BLL.DTOs.Business;
 using BLL.DTOs.Fleet;
+using BLL.Helpers;
 using BLL.Services.Interface;
 using DAL.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -42,14 +43,28 @@ namespace BLL.Services
                     x.ApprovalStatus == "Approved");
             if (business == null)
                 throw new NotFoundException("Business profile not found or not approved.");
-            var representativeVehicle = await _context.FleetVehicles
+            var requestedVehicles = request.Vehicles.Count > 0
+                ? request.Vehicles
+                : Enumerable.Range(0, Math.Max(1, request.VehicleCount ?? 1))
+                    .Select(_ => new VehicleBookingItemDTO
+                    {
+                        FleetVehicleId = request.FleetVehicleId,
+                        ServiceIds = request.ServiceIds
+                    })
+                    .ToList();
+            if (requestedVehicles.Any(x => x.FleetVehicleId <= 0))
+                throw new BadRequestException("Please select at least one vehicle.");
+
+            var vehicleIds = requestedVehicles.Select(x => x.FleetVehicleId).Distinct().ToList();
+            var fleetVehicles = await _context.FleetVehicles
                 .Include(x => x.VehicleType)
-                .FirstOrDefaultAsync(x =>
-                    x.FleetVehicleId == request.FleetVehicleId &&
+                .Where(x =>
+                    vehicleIds.Contains(x.FleetVehicleId) &&
                     x.BusinessProfileId == business.BusinessProfileId &&
-                    x.Status == "Active");
-            if (representativeVehicle == null)
-                throw new NotFoundException("Vehicle not found or not activated.");
+                    x.Status == "Active")
+                .ToListAsync();
+            if (fleetVehicles.Count != vehicleIds.Count)
+                throw new NotFoundException("One or more vehicles were not found or are not activated.");
             TimeZoneInfo vnTimeZone;
             try { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
             catch { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
@@ -57,26 +72,43 @@ namespace BLL.Services
             TimeSpan currentTimeInVN = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone).TimeOfDay;
             if (request.TargetDate.Date < todayInVN)
                 throw new BadRequestException("Cannot book for a date in the past.");
-            var servicePrices = await _context.ServicePrices
-                .Where(x =>
-                    x.BranchId == request.BranchId &&
-                    x.VehicleTypeId == representativeVehicle.VehicleTypeId &&
-                    request.ServiceIds.Contains(x.ServiceId))
-                .ToListAsync();
-            if (!servicePrices.Any() && request.ServiceIds.Any())
-                throw new BadRequestException("One or more services do not exist or are not priced.");
-            var simRequests = Enumerable.Range(0, (int)request.VehicleCount)
-                .Select(_ => new VehicleScheduleRequest
+            var simRequests = new List<VehicleScheduleRequest>();
+            foreach (var item in requestedVehicles)
+            {
+                var vehicle = fleetVehicles.First(x => x.FleetVehicleId == item.FleetVehicleId);
+                if (item.ServiceIds.Count == 0)
+                    throw new BadRequestException($"Vehicle {vehicle.LicensePlate} must have at least one service.");
+
+                var distinctServiceIds = item.ServiceIds.Distinct().ToList();
+                var servicePrices = await _context.ServicePrices
+                    .Where(x =>
+                        x.BranchId == request.BranchId &&
+                        x.VehicleTypeId == vehicle.VehicleTypeId &&
+                        distinctServiceIds.Contains(x.ServiceId))
+                    .ToListAsync();
+                if (servicePrices.Count != distinctServiceIds.Count)
+                    throw new BadRequestException(
+                        $"One or more services have not been priced for vehicle {vehicle.LicensePlate}.");
+
+                var capacityWeight = servicePrices
+                    .Select(x => x.CapacityWeight > 0 ? x.CapacityWeight : vehicle.VehicleType.BaseWeight)
+                    .DefaultIfEmpty(vehicle.VehicleType.BaseWeight)
+                    .Max();
+                simRequests.Add(new VehicleScheduleRequest
                 {
-                    FleetVehicleId = 0, 
-                    VehicleType = representativeVehicle.VehicleType,
-                    ServicePrices = servicePrices
-                })
-                .ToList();
+                    FleetVehicleId = vehicle.FleetVehicleId,
+                    VehicleType = vehicle.VehicleType,
+                    ServicePrices = servicePrices,
+                    CapacityWeight = capacityWeight
+                });
+            }
             var allSlots = await _context.TimeSlots
                 .Where(s => s.BranchId == request.BranchId)
                 .OrderBy(s => s.StartTime)
                 .ToListAsync();
+            var slotOrder = allSlots
+                .Select((timeSlot, index) => new { timeSlot.SlotId, Index = index })
+                .ToDictionary(x => x.SlotId, x => x.Index);
             var response = new List<DTOs.Business.TimeSlotResponseDTO>();
             foreach (var slot in allSlots)
             {
@@ -95,9 +127,11 @@ namespace BLL.Services
                     continue;
                 }
                 DateTime slotStart = request.TargetDate.Date.Add(slot.StartTime);
-                TimeSpan slotDuration = slot.EndTime - slot.StartTime;
-                var simResult = await _laneSchedulerService.ScheduleFleetAsync(
-                    request.BranchId, slotStart, slotDuration, simRequests);
+                var simResult = await _laneSchedulerService.ScheduleFleetAcrossSlotsAsync(
+                    request.BranchId,
+                    request.TargetDate,
+                    slot.SlotId,
+                    simRequests);
                 if (!simResult.Success)
                 {
                     slotDto.IsAvailable = false;
@@ -108,17 +142,17 @@ namespace BLL.Services
                     var lastEnd = simResult.Assignments.Max(a => a.EstimatedEnd);
                     slotDto.EstimatedLastEndMinutesIntoSlot =
                         (int)(lastEnd - slotStart).TotalMinutes;
-                    var laneIds = simResult.Assignments.Select(a => a.LaneId).Distinct().ToList();
-                    var laneNames = await _context.Lanes
-                        .Where(x => laneIds.Contains(x.LaneId))
-                        .ToDictionaryAsync(x => x.LaneId, x => x.Name);
+                    slotDto.OverflowSlotCount = simResult.Assignments
+                        .Select(a => slotOrder[a.AssignedSlotId] - slotOrder[slot.SlotId])
+                        .DefaultIfEmpty(0)
+                        .Max();
                     slotDto.VehicleProjections = simResult.Assignments
                         .Select(a => new VehicleSlotProjectionDTO
                         {
                             FleetVehicleId = a.FleetVehicleId,
+                            SlotId = a.AssignedSlotId,
                             EstimatedStart = a.EstimatedStart,
-                            EstimatedEnd = a.EstimatedEnd,
-                            LaneName = laneNames.TryGetValue(a.LaneId, out var ln) ? ln : ""
+                            EstimatedEnd = a.EstimatedEnd
                         })
                         .ToList();
                 }
@@ -134,7 +168,11 @@ namespace BLL.Services
                     x.ApprovalStatus == "Approved");
             if (business == null)
                 throw new NotFoundException("Business profile not found.");
-            var vehicleIds = dto.Vehicles.Select(v => v.FleetVehicleId).ToList();
+            if (dto.Vehicles.Count == 0)
+                throw new BadRequestException("Please select at least one vehicle.");
+            var vehicleIds = dto.Vehicles.Select(v => v.FleetVehicleId).Distinct().ToList();
+            if (vehicleIds.Count != dto.Vehicles.Count)
+                throw new BadRequestException("A vehicle cannot be added to the same booking more than once.");
             var fleetVehicles = await _context.FleetVehicles
                 .Include(x => x.VehicleType)
                 .Where(x =>
@@ -158,70 +196,113 @@ namespace BLL.Services
             if (slot == null)
                 throw new NotFoundException("Time slot not found.");
             DateTime scheduledTime = dto.ScheduledTime.Date.Add(slot.StartTime);
-            TimeSpan slotDuration = slot.EndTime - slot.StartTime;
             var scheduleRequests = new List<VehicleScheduleRequest>();
+            var capacityWeights = new Dictionary<int, int>();
             foreach (var item in dto.Vehicles)
             {
                 var vehicle = fleetVehicles.First(v => v.FleetVehicleId == item.FleetVehicleId);
                 if (!item.ServiceIds.Any())
                     throw new BadRequestException(
                         $"Vehicle {vehicle.LicensePlate} must have at least one service.");
+                var distinctServiceIds = item.ServiceIds.Distinct().ToList();
                 var vehicleServicePrices = await _context.ServicePrices
                     .Where(sp =>
                         sp.BranchId == dto.BranchId &&
                         sp.VehicleTypeId == vehicle.VehicleTypeId &&
-                        item.ServiceIds.Contains(sp.ServiceId))
+                        distinctServiceIds.Contains(sp.ServiceId))
                     .ToListAsync();
-                if (vehicleServicePrices.Count != item.ServiceIds.Count)
+                if (vehicleServicePrices.Count != distinctServiceIds.Count)
                     throw new BadRequestException(
                         $"One or more services have not been priced for the vehicle " +
                         $"{vehicle.LicensePlate} ({vehicle.VehicleType.Name}).");
+                capacityWeights[vehicle.FleetVehicleId] = vehicleServicePrices
+                    .Select(x => x.CapacityWeight > 0 ? x.CapacityWeight : vehicle.VehicleType.BaseWeight)
+                    .DefaultIfEmpty(vehicle.VehicleType.BaseWeight)
+                    .Max();
                 scheduleRequests.Add(new VehicleScheduleRequest
                 {
                     FleetVehicleId = vehicle.FleetVehicleId,
                     VehicleType = vehicle.VehicleType,
-                    ServicePrices = vehicleServicePrices
+                    ServicePrices = vehicleServicePrices,
+                    CapacityWeight = capacityWeights[vehicle.FleetVehicleId]
                 });
             }
-            var scheduleResult = await _laneSchedulerService.ScheduleFleetAsync(
-                dto.BranchId, scheduledTime, slotDuration, scheduleRequests);
+            var scheduleResult = await _laneSchedulerService.ScheduleFleetAcrossSlotsAsync(
+                dto.BranchId,
+                dto.ScheduledTime,
+                slot.SlotId,
+                scheduleRequests);
             if (!scheduleResult.Success)
                 throw new BadRequestException(scheduleResult.ErrorMessage!);
             var laneIds = scheduleResult.Assignments.Select(a => a.LaneId).Distinct().ToList();
             var laneNames = await _context.Lanes
                 .Where(x => laneIds.Contains(x.LaneId))
                 .ToDictionaryAsync(x => x.LaneId, x => x.Name);
-            var dailyCapacity = await _context.DailySlotCapacities
-                .FirstOrDefaultAsync(x =>
-                    x.BranchId == dto.BranchId &&
-                    x.SlotId == dto.SlotId &&
-                    x.Date == dto.ScheduledTime.Date);
-            if (dailyCapacity == null)
-            {
-                dailyCapacity = new DailySlotCapacity
-                {
-                    BranchId = dto.BranchId,
-                    SlotId = dto.SlotId,
-                    Date = dto.ScheduledTime.Date,
-                    BookedWeight = 0
-                };
-                _context.DailySlotCapacities.Add(dailyCapacity);
-            }
             var vehicleSummaries = new List<VehicleBookingSummaryDTO>();
-            decimal totalAmount = 0;
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            decimal totalAmount = scheduleRequests.Sum(request => request.ServicePrices.Sum(price => price.Price));
+            var billingPeriodStart = new DateTime(scheduledTime.Year, scheduledTime.Month, 1);
+            var billingPeriodEnd = billingPeriodStart.AddMonths(1);
+            var committedAmount = await _context.Bookings
+                .Where(booking =>
+                    booking.BusinessProfileId == business.BusinessProfileId &&
+                    booking.ScheduledTime >= billingPeriodStart &&
+                    booking.ScheduledTime < billingPeriodEnd &&
+                    booking.Status != "Cancelled" &&
+                    booking.Status != "NoShow")
+                .SumAsync(booking => (decimal?)booking.FinalAmount) ?? 0;
+            if (business.MonthlyCreditLimit > 0 &&
+                committedAmount + totalAmount > business.MonthlyCreditLimit)
+            {
+                throw new BadRequestException(
+                    "Doanh nghiệp không còn đủ hạn mức tín dụng để tạo đặt lịch này.",
+                    "BUSINESS_CREDIT_LIMIT_EXCEEDED");
+            }
+
+            var assignedSlotIds = scheduleResult.Assignments
+                .Select(x => x.AssignedSlotId)
+                .Distinct()
+                .ToList();
+            var assignedSlots = await _context.TimeSlots
+                .Where(x => assignedSlotIds.Contains(x.SlotId))
+                .ToDictionaryAsync(x => x.SlotId);
+            var requiredWeightBySlot = scheduleResult.Assignments
+                .GroupBy(x => x.AssignedSlotId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Sum(x => capacityWeights[x.FleetVehicleId]));
+            var createdBookingsByPlate = new Dictionary<string, Booking>();
+            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             try
             {
+                foreach (var (assignedSlotId, requiredWeight) in requiredWeightBySlot)
+                {
+                    var dailyCapacity = await _context.DailySlotCapacities
+                        .FirstOrDefaultAsync(x =>
+                            x.BranchId == dto.BranchId &&
+                            x.SlotId == assignedSlotId &&
+                            x.Date == scheduledTime.Date);
+                    if (dailyCapacity == null)
+                    {
+                        dailyCapacity = new DailySlotCapacity
+                        {
+                            BranchId = dto.BranchId,
+                            SlotId = assignedSlotId,
+                            Date = scheduledTime.Date,
+                            BookedWeight = 0
+                        };
+                        _context.DailySlotCapacities.Add(dailyCapacity);
+                    }
+                    if (dailyCapacity.BookedWeight + requiredWeight > assignedSlots[assignedSlotId].MaxCapacity)
+                        throw new BadRequestException("BUSINESS_SLOT_CAPACITY_EXCEEDED");
+                    dailyCapacity.BookedWeight += requiredWeight;
+                }
+
                 foreach (var item in dto.Vehicles)
                 {
                     var vehicle = fleetVehicles.First(v => v.FleetVehicleId == item.FleetVehicleId);
                     var request = scheduleRequests.First(r => r.FleetVehicleId == item.FleetVehicleId);
                     var assignment = scheduleResult.Assignments.First(a => a.FleetVehicleId == item.FleetVehicleId);
                     decimal vehicleTotal = request.ServicePrices.Sum(sp => sp.Price);
-                    if (dailyCapacity.BookedWeight + vehicle.VehicleType.BaseWeight > slot.MaxCapacity)
-                        throw new BadRequestException(
-                            $"The time slot is fully booked for vehicle {vehicle.LicensePlate}.");
-                    dailyCapacity.BookedWeight += vehicle.VehicleType.BaseWeight;
                     var booking = new Booking
                     {
                         UserId = business.UserId,
@@ -229,16 +310,17 @@ namespace BLL.Services
                         FleetVehicleId = vehicle.FleetVehicleId,
                         BookingType = "Business",
                         BranchId = dto.BranchId,
-                        ScheduledTime = scheduledTime,
+                        ScheduledTime = assignment.EstimatedStart,
                         LicensePlate = vehicle.LicensePlate,
                         Status = "Pending",
                         OriginalPrice = vehicleTotal,
                         FinalAmount = vehicleTotal,
-                        CapacityWeight = vehicle.VehicleType.BaseWeight,
+                        CapacityWeight = capacityWeights[vehicle.FleetVehicleId],
                         ActualVehicleTypeId = vehicle.VehicleTypeId,
                         FallbackQrCode = Guid.NewGuid().ToString("N")[..8].ToUpper()
                     };
                     _context.Bookings.Add(booking);
+                    createdBookingsByPlate[vehicle.LicensePlate] = booking;
                     foreach (var sp in request.ServicePrices)
                     {
                         _context.BookingDetails.Add(new BookingDetail
@@ -248,7 +330,6 @@ namespace BLL.Services
                             Price = sp.Price
                         });
                     }
-                    totalAmount += vehicleTotal;
                     vehicleSummaries.Add(new VehicleBookingSummaryDTO
                     {
                         LicensePlate = vehicle.LicensePlate,
@@ -260,26 +341,17 @@ namespace BLL.Services
                     });
                 }
                 await _context.SaveChangesAsync();
+                foreach (var summary in vehicleSummaries)
+                {
+                    if (createdBookingsByPlate.TryGetValue(summary.LicensePlate, out var booking))
+                        summary.BookingId = booking.BookingId;
+                }
                 await transaction.CommitAsync();
             }
             catch
             {
                 await transaction.RollbackAsync();
                 throw;
-            }
-            var savedBookings = await _context.Bookings
-                .Where(x =>
-                    x.BusinessProfileId == business.BusinessProfileId &&
-                    x.ScheduledTime == scheduledTime &&
-                    x.Status == "Pending")
-                .OrderBy(x => x.BookingId)
-                .Select(x => new { x.BookingId, x.LicensePlate })
-                .ToListAsync();
-            foreach (var summary in vehicleSummaries)
-            {
-                var match = savedBookings.FirstOrDefault(b => b.LicensePlate == summary.LicensePlate);
-                if (match != null)
-                    summary.BookingId = match.BookingId;
             }
             return new MultiVehicleBookingResponseDTO
             {
@@ -317,12 +389,13 @@ namespace BLL.Services
             if (newSlot == null)
                 throw new NotFoundException("New time slot not found.");
             DateTime newScheduledTime = dto.NewScheduledDate.Date.Add(newSlot.StartTime);
-            TimeSpan newSlotDuration = newSlot.EndTime - newSlot.StartTime;
             if (newScheduledTime <= DateTime.UtcNow.AddHours(24))
                 throw new BadRequestException(
                     "The new time slot must be at least 24 hours from the current time.");
             bool isSameSlot =
-                booking.ScheduledTime == newScheduledTime;
+                booking.ScheduledTime.Date == dto.NewScheduledDate.Date &&
+                booking.ScheduledTime.TimeOfDay >= newSlot.StartTime &&
+                booking.ScheduledTime.TimeOfDay < newSlot.EndTime;
             if (isSameSlot)
                 throw new BadRequestException("The new time slot is identical to the current time slot.");
             var bookingDetails = await _context.BookingDetails
@@ -341,23 +414,31 @@ namespace BLL.Services
         {
             FleetVehicleId = booking.FleetVehicleId!.Value,
             VehicleType    = booking.FleetVehicle!.VehicleType,
-            ServicePrices  = servicePrices
+            ServicePrices  = servicePrices,
+            CapacityWeight = booking.CapacityWeight
         }
     };
-            var scheduleResult = await _laneSchedulerService.ScheduleFleetAsync(
-                booking.BranchId, newScheduledTime, newSlotDuration, scheduleRequest);
+            var scheduleResult = await _laneSchedulerService.ScheduleFleetAcrossSlotsAsync(
+                booking.BranchId,
+                dto.NewScheduledDate,
+                newSlot.SlotId,
+                scheduleRequest,
+                excludedBookingId: booking.BookingId);
             if (!scheduleResult.Success)
                 throw new BadRequestException(scheduleResult.ErrorMessage!);
             var newAssignment = scheduleResult.Assignments.First();
             var newLane = await _context.Lanes
                 .FirstOrDefaultAsync(x => x.LaneId == newAssignment.LaneId);
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            var assignedSlot = await _context.TimeSlots
+                .FirstAsync(x => x.SlotId == newAssignment.AssignedSlotId);
+            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             try
             {
                 var oldSlot = await _context.TimeSlots
                     .FirstOrDefaultAsync(x =>
                         x.BranchId == booking.BranchId &&
-                        x.StartTime == booking.ScheduledTime.TimeOfDay);
+                        x.StartTime <= booking.ScheduledTime.TimeOfDay &&
+                        x.EndTime > booking.ScheduledTime.TimeOfDay);
                 if (oldSlot != null)
                 {
                     var oldDailyCapacity = await _context.DailySlotCapacities
@@ -375,24 +456,24 @@ namespace BLL.Services
                 var newDailyCapacity = await _context.DailySlotCapacities
                     .FirstOrDefaultAsync(x =>
                         x.BranchId == booking.BranchId &&
-                        x.SlotId == newSlot.SlotId &&
-                        x.Date == newScheduledTime.Date);
+                        x.SlotId == assignedSlot.SlotId &&
+                        x.Date == dto.NewScheduledDate.Date);
                 if (newDailyCapacity == null)
                 {
                     newDailyCapacity = new DailySlotCapacity
                     {
                         BranchId = booking.BranchId,
-                        SlotId = newSlot.SlotId,
-                        Date = newScheduledTime.Date,
+                        SlotId = assignedSlot.SlotId,
+                        Date = dto.NewScheduledDate.Date,
                         BookedWeight = 0
                     };
                     _context.DailySlotCapacities.Add(newDailyCapacity);
                 }
-                if (newDailyCapacity.BookedWeight + booking.CapacityWeight > newSlot.MaxCapacity)
+                if (newDailyCapacity.BookedWeight + booking.CapacityWeight > assignedSlot.MaxCapacity)
                     throw new BadRequestException("The new time slot is fully booked.");
                 newDailyCapacity.BookedWeight += booking.CapacityWeight;
                 DateTime oldScheduledTime = booking.ScheduledTime;
-                booking.ScheduledTime = newScheduledTime;
+                booking.ScheduledTime = newAssignment.EstimatedStart;
                 booking.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -401,7 +482,7 @@ namespace BLL.Services
                     BookingId = booking.BookingId,
                     LicensePlate = booking.LicensePlate,
                     OldScheduledTime = oldScheduledTime,
-                    NewScheduledTime = newScheduledTime,
+                    NewScheduledTime = newAssignment.EstimatedStart,
                     LaneId = newAssignment.LaneId,
                     LaneName = newLane?.Name ?? "",
                     EstimatedStart = newAssignment.EstimatedStart,
@@ -511,7 +592,8 @@ namespace BLL.Services
             var slot = await _context.TimeSlots
                 .FirstOrDefaultAsync(x =>
                     x.BranchId == booking.BranchId &&
-                    x.StartTime == booking.ScheduledTime.TimeOfDay);
+                    x.StartTime <= booking.ScheduledTime.TimeOfDay &&
+                    x.EndTime > booking.ScheduledTime.TimeOfDay);
             if (slot != null)
             {
                 var dailyCapacity = await _context.DailySlotCapacities
@@ -553,12 +635,15 @@ namespace BLL.Services
                 Status = "CheckedIn"
             };
             _context.FleetWashLogs.Add(washLog);
-            await _context.SaveChangesAsync(); 
-            var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
-                booking.LicensePlate ?? "UNKNOWN",
+            await _context.SaveChangesAsync();
+            var admission = await _laneCoordinator.CheckInAtEntryGateAsync(
+                booking.LicensePlate,
                 booking.BranchId,
                 bookingId: booking.BookingId,
                 fleetWashLogId: washLog.FleetWashLogId);
+            booking.Status = "CheckedIn";
+            booking.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
             return new FleetWashLogDTO
             {
                 FleetWashLogId = washLog.FleetWashLogId,
@@ -588,35 +673,59 @@ namespace BLL.Services
                 .FirstOrDefaultAsync(x =>
                     x.FleetVehicleId == vehicle.FleetVehicleId &&
                     (x.Status == "CheckedIn" ||
+                     x.Status == "Assigned" ||
                      x.Status == "Processing"));
             if (existingLog != null)
             {
                 throw new BadRequestException("This vehicle is currently undergoing wash processing.");
             }
+            // A Staff walk-in for a Fleet vehicle must consume that vehicle's next
+            // pending booking when one exists. Otherwise the wash log completes while
+            // the booking remains Pending and Business can incorrectly reschedule it.
+            var pendingBooking = await _context.Bookings
+                .Where(x =>
+                    x.FleetVehicleId == vehicle.FleetVehicleId &&
+                    x.BranchId == dto.BranchId &&
+                    x.BookingType == "Business" &&
+                    x.Status == "Pending")
+                .OrderBy(x => x.ScheduledTime)
+                .ThenBy(x => x.BookingId)
+                .FirstOrDefaultAsync();
+
+            var now = DateTime.UtcNow;
             var washLog = new FleetWashLog
             {
                 FleetVehicleId = vehicle.FleetVehicleId,
                 BranchId = dto.BranchId,
-                BookingId = null,
-                CheckInTime = DateTime.UtcNow,
+                BookingId = pendingBooking?.BookingId,
+                CheckInTime = now,
                 Status = "CheckedIn",
-                WashCost = 0
+                WashCost = pendingBooking?.FinalAmount ?? 0
             };
+            if (pendingBooking != null)
+            {
+                pendingBooking.Status = "CheckedIn";
+                pendingBooking.UpdatedAt = now;
+            }
             _context.FleetWashLogs.Add(washLog);
             await _context.SaveChangesAsync();
-            var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
-                vehicle.LicensePlate ?? "UNKNOWN",
+            var admission = await _laneCoordinator.CheckInAtEntryGateAsync(
+                vehicle.LicensePlate,
                 dto.BranchId,
-                bookingId: null,
+                bookingId: pendingBooking?.BookingId,
                 fleetWashLogId: washLog.FleetWashLogId);
             return new FleetCheckInResponseDTO
             {
                 FleetWashLogId = washLog.FleetWashLogId,
+                BookingId = pendingBooking?.BookingId,
                 FleetVehicleId = vehicle.FleetVehicleId,
                 LicensePlate = vehicle.LicensePlate,
                 DriverName = vehicle.DriverName,
                 CheckInTime = washLog.CheckInTime,
-                Status = washLog.Status!
+                Status = washLog.Status!,
+                IsWaiting = admission.IsWaiting,
+                LaneId = admission.LaneId,
+                LaneName = admission.LaneName
             };
         }
         public async Task WalkOutAsync(int washLogId)
@@ -660,10 +769,24 @@ namespace BLL.Services
             {
                 throw new NotFoundException("Wash lane not found.");
             }
+            var startedAt = DateTime.UtcNow;
             washLog.Status = "Processing";
+            var occupancy = await _context.LaneOccupancies
+                .FirstOrDefaultAsync(x => x.FleetWashLogId == washLogId);
+            if (occupancy != null)
+            {
+                // OccupiedAt is also the live Fleet wash timer source on the Staff UI.
+                occupancy.OccupiedAt = startedAt;
+            }
             if (washLog.Booking != null)
             {
                 washLog.Booking.ProcessingStaffId = staffUserId;
+                washLog.Booking.ProcessingLaneId = washLog.LaneId ?? dto.LaneId;
+                washLog.Booking.ProcessingStartTime = startedAt;
+                washLog.Booking.CompletedTime = null;
+                washLog.Booking.ActualDurationMinutes = null;
+                washLog.Booking.Status = "Processing";
+                washLog.Booking.UpdatedAt = startedAt;
             }
             await _context.SaveChangesAsync();
         }
@@ -688,6 +811,7 @@ namespace BLL.Services
         public async Task<FleetCheckoutResponseDTO> CheckOutAsync(int washLogId)
         {
             var washLog = await _context.FleetWashLogs
+                .Include(x => x.FleetVehicle)
                 .Include(x => x.Booking)
                     .ThenInclude(x => x.BookingDetails)
                 .FirstOrDefaultAsync(x =>
@@ -697,20 +821,36 @@ namespace BLL.Services
             {
                 throw new NotFoundException("Car wash log not found.");
             }
-            if (washLog.BookingId.HasValue)
+            var hasActiveOccupancy = await _context.LaneOccupancies
+                .AnyAsync(x => x.FleetWashLogId == washLogId);
+            var isActiveInWashBay = washLog.Status == "Processing" ||
+                (washLog.Status == "Assigned" && hasActiveOccupancy);
+            if (!isActiveInWashBay)
             {
-                var booking = washLog.Booking!;
+                throw new BadRequestException(
+                    "Can only check out Fleet vehicles that are currently occupying a wash lane.");
             }
-            if (washLog.Status != "Processing")
+            // Manual Fleet completion uses the same authoritative lane-release path as
+            // camera checkout. This completes both the wash log and linked booking,
+            // frees the lane, and admits the next waiting vehicle when possible.
+            await _laneCoordinator.CheckOutAtExitGateAsync(
+                washLog.FleetVehicle.LicensePlate,
+                washLog.BranchId);
+
+            // A legacy log may no longer have an occupancy. It must still be possible
+            // for Staff to close it manually instead of leaving it stuck in Processing.
+            if (washLog.Status != "Completed")
             {
-                throw new BadRequestException("Can only check out vehicles that are currently in processing status.");
-            }
-            washLog.Status = "Completed";
-            washLog.CompletedTime = DateTime.UtcNow;
-            if (washLog.Booking != null)
-            {
-                washLog.Booking.Status = "Completed";
-                washLog.Booking.UpdatedAt = DateTime.UtcNow;
+                washLog.Status = "Completed";
+                washLog.CompletedTime = DateTime.UtcNow;
+                washLog.LaneId = null;
+                if (washLog.Booking != null)
+                {
+                    washLog.Booking.Status = "Completed";
+                    washLog.Booking.CompletedTime = washLog.CompletedTime;
+                    washLog.Booking.ProcessingLaneId = null;
+                    washLog.Booking.UpdatedAt = DateTime.UtcNow;
+                }
             }
             if (washLog.BookingId.HasValue)
             {
@@ -720,6 +860,7 @@ namespace BLL.Services
             return new FleetCheckoutResponseDTO
             {
                 FleetWashLogId = washLog.FleetWashLogId,
+                TotalAmount = washLog.WashCost,
                 CompletedTime = washLog.CompletedTime.Value
             };
         }
@@ -772,30 +913,53 @@ namespace BLL.Services
             {
                 query = query.Where(x => x.CheckInTime <= filter.ToDate.Value);
             }
-            return await query
+            var history = await query
                 .OrderByDescending(x => x.CheckInTime)
                 .Skip((filter.Page - 1) * filter.PageSize)
                 .Take(filter.PageSize)
-                .Select(x => new FleetWashHistoryDTO
+                .Select(x => new
                 {
-                    FleetWashLogId = x.FleetWashLogId,
-                    LicensePlate = x.FleetVehicle.LicensePlate,
+                    x.FleetWashLogId,
+                    x.FleetVehicleId,
+                    x.FleetVehicle.LicensePlate,
                     VehicleType = x.FleetVehicle.VehicleType.Name,
                     BranchName =
                         x.Booking != null
                             ? x.Booking.Branch.Name
                             : "Walk-In",
-                    CheckInTime = x.CheckInTime,
-                    CompletedTime = x.CompletedTime,
+                    x.CheckInTime,
+                    ProcessingStartTime = x.Booking != null ? x.Booking.ProcessingStartTime : null,
+                    x.CompletedTime,
+                    ActualDurationMinutes = x.Booking != null ? x.Booking.ActualDurationMinutes : null,
                     Status = x.Status!,
-                    WashCost = x.WashCost,
-                    BookingId = x.BookingId,
+                    x.WashCost,
+                    x.BookingId,
                     WashType =
                         x.BookingId != null
                             ? "Booking"
                             : "WalkIn"
                 })
                 .ToListAsync();
+
+            return history.Select(x => new FleetWashHistoryDTO
+            {
+                FleetWashLogId = x.FleetWashLogId,
+                LicensePlate = x.LicensePlate,
+                VehicleType = x.VehicleType,
+                BranchName = x.BranchName,
+                CheckInTime = x.CheckInTime.ToVnTime(),
+                ProcessingStartTime = x.ProcessingStartTime.HasValue
+                    ? x.ProcessingStartTime.Value.ToVnTime()
+                    : null,
+                CompletedTime = x.CompletedTime.HasValue
+                    ? x.CompletedTime.Value.ToVnTime()
+                    : null,
+                ActualDurationMinutes = x.ActualDurationMinutes,
+                Status = x.Status,
+                WashCost = x.WashCost,
+                BookingId = x.BookingId,
+                WashType = x.WashType
+            }).ToList();
         }
         public async Task<FleetDashboardDTO> GetDashboardAsync(int businessUserId)
         {
@@ -843,7 +1007,8 @@ namespace BLL.Services
                     IssuedAt = x.IssuedAt,
                     TotalAmount = x.TotalAmount,
                     Status = x.Status,
-                    LicensePlate = x.Booking.LicensePlate
+                    LicensePlate = x.Booking != null ? x.Booking.LicensePlate : null,
+                    InvoiceType = x.InvoiceType
                 })
                 .ToListAsync();
         }
@@ -866,7 +1031,8 @@ namespace BLL.Services
                 TaxAmount = invoice.TaxAmount,
                 TotalAmount = invoice.TotalAmount,
                 Status = invoice.Status,
-                LicensePlate = invoice.Booking.LicensePlate,
+                LicensePlate = invoice.Booking != null ? invoice.Booking.LicensePlate : null,
+                InvoiceType = invoice.InvoiceType,
                 Items = invoice.InvoiceItems
                     .Select(i => new InvoiceItemDTO
                     {
@@ -963,32 +1129,6 @@ namespace BLL.Services
             if (business == null)
                 throw new NotFoundException("Business profile not found.");
             var result = new List<BusinessVehicleStatusDTO>();
-            var bookings = await _context.Bookings
-                .Include(x => x.FleetVehicle)
-                    .ThenInclude(x => x.VehicleType)
-                .Include(x => x.Branch)
-                .Where(x =>
-                    x.BusinessProfileId == business.BusinessProfileId &&
-                    x.BookingType == "Business" &&
-                    (x.Status == "Pending" || x.Status == "Cancelled"))
-                .OrderBy(x => x.ScheduledTime)
-                .ToListAsync();
-            result.AddRange(bookings.Select(x => new BusinessVehicleStatusDTO
-            {
-                FleetWashLogId = null,
-                BookingId = x.BookingId,
-                LicensePlate = x.LicensePlate,
-                DriverName = x.FleetVehicle!.DriverName,
-                VehicleType = x.FleetVehicle.VehicleType.Name,
-                Status = x.Status,
-                WashType = "Booking",
-                LaneName = null,
-                BranchName = x.Branch.Name,
-                ScheduledTime = x.ScheduledTime,
-                CheckInTime = null,
-                CompletedTime = null,
-                WashCost = x.FinalAmount
-            }));
             var washLogs = await _context.FleetWashLogs
                 .Include(x => x.FleetVehicle)
                     .ThenInclude(x => x.VehicleType)
@@ -1009,6 +1149,8 @@ namespace BLL.Services
                 VehicleType = x.FleetVehicle.VehicleType.Name,
                 Status = x.Status!,
                 WashType = x.BookingId != null ? "Booking" : "WalkIn",
+                BranchId = x.BranchId,
+                LaneId = x.LaneId,
                 LaneName = x.Lane?.Name,
                 BranchName = null,
                 ScheduledTime = null,
@@ -1017,8 +1159,7 @@ namespace BLL.Services
                 WashCost = x.WashCost
             }));
             return result
-                .OrderBy(x => x.Status == "Pending" || x.Status == "Cancelled" ? 0 : 1)
-                .ThenBy(x => x.ScheduledTime ?? x.CheckInTime)
+                .OrderBy(x => x.CheckInTime)
                 .ToList();
         }
         public async Task<List<BusinessVehicleStatusDTO>> GetVehiclesByStatusAsync(int businessUserId, string? status)
@@ -1055,6 +1196,8 @@ namespace BLL.Services
                     VehicleType = x.FleetVehicle.VehicleType.Name,
                     Status = x.Status,
                     WashType = "Booking",
+                    BranchId = x.BranchId,
+                    LaneId = x.ProcessingLaneId,
                     LaneName = null,
                     BranchName = x.Branch.Name,
                     ScheduledTime = x.ScheduledTime,
@@ -1086,6 +1229,8 @@ namespace BLL.Services
                     VehicleType = x.FleetVehicle.VehicleType.Name,
                     Status = x.Status!,
                     WashType = x.BookingId != null ? "Booking" : "WalkIn",
+                    BranchId = x.BranchId,
+                    LaneId = x.LaneId,
                     LaneName = x.Lane != null ? x.Lane.Name : null,
                     BranchName = null,
                     ScheduledTime = null,

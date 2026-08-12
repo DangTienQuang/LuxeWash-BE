@@ -44,6 +44,9 @@ namespace API.Controllers
         public async Task<IActionResult> DownloadTemplateFile()
         {
             var content = await _fleetService.GenerateFleetTemplateAsync();
+            Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            Response.Headers.Pragma = "no-cache";
+            Response.Headers.Expires = "0";
             return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "FleetTemplate.xlsx");
         }
 
@@ -57,7 +60,16 @@ namespace API.Controllers
             return Ok(new
             {
                 statusCode = 200,
-                message = "Fleet vehicle list imported successfully.",
+                message = result.PendingApprovalRows > 0
+                    ? result.FailedRows > 0
+                        ? $"Đã nhập danh sách xe. Có {result.PendingApprovalRows} xe đang chờ Admin duyệt và {result.FailedRows} dòng bị lỗi."
+                        : $"Đã nhập danh sách xe. Có {result.PendingApprovalRows} xe đang chờ Admin duyệt."
+                    : result.Status switch
+                {
+                    "Completed" => "Nhập danh sách xe thành công.",
+                    "PartialSuccess" => "Đã nhập danh sách xe nhưng có một số dòng bị lỗi.",
+                    _ => "Nhập danh sách xe thất bại. Vui lòng kiểm tra lỗi chi tiết."
+                },
                 data = result
             });
         }

@@ -16,6 +16,7 @@ namespace BLL.Services.Interface
         Task<List<PendingBusinessApplicationDTO>> GetPendingBusinessApplicationsAsync();
         Task<PendingBusinessApplicationDTO?> GetBusinessApplicationDetailAsync(int businessProfileId);
         Task<InvoiceExportDTO> GetInvoiceExportAsync(int invoiceId);
+        Task<List<BillingBusinessDTO>> GetBillingBusinessesAsync();
         Task<int> GenerateMonthlyInvoiceAsync(int businessProfileId, int year, int month);
     }
 }

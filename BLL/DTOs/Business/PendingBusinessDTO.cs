@@ -17,6 +17,8 @@ namespace BLL.DTOs.Business
         public string? RejectionReason { get; set; }
         public string BusinessLicenseFileUrl { get; set; } = null!;
         public string? AuthorizationLetterFileUrl { get; set; }
+        public int? PaymentTermDays { get; set; }
+        public decimal MonthlyCreditLimit { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

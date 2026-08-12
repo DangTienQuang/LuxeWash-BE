@@ -70,11 +70,64 @@ namespace AutoWashPro.BLL.Services.Operations
                         }
                     }
                 }
+
+                // A Business booking and its FleetWashLog describe the same physical
+                // wash session. Resolve the linked log even when the caller only sends
+                // BookingId so a single LaneOccupancy owns both references.
+                if (booking != null && !fleetWashLogId.HasValue)
+                {
+                    fleetLog = await _context.FleetWashLogs
+                        .FirstOrDefaultAsync(f =>
+                            f.BookingId == booking.BookingId &&
+                            f.Status != "Completed" &&
+                            f.Status != "Cancelled",
+                            cancellationToken);
+                    if (fleetLog != null)
+                    {
+                        fleetWashLogId = fleetLog.FleetWashLogId;
+                        isBusiness = true;
+                    }
+                }
                 
                 if (fleetWashLogId.HasValue)
                 {
                     fleetLog = await _context.FleetWashLogs.FindAsync(new object[] { fleetWashLogId.Value }, cancellationToken);
                     isBusiness = true; // Fleet is always business
+                }
+
+                var existingOccupancy = await _context.LaneOccupancies
+                    .Include(o => o.Lane)
+                    .FirstOrDefaultAsync(o =>
+                        (bookingId.HasValue && o.BookingId == bookingId.Value) ||
+                        (fleetWashLogId.HasValue && o.FleetWashLogId == fleetWashLogId.Value),
+                        cancellationToken);
+                if (existingOccupancy != null)
+                {
+                    if (booking != null && existingOccupancy.BookingId == null)
+                        existingOccupancy.BookingId = booking.BookingId;
+                    if (fleetLog != null && existingOccupancy.FleetWashLogId == null)
+                        existingOccupancy.FleetWashLogId = fleetLog.FleetWashLogId;
+                    if (booking != null)
+                        booking.ProcessingLaneId = existingOccupancy.LaneId;
+                    if (fleetLog != null)
+                        fleetLog.LaneId = existingOccupancy.LaneId;
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    if (ownsTransaction && tx != null)
+                        await tx.CommitAsync(cancellationToken);
+
+                    return new GateCheckInResult
+                    {
+                        BookingId = bookingId,
+                        FleetWashLogId = fleetWashLogId,
+                        LicensePlate = licensePlate,
+                        Status = "Assigned",
+                        AdmissionStatus = "Granted",
+                        IsWaiting = false,
+                        LaneId = existingOccupancy.LaneId,
+                        LaneName = existingOccupancy.Lane?.Name,
+                        Message = $"Already assigned to {existingOccupancy.Lane?.Name ?? "lane"}."
+                    };
                 }
 
                 Lane? selectedLane = null;
@@ -136,8 +189,8 @@ namespace AutoWashPro.BLL.Services.Operations
                     if (booking != null)
                     {
                         booking.ProcessingLaneId = selectedLane.LaneId;
-                        booking.Status = "Processing";
-                        booking.ProcessingStartTime = now;
+                        booking.Status = "CheckedIn";
+                        booking.ProcessingStartTime = null;
                         booking.CompletedTime = null;
                         booking.ActualDurationMinutes = null;
                         booking.UpdatedAt = now;
@@ -146,7 +199,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     if (fleetLog != null)
                     {
                         fleetLog.LaneId = selectedLane.LaneId;
-                        fleetLog.Status = "Processing";
+                        fleetLog.Status = "Assigned";
                     }
 
                     var barrierId = isVip ? "ENTRY_VIP_GATE" : "ENTRY_REGULAR_GATE";
@@ -578,7 +631,8 @@ namespace AutoWashPro.BLL.Services.Operations
 
             var waitingFleet = await _context.FleetWashLogs
                 .Include(f => f.FleetVehicle)
-                .Where(f => f.BranchId == branchId && f.Status == "CheckedIn" && f.LaneId == null && lane.IsBusinessLane)
+                .Where(f => f.BranchId == branchId && f.Status == "CheckedIn" &&
+                            f.LaneId == null && f.BookingId == null && lane.IsBusinessLane)
                 .OrderBy(f => f.CheckInTime)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -592,11 +646,28 @@ namespace AutoWashPro.BLL.Services.Operations
                     return null;
                 }
 
-                admission = await GrantAdmissionAsync(laneId, branchId, waitingBookingObj.Booking.BookingId, null, waitingBookingObj.LicensePlate, waitingBookingObj.IsVip, cancellationToken);
+                var linkedFleetLog = await _context.FleetWashLogs
+                    .FirstOrDefaultAsync(f =>
+                        f.BookingId == waitingBookingObj.Booking.BookingId &&
+                        f.Status != "Completed" && f.Status != "Cancelled",
+                        cancellationToken);
+                admission = await GrantAdmissionAsync(
+                    laneId,
+                    branchId,
+                    waitingBookingObj.Booking.BookingId,
+                    linkedFleetLog?.FleetWashLogId,
+                    waitingBookingObj.LicensePlate,
+                    waitingBookingObj.IsVip,
+                    cancellationToken);
                 waitingBookingObj.Booking.ProcessingLaneId = laneId;
-                waitingBookingObj.Booking.Status = "Processing";
-                waitingBookingObj.Booking.ProcessingStartTime = now;
+                waitingBookingObj.Booking.Status = "CheckedIn";
+                waitingBookingObj.Booking.ProcessingStartTime = null;
                 waitingBookingObj.Booking.UpdatedAt = now;
+                if (linkedFleetLog != null)
+                {
+                    linkedFleetLog.LaneId = laneId;
+                    linkedFleetLog.Status = "Assigned";
+                }
             }
             else if (waitingFleet != null)
             {
@@ -608,7 +679,7 @@ namespace AutoWashPro.BLL.Services.Operations
 
                 admission = await GrantAdmissionAsync(laneId, branchId, null, waitingFleet.FleetWashLogId, licensePlate, false, cancellationToken);
                 waitingFleet.LaneId = laneId;
-                waitingFleet.Status = "Processing";
+                waitingFleet.Status = "Assigned";
             }
 
             if (admission != null)

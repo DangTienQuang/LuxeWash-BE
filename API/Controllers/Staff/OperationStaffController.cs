@@ -52,7 +52,11 @@ namespace API.Controllers.Staff
         [HttpPost("bookings/{bookingId}/checkin")]
         public async Task<IActionResult> StaffCheckin(int bookingId, [FromForm] CheckInRequestDTO dto)
         {
-            var result = await _staffService.CheckInBookingAsync(GetUserId(), bookingId, dto.CheckInImage);
+            var result = await _staffService.CheckInBookingAsync(
+                GetUserId(),
+                bookingId,
+                dto.CheckInImage,
+                dto.AllowOutsideScheduledTime);
 
             var message = result.IsWaiting
                 ? "Check-in successful. All bays are currently busy — please wait before the barrier."

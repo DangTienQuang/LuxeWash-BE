@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using DAL.Entities;
 
 namespace AutoWashPro.DAL.Entities
 {
@@ -26,6 +27,10 @@ namespace AutoWashPro.DAL.Entities
         public required string Description { get; set; }
 
         public int? ReferenceBookingId { get; set; }
+
+        public int? ReferenceInvoiceId { get; set; }
+        [ForeignKey("ReferenceInvoiceId")]
+        public Invoice? ReferenceInvoice { get; set; }
 
         [MaxLength(100)]
         public string? OrderCode { get; set; }

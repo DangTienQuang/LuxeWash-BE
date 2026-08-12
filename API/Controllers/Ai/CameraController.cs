@@ -83,12 +83,54 @@ namespace API.Controllers.AI
                 var result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(
                     normalizedPlate,
                     "CheckedIn",
-                    request.CheckInImage);
+                    request.CheckInImage,
+                    request.AllowOutsideScheduledTime);
                 if (result.IsWaitingForLane)
                 {
                     return Ok(new { statusCode = 200, message = "Check-in successful! All bays are currently busy. Please wait before the barrier.", isWaiting = true, data = result });
                 }
-                return Ok(new { statusCode = 200, message = "Vehicle is valid, opening barrier!", isWaiting = false, data = result });
+
+                try
+                {
+                    result = await _bookingService.UpdateBookingStatusByLicensePlateAsync(
+                        normalizedPlate,
+                        "Processing");
+                }
+                catch (Exception startEx)
+                {
+                    // Check-in has already succeeded. Keep that result so the frontend can
+                    // retry auto-start without accidentally creating another check-in.
+                    _logger.LogWarning(
+                        startEx,
+                        "Vehicle {Plate} checked in but could not start washing automatically.",
+                        normalizedPlate);
+                    return Ok(new
+                    {
+                        statusCode = 200,
+                        message = "Check-in successful, but the wash could not start automatically.",
+                        isWaiting = false,
+                        autoStartFailed = true,
+                        data = result
+                    });
+                }
+
+                return Ok(new
+                {
+                    statusCode = 200,
+                    message = "Check-in successful and wash started automatically.",
+                    isWaiting = false,
+                    autoStarted = true,
+                    data = result
+                });
+            }
+            catch (AutoWashPro.BLL.Exceptions.BadRequestException ex)
+            {
+                return BadRequest(new
+                {
+                    statusCode = 400,
+                    errorCode = ex.ErrorCode,
+                    message = ex.Message
+                });
             }
             catch (System.Exception ex)
             {

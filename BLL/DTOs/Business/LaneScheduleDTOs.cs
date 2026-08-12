@@ -11,6 +11,7 @@ namespace BLL.DTOs.Business
         public int FleetVehicleId { get; set; }
         public VehicleType VehicleType { get; set; } = null!;
         public List<ServicePrice> ServicePrices { get; set; } = new();
+        public int CapacityWeight { get; set; }
     }
     public class LaneSimState
     {
@@ -31,6 +32,7 @@ namespace BLL.DTOs.Business
     public class VehicleAssignment
     {
         public int FleetVehicleId { get; set; }
+        public int AssignedSlotId { get; set; }
         public int LaneId { get; set; }
         public DateTime EstimatedStart { get; set; }
         public DateTime EstimatedEnd { get; set; }

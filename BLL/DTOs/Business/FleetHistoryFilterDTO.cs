@@ -37,7 +37,9 @@ namespace BLL.DTOs.Fleet
         public string VehicleType { get; set; } = null!;
         public string BranchName { get; set; } = null!;
         public DateTime CheckInTime { get; set; }
+        public DateTime? ProcessingStartTime { get; set; }
         public DateTime? CompletedTime { get; set; }
+        public int? ActualDurationMinutes { get; set; }
         public string Status { get; set; } = null!;
         public decimal WashCost { get; set; }
         public int? BookingId { get; set; }

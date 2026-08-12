@@ -23,7 +23,15 @@ namespace AutoWashPro.BLL.Services.Operations
         public string LaneName { get; set; } = null!;
         public string LicensePlate { get; set; } = null!;
         public int? BookingId { get; set; }
+        public int? FleetWashLogId { get; set; }
+        public string Status { get; set; } = "CheckedIn";
         public DateTime OccupiedAt { get; set; }
+        public string? CustomerName { get; set; }
+        public string? DriverName { get; set; }
+        public string? VehicleTypeName { get; set; }
+        public List<string> ServiceNames { get; set; } = new();
+        public decimal FinalAmount { get; set; }
+        public string? BookingType { get; set; }
     }
     public class WaitingVehicleDTO
     {

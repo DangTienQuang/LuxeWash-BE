@@ -33,7 +33,8 @@ namespace BLL.DTOs.Business
         public DateTime IssuedAt { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = null!;
-        public string LicensePlate { get; set; } = null!;
+        public string? LicensePlate { get; set; }
+        public string InvoiceType { get; set; } = null!;
     }
     public class InvoiceDetailDTO
     {
@@ -44,7 +45,8 @@ namespace BLL.DTOs.Business
         public decimal TaxAmount { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = null!;
-        public string LicensePlate { get; set; } = null!;
+        public string? LicensePlate { get; set; }
+        public string InvoiceType { get; set; } = null!;
         public List<InvoiceItemDTO> Items { get; set; } = new();
     }
     public class MonthlyStatementDTO
@@ -60,6 +62,38 @@ namespace BLL.DTOs.Business
         public int BusinessProfileId { get; set; }
         public int Year { get; set; }
         public int Month { get; set; }
+    }
+    public class BillingBusinessDTO
+    {
+        public int BusinessProfileId { get; set; }
+        public string CompanyName { get; set; } = string.Empty;
+        public string BillingEmail { get; set; } = string.Empty;
+        public string TaxCode { get; set; } = string.Empty;
+        public string ApprovalStatus { get; set; } = string.Empty;
+    }
+    public class InvoiceDispatchResponseDTO
+    {
+        public int InvoiceId { get; set; }
+        public string InvoiceCode { get; set; } = string.Empty;
+        public string Recipient { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public bool EmailSent { get; set; }
+        public string? EmailError { get; set; }
+    }
+    public class InvoicePaymentRequestDTO
+    {
+        public string PaymentMethod { get; set; } = "PayOS";
+        public string? ReturnUrl { get; set; }
+        public string? CancelUrl { get; set; }
+    }
+    public class InvoicePaymentResponseDTO
+    {
+        public int InvoiceId { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string PaymentMethod { get; set; } = string.Empty;
+        public string? PaymentUrl { get; set; }
+        public string? OrderCode { get; set; }
+        public decimal Amount { get; set; }
     }
     public class InvoiceExportDTO
     {

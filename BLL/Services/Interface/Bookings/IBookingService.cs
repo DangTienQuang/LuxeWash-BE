@@ -17,8 +17,8 @@ namespace AutoWashPro.BLL.Services
         Task<WalkInBookingResponseDTO> CreateWalkInBookingAsync(int staffId, CreateWalkInBookingDTO request);
         Task<List<AdminBookingResponseDTO>> GetAllBookingsByDateAsync(DateTime targetDate);
         Task<SmartLicensePlateResponseDTO> LookupLicensePlateAsync(string licensePlate, int branchId);
-        Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus);
-        Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null);
+        Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus, bool allowOutsideScheduledTime = false);
+        Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null, bool allowOutsideScheduledTime = false);
         Task<BookingResponseDTO> AutoCheckOutByLicensePlateAsync(string licensePlate, IFormFile checkOutImage);
         Task<List<BookingResponseDTO>> GetMyBookingsAsync(int userId, int page = 1, int pageSize = 50);
         Task<List<RelocationProposalCustomerDTO>> GetRelocationProposalsAsync(int userId);

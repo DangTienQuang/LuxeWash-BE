@@ -59,6 +59,7 @@ namespace AutoWashPro.BLL.DTOs
         public string Status { get; set; } = "Completed";
         public string? OrderCode { get; set; }
         public int? ReferenceBookingId { get; set; }
+        public int? ReferenceInvoiceId { get; set; }
         public DateTime CreatedAt { get; set; }
     }
     public class PointHistoryResponseDTO

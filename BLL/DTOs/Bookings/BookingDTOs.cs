@@ -154,6 +154,12 @@ namespace AutoWashPro.BLL.DTOs
     }
     public class AdminBookingResponseDTO : BookingResponseDTO
     {
+        public int? UserId { get; set; }
+        public string? CustomerName { get; set; }
+        public string? CustomerPhone { get; set; }
+        public string? BookingType { get; set; }
+        public int? BusinessProfileId { get; set; }
+        public int? FleetVehicleId { get; set; }
     }
     public class BookingPaymentStatusDTO
     {

@@ -1623,6 +1623,9 @@ namespace DAL.Migrations
                     b.Property<int?>("ReferenceBookingId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ReferenceInvoiceId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime(6)");
 
@@ -2148,6 +2151,8 @@ namespace DAL.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("TransactionId");
+
+                    b.HasIndex("ReferenceInvoiceId");
 
                     b.HasIndex("WalletId");
 
@@ -3789,9 +3794,15 @@ namespace DAL.Migrations
 
             modelBuilder.Entity("AutoWashPro.DAL.Entities.Transaction", b =>
                 {
+                    b.HasOne("DAL.Entities.Invoice", "ReferenceInvoice")
+                        .WithMany("Transactions")
+                        .HasForeignKey("ReferenceInvoiceId");
+
                     b.HasOne("AutoWashPro.DAL.Entities.Wallet", "Wallet")
                         .WithMany("Transactions")
                         .HasForeignKey("WalletId");
+
+                    b.Navigation("ReferenceInvoice");
 
                     b.Navigation("Wallet");
                 });
@@ -4184,6 +4195,8 @@ namespace DAL.Migrations
             modelBuilder.Entity("DAL.Entities.Invoice", b =>
                 {
                     b.Navigation("InvoiceItems");
+
+                    b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
         }

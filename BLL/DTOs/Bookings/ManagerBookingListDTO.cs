@@ -11,6 +11,8 @@ namespace AutoWashPro.BLL.DTOs
         public string? CustomerPhone { get; set; }
         public string LicensePlate { get; set; } = null!;
         public List<string> ServiceNames { get; set; } = new List<string>();
+        public decimal FinalAmount { get; set; }
+        public string BookingType { get; set; } = string.Empty;
         public int? ProcessingLaneId { get; set; }
         public string? ProcessingLaneName { get; set; }
         public bool IsBusinessLane { get; set; }

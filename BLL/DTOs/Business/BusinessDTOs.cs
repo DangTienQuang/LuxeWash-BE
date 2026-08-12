@@ -13,10 +13,19 @@ namespace BLL.DTOs.Business
         public string CompanyName { get; set; } = null!;
         public string? TaxCode { get; set; }
         public string? BusinessAddress { get; set; }
+        public string? BillingEmail { get; set; }
+        public string? RepresentativeName { get; set; }
+        public int? PaymentTermDays { get; set; }
         public string ApprovalStatus { get; set; } = null!;
         public string? RejectionReason { get; set; }
         public string BusinessLicenseFileUrl { get; set; } = null!;
         public string? AuthorizationLetterFileUrl { get; set; }
+        public decimal MonthlyCreditLimit { get; set; }
+        public decimal CurrentMonthUsage { get; set; }
+        public decimal DiscountPercent { get; set; }
+        public DateTime ContractStartDate { get; set; }
+        public DateTime ContractEndDate { get; set; }
+        public bool IsContractActive { get; set; }
     }
     public class RegisterBusinessUserRequest
     {
@@ -37,6 +46,8 @@ namespace BLL.DTOs.Business
         public string? BillingEmail { get; set; }
         public string? RepresentativeName { get; set; }
         public int? PaymentTermDays { get; set; }
+        [Range(0, double.MaxValue, ErrorMessage = "Monthly credit limit cannot be negative.")]
+        public decimal MonthlyCreditLimit { get; set; }
         [Required(ErrorMessage = "Please provide the business license.")]
         public IFormFile BusinessLicense { get; set; } = null!;
         public IFormFile? AuthorizationLetter { get; set; }

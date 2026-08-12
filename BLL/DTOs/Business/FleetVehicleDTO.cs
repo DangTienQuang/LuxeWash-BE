@@ -9,6 +9,8 @@ namespace BLL.DTOs.Fleet
     public class FleetVehicleDTO
     {
         public int FleetVehicleId { get; set; }
+        public int? BusinessProfileId { get; set; }
+        public string? CompanyName { get; set; }
         public string LicensePlate { get; set; } = null!;
         public string VehicleType { get; set; } = null!;
         public string VehicleTypeName { get; set; } = null!;

@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using BLL.Helpers;
 using BLL.Services.Interface;
 using BLL.DTOs.Business;
+using DAL.Entities;
 using AutoWashPro.BLL.Services.Interface;
 namespace AutoWashPro.BLL.Services
 {
@@ -123,6 +124,7 @@ namespace AutoWashPro.BLL.Services
             var bookings = await _context.Bookings
                 .Include(b => b.User)
                     .ThenInclude(u => u.CustomerProfile)
+                .Include(b => b.BusinessProfile)
                 .Include(b => b.BookingDetails)
                     .ThenInclude(d => d.Service)
                 .Include(b => b.ProcessingLane)
@@ -135,10 +137,12 @@ namespace AutoWashPro.BLL.Services
                 BookingId = b.BookingId,
                 Status = b.Status,
                 ScheduledTime = b.ScheduledTime,
-                CustomerName = b.User?.CustomerProfile?.FullName,
+                CustomerName = b.BusinessProfile?.CompanyName ?? b.User?.CustomerProfile?.FullName,
                 CustomerPhone = b.User?.PhoneNumber,
                 LicensePlate = b.LicensePlate,
                 ServiceNames = b.BookingDetails.Select(d => d.Service.ServiceName).ToList(),
+                FinalAmount = b.FinalAmount,
+                BookingType = b.BookingType,
                 ProcessingLaneId = b.ProcessingLaneId,
                 ProcessingLaneName = b.ProcessingLane?.Name,
                 ProcessingStaffId = b.ProcessingStaffId,
@@ -346,12 +350,43 @@ namespace AutoWashPro.BLL.Services
                     {
                         throw new BadRequestException("LANE_UNAVAILABLE");
                     }
-                    var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId);
+                    FleetWashLog? fleetWashLog = null;
+                    if (booking.BusinessProfileId.HasValue && booking.FleetVehicleId.HasValue)
+                    {
+                        fleetWashLog = await _context.FleetWashLogs
+                            .FirstOrDefaultAsync(log =>
+                                log.BookingId == booking.BookingId &&
+                                log.Status != "Completed" &&
+                                log.Status != "Cancelled");
+                        if (fleetWashLog == null)
+                        {
+                            fleetWashLog = new FleetWashLog
+                            {
+                                BookingId = booking.BookingId,
+                                FleetVehicleId = booking.FleetVehicleId.Value,
+                                BranchId = booking.BranchId,
+                                CheckInTime = DateTime.UtcNow,
+                                WashCost = booking.FinalAmount,
+                                Status = "CheckedIn"
+                            };
+                            _context.FleetWashLogs.Add(fleetWashLog);
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                    var fleetPlate = booking.FleetVehicleId.HasValue
+                        ? await _context.FleetVehicles
+                            .Where(v => v.FleetVehicleId == booking.FleetVehicleId.Value)
+                            .Select(v => v.LicensePlate)
+                            .FirstOrDefaultAsync()
+                        : null;
+                    var vehicle = booking.VehicleId.HasValue
+                        ? await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == booking.VehicleId.Value)
+                        : null;
                     var checkInResult = await _laneCoordinator.CheckInAtEntryGateAsync(
-                        vehicle?.LicensePlate ?? "UNKNOWN",
+                        booking.LicensePlate ?? fleetPlate ?? vehicle?.LicensePlate ?? "UNKNOWN",
                         managerProfile.BranchId.Value,
                         bookingId: booking.BookingId,
-                        fleetWashLogId: null,
+                        fleetWashLogId: fleetWashLog?.FleetWashLogId,
                         forcedLaneId: assignment.LaneId);
                     if (checkInResult.LaneId.HasValue && !checkInResult.IsWaiting)
                     {

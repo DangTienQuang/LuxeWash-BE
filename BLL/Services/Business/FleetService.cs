@@ -8,7 +8,6 @@ using BLL.Services.Interface;
 using DAL.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
@@ -22,12 +21,10 @@ namespace BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly ICloudinaryService _cloudinaryService;
-        private readonly IConfiguration _configuration;
-        public FleetService(AutoWashDbContext context, ICloudinaryService cloudinaryService, IConfiguration configuration)
+        public FleetService(AutoWashDbContext context, ICloudinaryService cloudinaryService)
         {
             _context = context;
             _cloudinaryService = cloudinaryService;
-            _configuration = configuration;
         }
         public async Task<FleetImportResultDTO> ImportFleetAsync(int userId, IFormFile file)
         {
@@ -36,14 +33,72 @@ namespace BLL.Services
                     x.ApprovalStatus == "Approved");
             if (business == null)
             {
-                throw new BadRequestException("Business account has not been approved.");
+                throw new BadRequestException("Tài khoản doanh nghiệp chưa được phê duyệt.");
             }
             if (file == null || file.Length == 0)
             {
-                throw new BadRequestException("Please upload an Excel file.");
+                throw new BadRequestException("Vui lòng chọn file Excel có dữ liệu để nhập.");
             }
-            var fileUrl =
-                await _cloudinaryService.UploadFileAsync(file, "fleet-imports");
+
+            var extension = Path.GetExtension(file.FileName);
+            if (!string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new BadRequestException("Định dạng file không hợp lệ. Vui lòng sử dụng file Excel .xlsx tải từ hệ thống.");
+            }
+
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+            stream.Position = 0;
+
+            ExcelPackage package;
+            try
+            {
+                package = new ExcelPackage(stream);
+            }
+            catch
+            {
+                throw new BadRequestException("Không thể đọc file Excel. File có thể bị hỏng hoặc không đúng định dạng .xlsx.");
+            }
+
+            using var packageScope = package;
+            var worksheet = package.Workbook.Worksheets[0];
+            if (worksheet?.Dimension == null)
+            {
+                throw new BadRequestException("File Excel không có dữ liệu. Vui lòng thêm ít nhất một xe từ dòng 2.");
+            }
+
+            var expectedHeaders = new[]
+            {
+                "STT",
+                "Biển số xe (*)",
+                "Loại xe (*)",
+                "Hãng xe",
+                "Mẫu xe",
+                "Tên tài xế",
+                "Mã nhân viên"
+            };
+            for (var column = 1; column <= expectedHeaders.Length; column++)
+            {
+                var actualHeader = worksheet.Cells[1, column].Text.Trim();
+                if (!string.Equals(actualHeader, expectedHeaders[column - 1], StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new BadRequestException(
+                        $"Cấu trúc file không đúng: cột {column} phải là '{expectedHeaders[column - 1]}'. Vui lòng tải lại file mẫu mới nhất.");
+                }
+            }
+
+            int rowCount = worksheet.Dimension.Rows;
+            var dataRows = Enumerable.Range(2, Math.Max(0, rowCount - 1))
+                .Where(row => Enumerable.Range(2, 6)
+                    .Any(column => !string.IsNullOrWhiteSpace(worksheet.Cells[row, column].Text)))
+                .ToList();
+            if (!dataRows.Any())
+            {
+                throw new BadRequestException(
+                    "File Excel chưa có dòng xe nào. Hãy nhập dữ liệu từ dòng 2, lưu file, đóng Excel rồi chọn lại file để nhập.");
+            }
+
+            var fileUrl = await _cloudinaryService.UploadFileAsync(file, "fleet-imports");
             var batch = new FleetImportBatch
             {
                 BusinessProfileId = business.BusinessProfileId,
@@ -53,58 +108,62 @@ namespace BLL.Services
             };
             _context.FleetImportBatches.Add(batch);
             await _context.SaveChangesAsync();
-            using var stream = new MemoryStream();
-            await file.CopyToAsync(stream);
-            stream.Position = 0;
-            using var package = new ExcelPackage(stream);
-            var worksheet = package.Workbook.Worksheets[0];
-            if (worksheet?.Dimension == null)
-            {
-                throw new BadRequestException("The Excel file contains no data.");
-            }
-            int rowCount = worksheet.Dimension.Rows;
+
             var importedPlates = new HashSet<string>();
-            for (int row = 2; row <= rowCount; row++)
+            var importErrors = new List<FleetImportErrorDTO>();
+            var importedVehicles = new List<FleetImportVehicleResultDTO>();
+            foreach (var row in dataRows)
             {
-                string licensePlate = worksheet.Cells[row, 2].Text.Trim();
+                string licensePlate = worksheet.Cells[row, 2].Text
+                    .Trim()
+                    .Replace("-", "")
+                    .Replace(".", "")
+                    .Replace(" ", "")
+                    .ToUpperInvariant();
                 string vehicleTypeName = worksheet.Cells[row, 3].Text.Trim();
                 string brand = worksheet.Cells[row, 4].Text.Trim();
                 string model = worksheet.Cells[row, 5].Text.Trim();
                 string driverName = worksheet.Cells[row, 6].Text.Trim();
                 string employeeCode = worksheet.Cells[row, 7].Text.Trim();
-                bool isEmptyRow =
-                    string.IsNullOrWhiteSpace(licensePlate) &&
-                    string.IsNullOrWhiteSpace(vehicleTypeName) &&
-                    string.IsNullOrWhiteSpace(brand) &&
-                    string.IsNullOrWhiteSpace(model) &&
-                    string.IsNullOrWhiteSpace(driverName) &&
-                    string.IsNullOrWhiteSpace(employeeCode);
-                if (isEmptyRow)
-                {
-                    continue;
-                }
+
                 var errors = new List<string>();
                 if (string.IsNullOrWhiteSpace(licensePlate))
                 {
-                    errors.Add("License plate cannot be empty.");
+                    errors.Add("Biển số xe không được để trống.");
                 }
-                if (importedPlates.Contains(licensePlate))
+                else if (!importedPlates.Add(licensePlate))
                 {
-                    errors.Add("Duplicate license plate found in file.");
+                    errors.Add($"Biển số '{licensePlate}' bị trùng trong file.");
                 }
-                bool existed = await _context.FleetVehicles.AnyAsync(x => x.LicensePlate == licensePlate);
-                if (existed)
+
+                if (!string.IsNullOrWhiteSpace(licensePlate))
                 {
-                    errors.Add("License plate already exists in the system.");
+                    bool existed = await _context.FleetVehicles.AnyAsync(x =>
+                        x.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == licensePlate);
+                    if (existed)
+                    {
+                        errors.Add($"Biển số '{licensePlate}' đã tồn tại trong hệ thống.");
+                    }
                 }
-                importedPlates.Add(licensePlate);
-                var vehicleType = await _context.VehicleTypes
-                    .FirstOrDefaultAsync(x => x.Name.ToLower().Contains(vehicleTypeName.ToLower()) || 
-                                              x.Name == vehicleTypeName);
-                if (vehicleType == null)
+
+                VehicleType? vehicleType = null;
+                if (string.IsNullOrWhiteSpace(vehicleTypeName))
                 {
-                    errors.Add($"Vehicle Type '{vehicleTypeName}' not found in the system.");
+                    errors.Add("Loại xe không được để trống.");
                 }
+                else
+                {
+                    var normalizedTypeName = vehicleTypeName.ToLower();
+                    vehicleType = await _context.VehicleTypes
+                        .FirstOrDefaultAsync(x =>
+                            x.Name.ToLower() == normalizedTypeName ||
+                            x.Name.ToLower().Contains(normalizedTypeName));
+                    if (vehicleType == null)
+                    {
+                        errors.Add($"Loại xe '{vehicleTypeName}' không tồn tại trong hệ thống. Vui lòng nhập đúng tên loại xe.");
+                    }
+                }
+
                 if (errors.Any())
                 {
                     foreach (var error in errors)
@@ -115,15 +174,24 @@ namespace BLL.Services
                             RowNumber = row,
                             ErrorMessage = error
                         });
+                        importErrors.Add(new FleetImportErrorDTO
+                        {
+                            RowNumber = row,
+                            ErrorMessage = error
+                        });
                     }
                     batch.FailedRows++;
                     continue;
                 }
+                var normalizedBrand = brand.Trim().ToLower();
+                var normalizedModel = model.Trim().ToLower();
                 bool carModelExists = await _context.CarModels.AnyAsync(x =>
-                    x.Brand == brand &&
-                    x.Name == model &&
+                    x.Brand.ToLower() == normalizedBrand &&
+                    x.Name.ToLower() == normalizedModel &&
                     x.VehicleTypeId == vehicleType!.Id &&
-                    x.IsActive == true);
+                    x.IsActive == true &&
+                    x.Status == "Approved");
+                var vehicleStatus = carModelExists ? "Active" : "PendingApproval";
                 var fleetVehicle = new FleetVehicle
                 {
                     BusinessProfileId = business.BusinessProfileId,
@@ -134,13 +202,22 @@ namespace BLL.Services
                     Model = model,
                     DriverName = driverName,
                     EmployeeCode = employeeCode,
-                    Status = carModelExists ? "Active" : "PendingApproval",
+                    Status = vehicleStatus,
                     CreatedAt = DateTime.UtcNow
                 };
                 _context.FleetVehicles.Add(fleetVehicle);
+                importedVehicles.Add(new FleetImportVehicleResultDTO
+                {
+                    RowNumber = row,
+                    LicensePlate = licensePlate,
+                    Status = vehicleStatus,
+                    Message = vehicleStatus == "Active"
+                        ? "Đã được duyệt tự động và có thể sử dụng."
+                        : "Hãng hoặc mẫu xe chưa được duyệt trong hệ thống. Xe đang chờ Admin duyệt."
+                });
                 batch.SuccessRows++;
             }
-            batch.TotalRows = batch.SuccessRows + batch.FailedRows;
+            batch.TotalRows = dataRows.Count;
             if (batch.SuccessRows == 0)
             {
                 batch.Status = "Failed";
@@ -160,7 +237,11 @@ namespace BLL.Services
                 TotalRows = batch.TotalRows,
                 SuccessRows = batch.SuccessRows,
                 FailedRows = batch.FailedRows,
-                Status = batch.Status
+                ApprovedRows = importedVehicles.Count(x => x.Status == "Active"),
+                PendingApprovalRows = importedVehicles.Count(x => x.Status == "PendingApproval"),
+                Status = batch.Status,
+                Errors = importErrors,
+                Vehicles = importedVehicles
             };
         }
         public async Task<List<FleetImportBatch>> GetImportBatchesAsync()
@@ -403,30 +484,14 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-        public async Task<FleetTemplateDTO> GetFleetTemplateInfoAsync(string fallbackBaseUrl)
+        public Task<FleetTemplateDTO> GetFleetTemplateInfoAsync(string fallbackBaseUrl)
         {
-            var url = _configuration["FleetTemplate:DownloadUrl"];
-            string finalUrl = $"{fallbackBaseUrl}/api/v1/fleet/template/download";
-            if (!string.IsNullOrWhiteSpace(url))
-            {
-                try
-                {
-                    using var httpClient = new HttpClient();
-                    var response = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, url));
-                    if (response.IsSuccessStatusCode)
-                    {
-                        finalUrl = url;
-                    }
-                }
-                catch
-                {
-                }
-            }
-            return new FleetTemplateDTO
+            var baseUrl = fallbackBaseUrl.TrimEnd('/');
+            return Task.FromResult(new FleetTemplateDTO
             {
                 FileName = "FleetTemplate.xlsx",
-                DownloadUrl = finalUrl
-            };
+                DownloadUrl = $"{baseUrl}/api/v1/fleet/template/download?v=3"
+            });
         }
         public async Task<byte[]> GenerateFleetTemplateAsync()
         {
@@ -439,6 +504,15 @@ namespace BLL.Services
             worksheet.Cells[1, 5].Value = "Mẫu xe";
             worksheet.Cells[1, 6].Value = "Tên tài xế";
             worksheet.Cells[1, 7].Value = "Mã nhân viên";
+
+            var sampleVehicles = new object[,]
+            {
+                { 1, "51A12345", "Sedan", "Toyota", "Vios", "Nguyễn Văn An", "NV001" },
+                { 2, "51B67890", "Sedan", "Honda", "City", "Trần Minh Bình", "NV002" },
+                { 3, "51C24680", "Sedan", "Hyundai", "Accent", "Lê Hoàng Nam", "NV003" }
+            };
+            worksheet.Cells[2, 1, 4, 7].Value = sampleVehicles;
+
             using (var range = worksheet.Cells[1, 1, 1, 7])
             {
                 range.Style.Font.Bold = true;
@@ -446,6 +520,26 @@ namespace BLL.Services
                 range.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
                 range.Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
             }
+
+            using (var sampleRange = worksheet.Cells[2, 1, 4, 7])
+            {
+                sampleRange.Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                sampleRange.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightYellow);
+                sampleRange.Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Hair;
+                sampleRange.Style.Border.Bottom.Color.SetColor(System.Drawing.Color.LightGray);
+                sampleRange.Style.Border.Right.Style = OfficeOpenXml.Style.ExcelBorderStyle.Hair;
+                sampleRange.Style.Border.Right.Color.SetColor(System.Drawing.Color.LightGray);
+            }
+
+            worksheet.Column(2).Style.Numberformat.Format = "@";
+            worksheet.Column(7).Style.Numberformat.Format = "@";
+            worksheet.Cells[2, 1, 4, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+            worksheet.Cells[2, 3, 4, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+            worksheet.Cells[2, 1].AddComment(
+                "Đây là dữ liệu mẫu. Hãy thay bằng thông tin xe thật trước khi nhập.",
+                "LuxeWash Pro");
+            worksheet.View.FreezePanes(2, 1);
+            worksheet.Cells[1, 1, 4, 7].AutoFilter = true;
             worksheet.Cells.AutoFitColumns();
             return await package.GetAsByteArrayAsync();
         }

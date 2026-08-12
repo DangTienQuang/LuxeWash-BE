@@ -14,6 +14,7 @@ using PayOS.Models.Webhooks;
 using Microsoft.Extensions.Logging;
 using AutoWashPro.BLL.Exceptions;
 using BLL.Helpers;
+using BLL.DTOs.Business;
 namespace AutoWashPro.BLL.Services
 {
     public class WalletService : IWalletService
@@ -37,6 +38,12 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<WalletResponseDTO> GetWalletInfoAsync(int userId)
         {
+            // PayOS cannot call a webhook hosted on localhost. When the user
+            // returns from checkout, reconcile their pending top-ups directly
+            // with PayOS before returning the balance. Confirming a transaction
+            // is idempotent, so this is also safe when the webhook arrives later.
+            await ReconcilePendingTopUpsAsync(userId);
+
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
             if (wallet == null)
             {
@@ -51,6 +58,78 @@ namespace AutoWashPro.BLL.Services
                 TotalPoints = profile?.TotalPoint ?? 0,
                 PromotionPoints = profile?.PromotionPoint ?? 0
             };
+        }
+
+        private async Task ReconcilePendingTopUpsAsync(int userId)
+        {
+            var pendingTopUps = await _context.Transactions
+                .AsNoTracking()
+                .Where(t =>
+                    t.Wallet != null &&
+                    t.Wallet.UserId == userId &&
+                    t.TransactionType == "Topup" &&
+                    t.Status == "Pending" &&
+                    t.PaymentMethod == "PayOS" &&
+                    t.OrderCode != null)
+                .OrderByDescending(t => t.CreatedAt)
+                .Take(10)
+                .Select(t => new
+                {
+                    t.TransactionId,
+                    t.OrderCode
+                })
+                .ToListAsync();
+
+            foreach (var pending in pendingTopUps)
+            {
+                if (!long.TryParse(pending.OrderCode, out var numericOrderCode))
+                    continue;
+
+                try
+                {
+                    dynamic paymentLink = await _payOSClient.PaymentRequests.GetAsync(numericOrderCode);
+                    var status = string.Empty;
+                    decimal amount = 0;
+
+                    try { status = paymentLink.Status?.ToString() ?? string.Empty; } catch { }
+                    try { amount = Convert.ToDecimal(paymentLink.Amount); } catch { }
+
+                    var isPaid =
+                        string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(status, "COMPLETED", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(status, "SUCCESS", StringComparison.OrdinalIgnoreCase);
+                    var isTerminal =
+                        string.Equals(status, "CANCELLED", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(status, "FAILED", StringComparison.OrdinalIgnoreCase);
+
+                    if (isPaid)
+                    {
+                        await ConfirmTransactionPaymentAsync(
+                            pending.TransactionId,
+                            amount > 0 ? amount : null,
+                            pending.OrderCode!);
+                    }
+                    else if (isTerminal)
+                    {
+                        await MarkTransactionTerminalAsync(
+                            pending.TransactionId,
+                            string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase)
+                                ? "Expired"
+                                : "Failed");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // A temporary PayOS error must not prevent the wallet page
+                    // from loading. A later refresh will retry reconciliation.
+                    _logger.LogWarning(
+                        ex,
+                        "Could not reconcile pending wallet top-up {OrderCode} for user {UserId}.",
+                        pending.OrderCode,
+                        userId);
+                }
+            }
         }
         public async Task<TopUpResponseDTO> CreateTopUpLinkAsync(int userId, TopUpRequestDTO request)
         {
@@ -225,8 +304,219 @@ namespace AutoWashPro.BLL.Services
                     Status = t.Status,
                     OrderCode = t.OrderCode,
                     ReferenceBookingId = t.ReferenceBookingId,
+                    ReferenceInvoiceId = t.ReferenceInvoiceId,
                     CreatedAt = t.CreatedAt
                 }).ToListAsync();
+        }
+
+        public async Task<InvoicePaymentResponseDTO> CreateInvoicePaymentAsync(
+            int businessUserId,
+            int invoiceId,
+            InvoicePaymentRequestDTO request)
+        {
+            var invoice = await _context.Invoices
+                .Include(x => x.BusinessProfile)
+                .FirstOrDefaultAsync(x =>
+                    x.InvoiceId == invoiceId &&
+                    x.BusinessProfile != null &&
+                    x.BusinessProfile.UserId == businessUserId);
+            if (invoice == null)
+                throw new NotFoundException("Invoice not found.");
+            if (string.Equals(invoice.Status, "Paid", StringComparison.OrdinalIgnoreCase))
+            {
+                return new InvoicePaymentResponseDTO
+                {
+                    InvoiceId = invoice.InvoiceId,
+                    Status = "Paid",
+                    Amount = invoice.TotalAmount
+                };
+            }
+            if (invoice.TotalAmount <= 0)
+                throw new BadRequestException("Invoice total must be greater than zero.");
+
+            var paymentMethod = request.PaymentMethod?.Trim() ?? "PayOS";
+            var wallet = await _context.Wallets.FirstOrDefaultAsync(x => x.UserId == businessUserId);
+            if (wallet == null)
+            {
+                wallet = new Wallet { UserId = businessUserId, Balance = 0, Status = "Active" };
+                _context.Wallets.Add(wallet);
+                await _context.SaveChangesAsync();
+            }
+
+            if (string.Equals(paymentMethod, "Wallet", StringComparison.OrdinalIgnoreCase))
+            {
+                await using var dbTransaction = await _context.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
+                try
+                {
+                    var currentInvoice = await _context.Invoices
+                        .FirstAsync(x => x.InvoiceId == invoice.InvoiceId);
+                    var currentWallet = await _context.Wallets
+                        .FirstAsync(x => x.WalletId == wallet.WalletId);
+                    if (string.Equals(currentInvoice.Status, "Paid", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await dbTransaction.CommitAsync();
+                        return new InvoicePaymentResponseDTO
+                        {
+                            InvoiceId = currentInvoice.InvoiceId,
+                            Status = "Paid",
+                            PaymentMethod = "Wallet",
+                            Amount = currentInvoice.TotalAmount
+                        };
+                    }
+                    if (currentWallet.Balance < currentInvoice.TotalAmount)
+                        throw new BadRequestException(
+                            "Số dư ví không đủ để thanh toán hóa đơn.",
+                            "INSUFFICIENT_WALLET_BALANCE");
+
+                    currentWallet.Balance -= currentInvoice.TotalAmount;
+                    currentInvoice.Status = "Paid";
+                    _context.Transactions.Add(new Transaction
+                    {
+                        WalletId = currentWallet.WalletId,
+                        ReferenceInvoiceId = currentInvoice.InvoiceId,
+                        Amount = currentInvoice.TotalAmount,
+                        TransactionType = "InvoicePayment",
+                        Description = $"Invoice payment {currentInvoice.InvoiceCode}",
+                        PaymentMethod = "Wallet",
+                        Status = "Completed",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                    await dbTransaction.CommitAsync();
+                    return new InvoicePaymentResponseDTO
+                    {
+                        InvoiceId = currentInvoice.InvoiceId,
+                        Status = "Paid",
+                        PaymentMethod = "Wallet",
+                        Amount = currentInvoice.TotalAmount
+                    };
+                }
+                catch
+                {
+                    await dbTransaction.RollbackAsync();
+                    throw;
+                }
+            }
+
+            if (!string.Equals(paymentMethod, "PayOS", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(paymentMethod, "QR", StringComparison.OrdinalIgnoreCase))
+                throw new BadRequestException("Payment method must be Wallet or PayOS.");
+            if (string.IsNullOrWhiteSpace(request.ReturnUrl) || string.IsNullOrWhiteSpace(request.CancelUrl))
+                throw new BadRequestException("ReturnUrl and CancelUrl are required for PayOS payment.");
+
+            var otherPendingPayments = await _context.Transactions
+                .Where(x =>
+                    x.ReferenceInvoiceId == invoice.InvoiceId &&
+                    x.TransactionType == "InvoicePayment" &&
+                    x.Status == "Pending")
+                .ToListAsync();
+            foreach (var pending in otherPendingPayments)
+                pending.Status = "Expired";
+
+            var amount = ToPayOsAmount(invoice.TotalAmount);
+            var orderCode = GenerateOrderCode();
+            var transaction = new Transaction
+            {
+                WalletId = wallet.WalletId,
+                ReferenceInvoiceId = invoice.InvoiceId,
+                Amount = amount,
+                TransactionType = "InvoicePayment",
+                Description = $"Invoice payment {invoice.InvoiceCode}",
+                PaymentMethod = "PayOS",
+                OrderCode = orderCode.ToString(),
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Transactions.Add(transaction);
+            await _context.SaveChangesAsync();
+
+            var paymentRequest = new CreatePaymentLinkRequest
+            {
+                OrderCode = orderCode,
+                Amount = amount,
+                Description = $"Invoice #{invoice.InvoiceId}",
+                CancelUrl = request.CancelUrl,
+                ReturnUrl = request.ReturnUrl
+            };
+            var paymentResult = await _payOSClient.PaymentRequests.CreateAsync(paymentRequest);
+            return new InvoicePaymentResponseDTO
+            {
+                InvoiceId = invoice.InvoiceId,
+                Status = "Pending",
+                PaymentMethod = "PayOS",
+                PaymentUrl = paymentResult.CheckoutUrl,
+                OrderCode = orderCode.ToString(),
+                Amount = amount
+            };
+        }
+
+        public async Task<InvoicePaymentResponseDTO> GetInvoicePaymentStatusAsync(
+            int businessUserId,
+            int invoiceId)
+        {
+            var invoice = await _context.Invoices
+                .Include(x => x.BusinessProfile)
+                .FirstOrDefaultAsync(x =>
+                    x.InvoiceId == invoiceId &&
+                    x.BusinessProfile != null &&
+                    x.BusinessProfile.UserId == businessUserId);
+            if (invoice == null)
+                throw new NotFoundException("Invoice not found.");
+
+            var transaction = await _context.Transactions
+                .Where(x => x.ReferenceInvoiceId == invoice.InvoiceId && x.TransactionType == "InvoicePayment")
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (!string.Equals(invoice.Status, "Paid", StringComparison.OrdinalIgnoreCase) &&
+                transaction != null &&
+                transaction.Status == "Pending" &&
+                transaction.PaymentMethod == "PayOS" &&
+                long.TryParse(transaction.OrderCode, out var orderCode))
+            {
+                try
+                {
+                    dynamic paymentLink = await _payOSClient.PaymentRequests.GetAsync(orderCode);
+                    var status = string.Empty;
+                    decimal paidAmount = 0;
+                    try { status = paymentLink.Status?.ToString() ?? string.Empty; } catch { }
+                    try { paidAmount = Convert.ToDecimal(paymentLink.Amount); } catch { }
+                    if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(status, "COMPLETED", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(status, "SUCCESS", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await ConfirmTransactionPaymentAsync(
+                            transaction.TransactionId,
+                            paidAmount > 0 ? paidAmount : null,
+                            transaction.OrderCode!);
+                        invoice.Status = "Paid";
+                        transaction.Status = "Completed";
+                    }
+                    else if (string.Equals(status, "CANCELLED", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(status, "FAILED", StringComparison.OrdinalIgnoreCase))
+                    {
+                        transaction.Status = string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase)
+                            ? "Expired"
+                            : "Failed";
+                        await MarkTransactionTerminalAsync(transaction.TransactionId, transaction.Status);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not reconcile invoice payment for invoice {InvoiceId}.", invoiceId);
+                }
+            }
+
+            return new InvoicePaymentResponseDTO
+            {
+                InvoiceId = invoice.InvoiceId,
+                Status = invoice.Status,
+                PaymentMethod = transaction?.PaymentMethod ?? string.Empty,
+                OrderCode = transaction?.OrderCode,
+                Amount = invoice.TotalAmount
+            };
         }
         private async Task SendBookingPaymentConfirmationEmailAsync(int bookingId)
         {
@@ -383,6 +673,18 @@ namespace AutoWashPro.BLL.Services
                             }
                         }
                     }
+                }
+                else if (transaction.TransactionType == "InvoicePayment")
+                {
+                    if (!transaction.ReferenceInvoiceId.HasValue)
+                        throw new BadRequestException("Invoice payment transaction is missing invoice ID.");
+                    var invoice = await _context.Invoices
+                        .FirstOrDefaultAsync(x => x.InvoiceId == transaction.ReferenceInvoiceId.Value);
+                    if (invoice == null)
+                        throw new NotFoundException("Invoice not found for payment transaction.");
+                    transaction.Status = "Completed";
+                    transaction.Description = $"Invoice payment successful (Code: {orderCode})";
+                    invoice.Status = "Paid";
                 }
                 else
                 {

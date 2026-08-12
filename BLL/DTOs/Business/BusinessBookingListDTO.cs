@@ -22,7 +22,9 @@ namespace BLL.DTOs.Business
         public string VehicleType { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string WashType { get; set; } = string.Empty;
+        public int BranchId { get; set; }
         public string? LaneName { get; set; }
+        public int? LaneId { get; set; }
         public string? BranchName { get; set; }
         public DateTime? ScheduledTime { get; set; }
         public DateTime? CheckInTime { get; set; }

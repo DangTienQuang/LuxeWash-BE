@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoWashPro.BLL.DTOs;
+using BLL.DTOs.Business;
 namespace AutoWashPro.BLL.Services
 {
     public interface IWalletService
@@ -17,5 +18,12 @@ namespace AutoWashPro.BLL.Services
         Task<int> AwardCompletionPointsAsync(int userId, int pointsEarned, int bookingId);
         Task ConfirmTransactionPaymentAsync(int transactionId, decimal? webhookAmount, string orderCode);
         Task MarkTransactionTerminalAsync(int transactionId, string terminalStatus);
+        Task<InvoicePaymentResponseDTO> CreateInvoicePaymentAsync(
+            int businessUserId,
+            int invoiceId,
+            InvoicePaymentRequestDTO request);
+        Task<InvoicePaymentResponseDTO> GetInvoicePaymentStatusAsync(
+            int businessUserId,
+            int invoiceId);
     }
 }
