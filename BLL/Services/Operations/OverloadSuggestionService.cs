@@ -15,15 +15,18 @@ namespace AutoWashPro.BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly IPushNotificationService _pushNotificationService;
+        private readonly IUserNotificationService _userNotificationService;
         private readonly ILogger<OverloadSuggestionService> _logger;
 
         public OverloadSuggestionService(
             AutoWashDbContext context,
             IPushNotificationService pushNotificationService,
+            IUserNotificationService userNotificationService,
             ILogger<OverloadSuggestionService> logger)
         {
             _context = context;
             _pushNotificationService = pushNotificationService;
+            _userNotificationService = userNotificationService;
             _logger = logger;
         }
 
@@ -194,6 +197,15 @@ namespace AutoWashPro.BLL.Services
                     await suggTx.CommitAsync();
 
                     result.CreatedSuggestions++;
+
+                    await _userNotificationService.CreateNotificationAsync(
+                        booking.UserId!.Value,
+                        "Branch Overloaded",
+                        $"Branch '{currentBranch.Name}' is currently overloaded. " +
+                        $"Switch to '{bestBranch.Name}' and receive a 10% compensation voucher!",
+                        "Booking",
+                        suggestion.Id.ToString()
+                    );
 
                     // 4. Send FCM after commit so no notification on failed transaction
                     var pushRequest = new PushNotificationRequest
