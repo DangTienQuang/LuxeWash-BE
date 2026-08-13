@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
+#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using AutoWashPro.BLL.Exceptions;
 using BLL.Helpers;
 using BLL.DTOs.Business;
+using Microsoft.Extensions.DependencyInjection;
 namespace AutoWashPro.BLL.Services
 {
     public class WalletService : IWalletService
@@ -26,7 +27,8 @@ namespace AutoWashPro.BLL.Services
         private readonly IEmailService _emailService;
         private readonly global::BLL.Services.Interface.ILaneSchedulerService _laneSchedulerService;
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
-        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator)
+        private readonly IServiceScopeFactory _scopeFactory;
+        public WalletService(AutoWashDbContext context, PayOSClient payOSClient, ILogger<WalletService> logger, ITierService tierService, IEmailService emailService, global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService, AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator, IServiceScopeFactory scopeFactory)
         {
             _context = context;
             _payOSClient = payOSClient;
@@ -35,13 +37,10 @@ namespace AutoWashPro.BLL.Services
             _emailService = emailService;
             _laneSchedulerService = laneSchedulerService;
             _laneCoordinator = laneCoordinator;
+            _scopeFactory = scopeFactory;
         }
         public async Task<WalletResponseDTO> GetWalletInfoAsync(int userId)
         {
-            // PayOS cannot call a webhook hosted on localhost. When the user
-            // returns from checkout, reconcile their pending top-ups directly
-            // with PayOS before returning the balance. Confirming a transaction
-            // is idempotent, so this is also safe when the webhook arrives later.
             await ReconcilePendingTopUpsAsync(userId);
 
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
@@ -522,7 +521,11 @@ namespace AutoWashPro.BLL.Services
         {
             try
             {
-                var booking = await _context.Bookings
+                using var scope = _scopeFactory.CreateScope();
+                var scopedContext = scope.ServiceProvider.GetRequiredService<AutoWashDbContext>();
+                var scopedEmailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+
+                var booking = await scopedContext.Bookings
                     .Include(b => b.BookingDetails)
                         .ThenInclude(bd => bd.Service)
                     .Include(b => b.User)
@@ -538,7 +541,7 @@ namespace AutoWashPro.BLL.Services
                     booking,
                     booking.BookingDetails.ToList(),
                     customerName);
-                await _emailService.SendEmailAsync(
+                await scopedEmailService.SendEmailAsync(
                     booking.User.Email,
                     $"[SmartWash] Booking successful - #{booking.BookingId}",
                     emailHtml);

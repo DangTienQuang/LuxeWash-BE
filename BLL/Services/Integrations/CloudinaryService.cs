@@ -1,7 +1,8 @@
-﻿using CloudinaryDotNet;
+using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Http;
 using BLL.Services.Interface;
+using AutoWashPro.BLL.Exceptions;
 
 namespace BLL.Services
 {
@@ -18,7 +19,12 @@ namespace BLL.Services
         {
             if (file == null || file.Length == 0)
             {
-                throw new Exception("File is empty.");
+                throw new BadRequestException("File is empty.");
+            }
+
+            if (file.Length > 10485760) // 10MB
+            {
+                throw new BadRequestException($"File size too large. Got {file.Length}. Maximum is 10485760.");
             }
 
             using var stream = file.OpenReadStream();
@@ -32,7 +38,7 @@ namespace BLL.Services
             var result = await _cloudinary.UploadAsync(uploadParams);
 
             if (result.Error != null)
-                throw new Exception(result.Error.Message);
+                throw new BadRequestException(result.Error.Message);
 
             return result.SecureUrl.ToString();
         }
