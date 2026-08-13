@@ -247,17 +247,7 @@ namespace AutoWashPro.BLL.Services
                     _logger.LogError(ex,
                         "Error creating overload suggestion for Booking {BookingId}. Rolling back.",
                         booking.BookingId);
-                    try { await suggTx.RollbackAsync(); } catch { }
-
-                    var addedEntries = _context.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList();
-                    foreach (var entry in addedEntries) entry.State = EntityState.Detached;
-
-                    var modifiedEntries = _context.ChangeTracker.Entries().Where(e => e.State == EntityState.Modified).ToList();
-                    foreach (var entry in modifiedEntries)
-                    {
-                        entry.CurrentValues.SetValues(entry.OriginalValues);
-                        entry.State = EntityState.Unchanged;
-                    }
+                    try { await suggTx.RollbackAsync(); } catch { /* already rolled back */ }
                 }
             }
 
