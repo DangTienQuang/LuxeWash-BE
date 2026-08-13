@@ -17,17 +17,19 @@ namespace API.Controllers.User
         private readonly IBusinessBookingService _businessBookingService;
         private readonly IBusinessService _businessService;
         private readonly IInvoicePdfService _invoicePdfService;
-        private readonly IEmailService _emailService;
+        private readonly IInvoiceDispatchService _invoiceDispatchService;
+        private readonly ILogger<InvoiceController> _logger;
         private readonly IWalletService _walletService;
 
         public InvoiceController(IBusinessBookingService businessBookingService, IBusinessService businessService,
-            IInvoicePdfService invoicePdfService, IEmailService emailService, IWalletService walletService)
+            IInvoicePdfService invoicePdfService, IWalletService walletService, IInvoiceDispatchService invoiceDispatchService, ILogger<InvoiceController> logger)
         {
             _businessBookingService = businessBookingService;
             _businessService = businessService;
             _invoicePdfService = invoicePdfService;
-            _emailService = emailService;
             _walletService = walletService;
+            _invoiceDispatchService = invoiceDispatchService;
+            _logger = logger;
         }
 
         [Authorize(Roles = "Business, Manager")]
@@ -75,10 +77,11 @@ namespace API.Controllers.User
             InvoiceDispatchResponseDTO dispatch;
             try
             {
-                dispatch = await SendInvoiceEmailAsync(invoiceId);
+                dispatch = await _invoiceDispatchService.SendInvoiceEmailAsync(invoiceId);
             }
             catch (Exception ex)
             {
+                _logger.LogWarning(ex, "Failed to dispatch email for invoice {InvoiceId}. This can be retried later.", invoiceId);
                 var invoice = await _businessService.GetInvoiceExportAsync(invoiceId);
                 dispatch = new InvoiceDispatchResponseDTO
                 {
@@ -113,7 +116,7 @@ namespace API.Controllers.User
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ResendInvoice(int invoiceId)
         {
-            var dispatch = await SendInvoiceEmailAsync(invoiceId);
+            var dispatch = await _invoiceDispatchService.SendInvoiceEmailAsync(invoiceId);
             return Ok(new
             {
                 statusCode = 200,
@@ -142,42 +145,5 @@ namespace API.Controllers.User
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
-        private async Task<InvoiceDispatchResponseDTO> SendInvoiceEmailAsync(int invoiceId)
-        {
-            var invoice = await _businessService.GetInvoiceExportAsync(invoiceId);
-            if (string.IsNullOrWhiteSpace(invoice.BillingEmail))
-                throw new InvalidOperationException("The business does not have a billing email.");
-
-            var pdfBytes = await _invoicePdfService.GenerateInvoiceAsync(invoiceId);
-            var fileName = InvoiceFileNameHelper.BuildInvoiceFileName(invoice);
-            var company = WebUtility.HtmlEncode(invoice.BusinessName);
-            var invoiceCode = WebUtility.HtmlEncode(invoice.InvoiceCode);
-            var html = $@"
-                <div style='font-family:Arial,sans-serif;line-height:1.6;color:#263238'>
-                  <h2 style='color:#007493'>LuxeWash Pro - Business invoice</h2>
-                  <p>Dear {company},</p>
-                  <p>Your invoice <strong>{invoiceCode}</strong> has been issued.</p>
-                  <p>Total amount: <strong>{invoice.TotalAmount:N0} VND</strong></p>
-                  <p>The PDF invoice is attached. Sign in to the Business Portal, open <strong>Invoices</strong>, then choose Wallet or PayOS/QR to pay.</p>
-                  <p>Thank you for using LuxeWash Pro.</p>
-                </div>";
-
-            await _emailService.SendEmailWithAttachmentAsync(
-                invoice.BillingEmail,
-                $"[LuxeWash Pro] Invoice {invoice.InvoiceCode}",
-                html,
-                pdfBytes,
-                fileName,
-                "application/pdf");
-
-            return new InvoiceDispatchResponseDTO
-            {
-                InvoiceId = invoice.InvoiceId,
-                InvoiceCode = invoice.InvoiceCode,
-                Recipient = invoice.BillingEmail,
-                TotalAmount = invoice.TotalAmount,
-                EmailSent = true
-            };
-        }
     }
 }

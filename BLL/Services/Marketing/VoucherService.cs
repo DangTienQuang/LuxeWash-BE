@@ -178,6 +178,7 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Voucher code already exists.");
 
             await ValidateTierAsync(request.RequiredTierId);
+            await ValidateVehicleTypeAsync(request.VehicleTypeId);
 
             var voucher = new Voucher
             {
@@ -220,6 +221,7 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Voucher code already exists.");
 
             await ValidateTierAsync(request.RequiredTierId);
+            await ValidateVehicleTypeAsync(request.VehicleTypeId);
 
             voucher.Code = code;
             voucher.DiscountAmount = request.DiscountAmount;
@@ -337,6 +339,13 @@ namespace AutoWashPro.BLL.Services
             if (!tierId.HasValue) return;
             var tierExists = await _context.Tiers.AnyAsync(t => t.TierId == tierId.Value);
             if (!tierExists) throw new BadRequestException("Required tier does not exist.");
+        }
+
+        private async Task ValidateVehicleTypeAsync(int? vehicleTypeId)
+        {
+            if (!vehicleTypeId.HasValue) return;
+            var vehicleTypeExists = await _context.VehicleTypes.AnyAsync(t => t.Id == vehicleTypeId.Value);
+            if (!vehicleTypeExists) throw new BadRequestException("Vehicle type does not exist.");
         }
 
         private async Task LoadTierAsync(Voucher voucher)

@@ -109,9 +109,31 @@ namespace BLL.Services
             _context.FleetImportBatches.Add(batch);
             await _context.SaveChangesAsync();
 
+            var requestedLicensePlates = dataRows
+                .Select(r => worksheet.Cells[r, 2].Text.Trim().Replace("-", "").Replace(".", "").Replace(" ", "").ToUpperInvariant())
+                .Where(lp => !string.IsNullOrWhiteSpace(lp))
+                .Distinct()
+                .ToList();
+
+            var existingLicensePlatesInDb = await _context.FleetVehicles
+                .Where(v => requestedLicensePlates.Contains(v.LicensePlate))
+                .Select(v => v.LicensePlate)
+                .ToListAsync();
+            var existingLicensePlatesSet = new HashSet<string>(existingLicensePlatesInDb, StringComparer.OrdinalIgnoreCase);
+
+            var allVehicleTypes = await _context.VehicleTypes.ToListAsync();
+
+            var requestedBrands = dataRows.Select(r => worksheet.Cells[r, 4].Text.Trim()).Where(b => !string.IsNullOrWhiteSpace(b)).Distinct().ToList();
+            var requestedModels = dataRows.Select(r => worksheet.Cells[r, 5].Text.Trim()).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct().ToList();
+
+            var activeCarModels = await _context.CarModels
+                .Where(c => c.IsActive == true && c.Status == "Approved" && requestedBrands.Contains(c.Brand) && requestedModels.Contains(c.Name))
+                .ToListAsync();
+
             var importedPlates = new HashSet<string>();
             var importErrors = new List<FleetImportErrorDTO>();
             var importedVehicles = new List<FleetImportVehicleResultDTO>();
+            
             foreach (var row in dataRows)
             {
                 string licensePlate = worksheet.Cells[row, 2].Text
@@ -138,9 +160,7 @@ namespace BLL.Services
 
                 if (!string.IsNullOrWhiteSpace(licensePlate))
                 {
-                    bool existed = await _context.FleetVehicles.AnyAsync(x =>
-                        x.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == licensePlate);
-                    if (existed)
+                    if (existingLicensePlatesSet.Contains(licensePlate))
                     {
                         errors.Add($"Biển số '{licensePlate}' đã tồn tại trong hệ thống.");
                     }
@@ -153,11 +173,10 @@ namespace BLL.Services
                 }
                 else
                 {
-                    var normalizedTypeName = vehicleTypeName.ToLower();
-                    vehicleType = await _context.VehicleTypes
-                        .FirstOrDefaultAsync(x =>
-                            x.Name.ToLower() == normalizedTypeName ||
-                            x.Name.ToLower().Contains(normalizedTypeName));
+                    vehicleType = allVehicleTypes.FirstOrDefault(x => 
+                        string.Equals(x.Name, vehicleTypeName, StringComparison.OrdinalIgnoreCase) || 
+                        x.Name.Contains(vehicleTypeName, StringComparison.OrdinalIgnoreCase));
+                        
                     if (vehicleType == null)
                     {
                         errors.Add($"Loại xe '{vehicleTypeName}' không tồn tại trong hệ thống. Vui lòng nhập đúng tên loại xe.");
@@ -183,15 +202,14 @@ namespace BLL.Services
                     batch.FailedRows++;
                     continue;
                 }
-                var normalizedBrand = brand.Trim().ToLower();
-                var normalizedModel = model.Trim().ToLower();
-                bool carModelExists = await _context.CarModels.AnyAsync(x =>
-                    x.Brand.ToLower() == normalizedBrand &&
-                    x.Name.ToLower() == normalizedModel &&
-                    x.VehicleTypeId == vehicleType!.Id &&
-                    x.IsActive == true &&
-                    x.Status == "Approved");
+                
+                bool carModelExists = activeCarModels.Any(x =>
+                    string.Equals(x.Brand, brand, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(x.Name, model, StringComparison.OrdinalIgnoreCase) &&
+                    x.VehicleTypeId == vehicleType!.Id);
+
                 var vehicleStatus = carModelExists ? "Active" : "PendingApproval";
+                
                 var fleetVehicle = new FleetVehicle
                 {
                     BusinessProfileId = business.BusinessProfileId,
@@ -206,6 +224,7 @@ namespace BLL.Services
                     CreatedAt = DateTime.UtcNow
                 };
                 _context.FleetVehicles.Add(fleetVehicle);
+                
                 importedVehicles.Add(new FleetImportVehicleResultDTO
                 {
                     RowNumber = row,
@@ -215,6 +234,7 @@ namespace BLL.Services
                         ? "Đã được duyệt tự động và có thể sử dụng."
                         : "Hãng hoặc mẫu xe chưa được duyệt trong hệ thống. Xe đang chờ Admin duyệt."
                 });
+                
                 batch.SuccessRows++;
             }
             batch.TotalRows = dataRows.Count;

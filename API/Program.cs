@@ -229,6 +229,7 @@ builder.Services.AddScoped<IBusinessBookingService, BusinessBookingService>();
 builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.IOperationsMonitoringService, AutoWashPro.BLL.Services.Operations.OperationsMonitoringService>();
 builder.Services.AddHostedService<AutoWashPro.BLL.BackgroundServices.OperationsReconciliationBackgroundService>();
 builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
+builder.Services.AddScoped<IInvoiceDispatchService, InvoiceDispatchService>();
 builder.Services.AddScoped<ILaneSchedulerService, LaneSchedulerService>();
 builder.Services.AddSingleton<AutoWashPro.BLL.Services.Operations.ILaneDisplayPublisherService, AutoWashPro.BLL.Services.Operations.LaneDisplayPublisherService>();
 builder.Services.AddScoped<IFleetService, FleetService>();
