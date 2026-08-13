@@ -11,6 +11,7 @@ using BLL.Helpers;
 using Microsoft.EntityFrameworkCore;
 using AutoWashPro.BLL.Services.Interface;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 namespace AutoWashPro.BLL.Services
 {
     public class BookingService : IBookingService
@@ -28,6 +29,7 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
         private readonly global::BLL.Services.Interface.IPhotoService _photoService;
         private readonly IUserNotificationService _userNotificationService;
+        private readonly ILogger<BookingService> _logger;
 
         public BookingService(
             AutoWashDbContext context,
@@ -42,7 +44,8 @@ namespace AutoWashPro.BLL.Services
             global::BLL.Services.Interface.ILaneSchedulerService laneSchedulerService,
             AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator,
             global::BLL.Services.Interface.IPhotoService photoService,
-            IUserNotificationService userNotificationService)
+            IUserNotificationService userNotificationService,
+            ILogger<BookingService> logger)
         {
             _context = context;
             _walletService = walletService;
@@ -57,6 +60,7 @@ namespace AutoWashPro.BLL.Services
             _laneCoordinator = laneCoordinator;
             _photoService = photoService;
             _userNotificationService = userNotificationService;
+            _logger = logger;
         }
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
         {
@@ -2933,6 +2937,8 @@ namespace AutoWashPro.BLL.Services
         private async Task<HandleOverloadDecisionResponseDTO> HandleOverloadDecisionInnerAsync(int userId, int bookingId, HandleOverloadDecisionDTO request)
         {
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            string? switchNotificationTitle = null;
+            string? switchNotificationBody = null;
             try
             {
                 var booking = await _context.Bookings
@@ -3043,6 +3049,7 @@ namespace AutoWashPro.BLL.Services
                 }
                 else if (decision == "Switch")
                 {
+                    var originalBranchName = booking.Branch?.Name ?? $"Chi nhánh #{booking.BranchId}";
                     var oldSlot = await _context.DailySlotCapacities
                         .Include(c => c.TimeSlot)
                         .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.TimeSlot.StartTime <= booking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > booking.ScheduledTime.TimeOfDay);
@@ -3100,12 +3107,39 @@ namespace AutoWashPro.BLL.Services
                         ExpiryDate = voucher.ExpiryDate,
                         IsActive = voucher.IsActive
                     };
+                    switchNotificationTitle = "Đổi chi nhánh thành công";
+                    switchNotificationBody =
+                        $"Lịch hẹn #{booking.BookingId} đã được đổi từ '{originalBranchName}' " +
+                        $"sang '{destBranch.Name}' vào lúc {booking.ScheduledTime:dd/MM/yyyy HH:mm}. " +
+                        $"Voucher đền bù {voucher.Code} đã được thêm vào tài khoản.";
                 }
                 else
                 {
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Decision must be Switch, Cancel, or Keep.");
                 }
                 await transaction.CommitAsync();
+                if (switchNotificationTitle != null && switchNotificationBody != null)
+                {
+                    try
+                    {
+                        await _userNotificationService.CreateNotificationAsync(
+                            userId,
+                            switchNotificationTitle,
+                            switchNotificationBody,
+                            "Booking",
+                            booking.BookingId.ToString());
+                    }
+                    catch (Exception ex)
+                    {
+                        // The booking switch is already committed. A notification failure must
+                        // not turn a successful customer decision into a failed API response.
+                        _logger.LogError(
+                            ex,
+                            "Failed to send branch-switch confirmation for Booking {BookingId} and User {UserId}.",
+                            booking.BookingId,
+                            userId);
+                    }
+                }
                 response.UpdatedBooking = new BookingResponseDTO
                 {
                     BookingId = booking.BookingId,
