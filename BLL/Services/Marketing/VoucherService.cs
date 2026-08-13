@@ -52,6 +52,56 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
         }
 
+        public async Task<List<RedeemableVoucherResponseDTO>> GetRedeemableVouchersAsync(int userId)
+        {
+            var userProfile = await _context.CustomerProfiles
+                .Include(cp => cp.Tier)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(cp => cp.UserId == userId);
+            if (userProfile == null) throw new NotFoundException("User profile not found.");
+
+            var now = DateTime.UtcNow;
+            var ownedVoucherIds = _context.UserVouchers
+                .Where(uv => uv.UserId == userId)
+                .Select(uv => uv.VoucherId);
+            var userTierMinimumPoints = userProfile.Tier?.MinAccumulatedPoints ?? 0;
+
+            return await _context.Vouchers
+                .Include(v => v.RequiredTier)
+                .AsNoTracking()
+                .Where(v =>
+                    v.CampaignType == VoucherCampaignType.Manual &&
+                    v.ApprovalStatus == "Approved" &&
+                    v.IsActive &&
+                    (!v.StartDate.HasValue || v.StartDate.Value <= now) &&
+                    v.ExpiryDate >= now &&
+                    (v.MaxUsages <= 0 || v.CurrentUsageCount < v.MaxUsages) &&
+                    !ownedVoucherIds.Contains(v.VoucherId) &&
+                    (!v.RequiredTierId.HasValue ||
+                     (v.RequiredTier != null && userTierMinimumPoints >= v.RequiredTier.MinAccumulatedPoints)))
+                .OrderBy(v => v.PointsRequired)
+                .ThenByDescending(v => v.DiscountAmount)
+                .Select(v => new RedeemableVoucherResponseDTO
+                {
+                    VoucherId = v.VoucherId,
+                    Code = v.Code,
+                    DiscountAmount = v.DiscountAmount,
+                    PointsRequired = v.PointsRequired,
+                    ExpiryDate = v.ExpiryDate,
+                    MinOrderAmount = v.MinOrderAmount,
+                    MaxUsagePerUser = v.MaxUsagePerUser,
+                    CampaignType = (AutoWashPro.BLL.Enums.VoucherCampaignTypeEnum)v.CampaignType,
+                    VoucherType = (AutoWashPro.BLL.Enums.VoucherTypeEnum)v.VoucherType,
+                    ImageUrl = v.ImageUrl,
+                    RequiredTierId = v.RequiredTierId,
+                    RequiredTierName = v.RequiredTier != null ? v.RequiredTier.TierName : null,
+                    ValidStartTime = v.ValidStartTime,
+                    ValidEndTime = v.ValidEndTime,
+                    VehicleTypeId = v.VehicleTypeId
+                })
+                .ToListAsync();
+        }
+
         public async Task RedeemVoucherAsync(int userId, int voucherId)
         {
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
@@ -60,6 +110,8 @@ namespace AutoWashPro.BLL.Services
                 var voucher = await _context.Vouchers.Include(v => v.RequiredTier).FirstOrDefaultAsync(v => v.VoucherId == voucherId);
                 if (voucher == null) throw new NotFoundException("Voucher does not exist.");
                 ValidateVoucherAvailability(voucher);
+                if (voucher.CampaignType != VoucherCampaignType.Manual || voucher.ApprovalStatus != "Approved")
+                    throw new BadRequestException("This voucher cannot be redeemed manually.");
 
                 if (voucher.RequiredTierId.HasValue)
                 {
@@ -67,15 +119,16 @@ namespace AutoWashPro.BLL.Services
                     if (userProfile == null) throw new NotFoundException("User profile not found.");
 
                     var requiredTier = await _context.Tiers.FindAsync(voucher.RequiredTierId.Value);
-                    if (requiredTier != null && userProfile.Tier != null
-                        && userProfile.Tier.MinAccumulatedPoints < requiredTier.MinAccumulatedPoints)
+                    if (requiredTier != null &&
+                        (userProfile.Tier == null ||
+                         userProfile.Tier.MinAccumulatedPoints < requiredTier.MinAccumulatedPoints))
                     {
                         throw new BadRequestException($"You need to reach tier {voucher.RequiredTier?.TierName} to redeem this voucher.");
                     }
                 }
 
                 var existingUserVoucher = await _context.UserVouchers
-                    .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VoucherId == voucherId && uv.TriggerKey == null);
+                    .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VoucherId == voucherId);
                 if (existingUserVoucher != null) throw new BadRequestException("You already own this voucher.");
 
                 if (voucher.PointsRequired > 0)

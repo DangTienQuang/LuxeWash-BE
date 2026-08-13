@@ -30,6 +30,15 @@ namespace AutoWashPro.API.Controllers
         }
 
         [Authorize]
+        [HttpGet("available")]
+        public async Task<IActionResult> GetRedeemableVouchers()
+        {
+            var userId = ClaimHelper.GetUserId(User);
+            var result = await _voucherService.GetRedeemableVouchersAsync(userId);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
+        [Authorize]
         [HttpPost("redeem")]
         public async Task<IActionResult> RedeemVoucher([FromBody] RedeemVoucherRequestDTO request)
         {

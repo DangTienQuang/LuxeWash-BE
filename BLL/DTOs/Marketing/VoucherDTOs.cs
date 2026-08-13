@@ -32,6 +32,24 @@ namespace AutoWashPro.BLL.DTOs
         [Required(ErrorMessage = "Voucher ID is required.")]
         public int VoucherId { get; set; }
     }
+    public class RedeemableVoucherResponseDTO
+    {
+        public int VoucherId { get; set; }
+        public required string Code { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public int PointsRequired { get; set; }
+        public DateTime ExpiryDate { get; set; }
+        public decimal MinOrderAmount { get; set; }
+        public int MaxUsagePerUser { get; set; }
+        public AutoWashPro.BLL.Enums.VoucherCampaignTypeEnum CampaignType { get; set; }
+        public AutoWashPro.BLL.Enums.VoucherTypeEnum VoucherType { get; set; }
+        public string? ImageUrl { get; set; }
+        public int? RequiredTierId { get; set; }
+        public string? RequiredTierName { get; set; }
+        public TimeSpan? ValidStartTime { get; set; }
+        public TimeSpan? ValidEndTime { get; set; }
+        public int? VehicleTypeId { get; set; }
+    }
     public class ConsumeVoucherRequestDTO
     {
         [Required(ErrorMessage = "User ID is required.")]
