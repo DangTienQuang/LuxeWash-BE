@@ -53,7 +53,21 @@ namespace AutoWashPro.BLL.Services
                 }
             }
 
-            bool allSuccess = true;
+            FirebaseMessaging messaging;
+            try
+            {
+                messaging = FirebaseMessaging.DefaultInstance;
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Firebase is not initialized. Push notification for User {UserId} was not sent.",
+                    request.UserId);
+                return false;
+            }
+
+            var successCount = 0;
+            var failureCount = 0;
             var tokensToRemove = new List<UserFcmToken>();
 
             foreach (var userToken in user.FcmTokens)
@@ -65,6 +79,15 @@ namespace AutoWashPro.BLL.Services
                     {
                         Title = request.Title,
                         Body = request.Body
+                    },
+                    Android = new AndroidConfig
+                    {
+                        Priority = Priority.High,
+                        Notification = new AndroidNotification
+                        {
+                            ChannelId = "overload-alerts",
+                            Sound = "default"
+                        }
                     },
                     Data = fcmData,
                     Webpush = new WebpushConfig
@@ -78,27 +101,31 @@ namespace AutoWashPro.BLL.Services
 
                 try
                 {
-                    string response = await FirebaseMessaging.DefaultInstance.SendAsync(message);
-                    _logger.LogInformation("Successfully sent message via FCM to token {Token}: {Response}", userToken.Token, response);
+                    string response = await messaging.SendAsync(message);
+                    successCount++;
+                    _logger.LogInformation(
+                        "Successfully sent FCM message to token record {TokenId}: {Response}",
+                        userToken.Id, response);
                 }
                 catch (FirebaseMessagingException ex)
                 {
-                    _logger.LogError(ex, "Error sending FCM push notification to User {UserId} with token {Token}", request.UserId, userToken.Token);
+                    failureCount++;
+                    _logger.LogError(ex,
+                        "Error sending FCM push notification to User {UserId}, token record {TokenId}",
+                        request.UserId, userToken.Id);
                     
                     if (ex.MessagingErrorCode == MessagingErrorCode.Unregistered || 
                         ex.MessagingErrorCode == MessagingErrorCode.InvalidArgument)
                     {
                         tokensToRemove.Add(userToken);
                     }
-                    else
-                    {
-                        allSuccess = false;
-                    }
                 }
                 catch (System.Exception ex)
                 {
-                    _logger.LogError(ex, "Unexpected error sending FCM to User {UserId} with token {Token}", request.UserId, userToken.Token);
-                    allSuccess = false;
+                    failureCount++;
+                    _logger.LogError(ex,
+                        "Unexpected error sending FCM to User {UserId}, token record {TokenId}",
+                        request.UserId, userToken.Id);
                 }
             }
 
@@ -109,7 +136,16 @@ namespace AutoWashPro.BLL.Services
                 _logger.LogInformation("Removed {Count} invalid FCM tokens for User {UserId}", tokensToRemove.Count, request.UserId);
             }
 
-            return allSuccess;
+            if (failureCount > 0)
+            {
+                _logger.LogWarning(
+                    "FCM send completed for User {UserId}: {SuccessCount} accepted, {FailureCount} failed.",
+                    request.UserId, successCount, failureCount);
+            }
+
+            // A customer may have several devices. Treat the notification as sent
+            // when FCM accepted it for at least one currently registered device.
+            return successCount > 0;
         }
 
         public async Task RegisterTokenAsync(int userId, string token)

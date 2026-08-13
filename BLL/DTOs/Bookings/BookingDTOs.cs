@@ -145,6 +145,8 @@ namespace AutoWashPro.BLL.DTOs
         public string? BarrierId { get; set; }
         public DateTime? BarrierCommandExpiresAt { get; set; }
         public string? ExitBarrierCommandId { get; set; }
+        public string? BarrierCommandStatus { get; set; }
+        public bool IsDuplicate { get; set; }
         public bool HasPendingRelocation { get; set; } = false;
         public RelocationProposalCustomerDTO? Relocation { get; set; }
         public bool IsWaitAccepted { get; set; }

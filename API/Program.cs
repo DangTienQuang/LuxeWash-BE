@@ -162,27 +162,65 @@ QuestPDF.Settings.License = LicenseType.Community;
 try
 {
     var credentialEnv = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+    var configuredCredentialPath = builder.Configuration["FirebaseAdmin:CredentialPath"];
     var credentialJson = builder.Configuration["FirebaseAdmin:CredentialJson"];
 
-    if (!string.IsNullOrEmpty(credentialEnv))
+    if (!string.IsNullOrWhiteSpace(credentialEnv))
     {
+        var resolvedCredentialPath = Path.IsPathRooted(credentialEnv)
+            ? credentialEnv
+            : Path.Combine(builder.Environment.ContentRootPath, credentialEnv);
+
+        if (!File.Exists(resolvedCredentialPath))
+        {
+            throw new FileNotFoundException(
+                "Firebase credential file was not found.", resolvedCredentialPath);
+        }
+
         FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
         {
-            Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(credentialEnv)
+            Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(resolvedCredentialPath)
         });
         Console.WriteLine("[INFO] Firebase initialized using GOOGLE_APPLICATION_CREDENTIALS.");
     }
-    else if (!string.IsNullOrEmpty(credentialJson))
+    else if (!string.IsNullOrWhiteSpace(configuredCredentialPath))
+    {
+        var resolvedCredentialPath = Path.IsPathRooted(configuredCredentialPath)
+            ? configuredCredentialPath
+            : Path.Combine(builder.Environment.ContentRootPath, configuredCredentialPath);
+
+        if (File.Exists(resolvedCredentialPath))
+        {
+            FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
+            {
+                Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(resolvedCredentialPath)
+            });
+            Console.WriteLine("[INFO] Firebase initialized using FirebaseAdmin:CredentialPath.");
+        }
+        else if (!string.IsNullOrWhiteSpace(credentialJson))
+        {
+            FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
+            {
+                Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(credentialJson)
+            });
+            Console.WriteLine("[INFO] Firebase initialized using FirebaseAdmin:CredentialJson.");
+        }
+        else
+        {
+            Console.WriteLine("[WARNING] Configured Firebase credential file was not found. Push notifications will fail.");
+        }
+    }
+    else if (!string.IsNullOrWhiteSpace(credentialJson))
     {
         FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions()
         {
             Credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(credentialJson)
         });
-        Console.WriteLine("[INFO] Firebase initialized using User Secrets / Configuration.");
+        Console.WriteLine("[INFO] Firebase initialized using FirebaseAdmin:CredentialJson.");
     }
     else
     {
-        Console.WriteLine("[WARNING] Firebase credentials not found in env or secrets. Push notifications will fail.");
+        Console.WriteLine("[WARNING] Firebase credentials not found in env or configuration. Push notifications will fail.");
     }
 }
 catch (Exception ex)

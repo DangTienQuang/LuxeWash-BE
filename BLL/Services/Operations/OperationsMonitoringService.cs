@@ -94,6 +94,7 @@ namespace AutoWashPro.BLL.Services.Operations
         {
             var alerts = new List<ReconciliationAlertDTO>();
             var now = DateTime.UtcNow;
+            var terminalOccupancyGraceCutoff = now.AddMinutes(-2);
 
             var expiredCommands = await _context.BarrierCommands
                 .Where(x => x.BranchId == branchId
@@ -126,12 +127,23 @@ namespace AutoWashPro.BLL.Services.Operations
                 var bookingLookup = occupancyBookingIds.Count > 0
                     ? (await _context.Bookings
                         .Where(b => occupancyBookingIds.Contains(b.BookingId))
-                        .Select(b => new { b.BookingId, b.Status, b.ProcessingLaneId })
+                        .Select(b => new
+                        {
+                            b.BookingId,
+                            b.Status,
+                            b.ProcessingLaneId,
+                            b.CompletedTime,
+                            b.UpdatedAt
+                        })
                         .ToListAsync(cancellationToken))
                         .ToDictionary(
                             b => b.BookingId,
-                            b => (Status: b.Status ?? "", ProcessingLaneId: b.ProcessingLaneId))
-                    : new Dictionary<int, (string Status, int? ProcessingLaneId)>();
+                            b => (
+                                Status: b.Status ?? "",
+                                ProcessingLaneId: b.ProcessingLaneId,
+                                CompletedTime: b.CompletedTime,
+                                UpdatedAt: b.UpdatedAt))
+                    : new Dictionary<int, (string Status, int? ProcessingLaneId, DateTime? CompletedTime, DateTime? UpdatedAt)>();
 
                 // Batch load tất cả fleet logs liên quan
                 var occupancyFleetIds = occupanciesToCheck
@@ -164,8 +176,17 @@ namespace AutoWashPro.BLL.Services.Operations
                         }
                         else if (bk.Status == "Completed" || bk.Status == "Cancelled" || bk.Status == "NoShow")
                         {
-                            shouldDelete = true;
-                            reason = $"Booking {occupancy.BookingId} is in terminal status '{bk.Status}'";
+                            // Completion services share this DbContext with material and
+                            // point services that may persist Status before the lane
+                            // coordinator creates the exit barrier command. Give that
+                            // in-flight checkout a short window to finish atomically from
+                            // the reconciliation worker's point of view.
+                            var terminalAt = bk.CompletedTime ?? bk.UpdatedAt;
+                            if (!terminalAt.HasValue || terminalAt.Value <= terminalOccupancyGraceCutoff)
+                            {
+                                shouldDelete = true;
+                                reason = $"Booking {occupancy.BookingId} is in terminal status '{bk.Status}'";
+                            }
                         }
                         else if (bk.Status != "CheckedIn" && bk.Status != "Processing" && bk.Status != "Assigned")
                         {

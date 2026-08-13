@@ -318,6 +318,13 @@ namespace AutoWashPro.BLL.Services
                 }
             }
             var isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
+            if (isCompletingNow && !await _context.LaneOccupancies.AnyAsync(o => o.BookingId == booking.BookingId))
+            {
+                throw new BadRequestException(
+                    "The vehicle does not have an active lane occupancy; check-out was not completed.",
+                    "LANE_OCCUPANCY_NOT_FOUND");
+            }
+
             booking.Status = newStatus;
             if (isCompletingNow)
             {
