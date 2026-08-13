@@ -15,15 +15,18 @@ namespace AutoWashPro.BLL.Services
     {
         private readonly AutoWashDbContext _context;
         private readonly IPushNotificationService _pushNotificationService;
+        private readonly IUserNotificationService _userNotificationService;
         private readonly ILogger<OverloadSuggestionService> _logger;
 
         public OverloadSuggestionService(
             AutoWashDbContext context,
             IPushNotificationService pushNotificationService,
+            IUserNotificationService userNotificationService,
             ILogger<OverloadSuggestionService> logger)
         {
             _context = context;
             _pushNotificationService = pushNotificationService;
+            _userNotificationService = userNotificationService;
             _logger = logger;
         }
 
@@ -195,13 +198,38 @@ namespace AutoWashPro.BLL.Services
 
                     result.CreatedSuggestions++;
 
-                    // 4. Send FCM after commit so no notification on failed transaction
+                    // 4. Persist the notification after commit so it appears in notification history.
+                    // Do not send push here; the overload-specific FCM below includes the IDs
+                    // required by the mobile app to open the decision modal.
+                    var notificationTitle = "Chi nhánh đang quá tải";
+                    var notificationBody = $"Chi nhánh '{currentBranch.Name}' hiện đang quá tải. " +
+                                           $"Bạn có thể đổi sang '{bestBranch.Name}' và nhận voucher đền bù 10%.";
+
+                    try
+                    {
+                        await _userNotificationService.CreateInAppNotificationAsync(
+                            booking.UserId!.Value,
+                            notificationTitle,
+                            notificationBody,
+                            "OVERLOAD_SUGGESTION",
+                            booking.BookingId.ToString());
+                    }
+                    catch (Exception ex)
+                    {
+                        // A notification-history failure must not undo the committed suggestion
+                        // or prevent the time-sensitive push notification from being sent.
+                        _logger.LogError(ex,
+                            "Failed to persist overload notification for Booking {BookingId} " +
+                            "(SuggestionId={SuggestionId}). Continuing with FCM.",
+                            booking.BookingId, suggestion.Id);
+                    }
+
+                    // 5. Send FCM after commit so no notification on failed transaction
                     var pushRequest = new PushNotificationRequest
                     {
                         UserId = booking.UserId!.Value,
-                        Title = "Branch Overloaded",
-                        Body = $"Branch '{currentBranch.Name}' is currently overloaded. " +
-                               $"Switch to '{bestBranch.Name}' and receive a 10% compensation voucher!",
+                        Title = notificationTitle,
+                        Body = notificationBody,
                         Data = new OverloadNotificationData
                         {
                             SuggestionId = suggestion.Id,

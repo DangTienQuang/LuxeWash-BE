@@ -81,6 +81,22 @@ namespace AutoWashPro.BLL.Services
 
         public async Task CreateNotificationAsync(int userId, string title, string body, string type, string? referenceId = null)
         {
+            await CreateNotificationInternalAsync(userId, title, body, type, referenceId, sendPush: true);
+        }
+
+        public async Task CreateInAppNotificationAsync(int userId, string title, string body, string type, string? referenceId = null)
+        {
+            await CreateNotificationInternalAsync(userId, title, body, type, referenceId, sendPush: false);
+        }
+
+        private async Task CreateNotificationInternalAsync(
+            int userId,
+            string title,
+            string body,
+            string type,
+            string? referenceId,
+            bool sendPush)
+        {
             var notification = new UserNotification
             {
                 UserId = userId,
@@ -113,6 +129,11 @@ namespace AutoWashPro.BLL.Services
             catch (Exception)
             {
                 // Log exception if signalR fails
+            }
+
+            if (!sendPush)
+            {
+                return;
             }
 
             try
