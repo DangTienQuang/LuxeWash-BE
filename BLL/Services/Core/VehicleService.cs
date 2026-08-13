@@ -389,14 +389,14 @@ namespace AutoWashPro.BLL.Services
         {
             var customerVehicle = await _context.Vehicles
                 .Include(v => v.VehicleType)
-                .Where(v => v.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate && !v.IsDeleted)
+                .Where(v => v.LicensePlate == normalizedPlate && !v.IsDeleted)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
             if (customerVehicle != null)
                 return customerVehicle.VehicleType?.Name;
             var fleetVehicle = await _context.FleetVehicles
                 .Include(fv => fv.VehicleType)
-                .Where(fv => fv.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate && fv.Status == "Active")
+                .Where(fv => fv.LicensePlate == normalizedPlate && fv.Status == "Active")
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
             return fleetVehicle?.VehicleType?.Name;

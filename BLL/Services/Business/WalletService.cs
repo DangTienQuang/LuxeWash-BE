@@ -1,4 +1,4 @@
-#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
+﻿#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -91,8 +91,8 @@ namespace AutoWashPro.BLL.Services
                     var status = string.Empty;
                     decimal amount = 0;
 
-                    try { status = paymentLink.Status?.ToString() ?? string.Empty; } catch { }
-                    try { amount = Convert.ToDecimal(paymentLink.Amount); } catch { }
+                    status = paymentLink.Status?.ToString() ?? string.Empty;
+                    decimal.TryParse(paymentLink.Amount?.ToString(), out amount);
 
                     var isPaid =
                         string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase) ||
@@ -366,7 +366,7 @@ namespace AutoWashPro.BLL.Services
                     }
                     if (currentWallet.Balance < currentInvoice.TotalAmount)
                         throw new BadRequestException(
-                            "Số dư ví không đủ để thanh toán hóa đơn.",
+                            "Sá»‘ dÆ° vÃ­ khÃ´ng Ä‘á»§ Ä‘á»ƒ thanh toÃ¡n hÃ³a Ä‘Æ¡n.",
                             "INSUFFICIENT_WALLET_BALANCE");
 
                     currentWallet.Balance -= currentInvoice.TotalAmount;
@@ -480,8 +480,8 @@ namespace AutoWashPro.BLL.Services
                     dynamic paymentLink = await _payOSClient.PaymentRequests.GetAsync(orderCode);
                     var status = string.Empty;
                     decimal paidAmount = 0;
-                    try { status = paymentLink.Status?.ToString() ?? string.Empty; } catch { }
-                    try { paidAmount = Convert.ToDecimal(paymentLink.Amount); } catch { }
+                    status = paymentLink.Status?.ToString() ?? string.Empty;
+                    decimal.TryParse(paymentLink.Amount?.ToString(), out paidAmount);
                     if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(status, "COMPLETED", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(status, "SUCCESS", StringComparison.OrdinalIgnoreCase))

@@ -1,4 +1,4 @@
-#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
+﻿#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -170,10 +170,10 @@ namespace AutoWashPro.BLL.Services
             };
             if (!isOverloaded)
             {
-                response.StatusMessage = "Chi nhánh đang có sẵn lịch trống và công suất phục vụ tốt.";
+                response.StatusMessage = "Chi nhÃ¡nh Ä‘ang cÃ³ sáºµn lá»‹ch trá»‘ng vÃ  cÃ´ng suáº¥t phá»¥c vá»¥ tá»‘t.";
                 return response;
             }
-            response.StatusMessage = $"Chi nhánh {currentBranch.Name} hiện đang rất đông ({currentOccupancyRate * 100:F0}% kín lịch). Thời gian chờ có thể kéo dài.";
+            response.StatusMessage = $"Chi nhÃ¡nh {currentBranch.Name} hiá»‡n Ä‘ang ráº¥t Ä‘Ã´ng ({currentOccupancyRate * 100:F0}% kÃ­n lá»‹ch). Thá»i gian chá» cÃ³ thá»ƒ kÃ©o dÃ i.";
             if (!currentBranch.Latitude.HasValue || !currentBranch.Longitude.HasValue)
             {
                 return response;
@@ -279,7 +279,7 @@ namespace AutoWashPro.BLL.Services
                     VoucherId = voucher.VoucherId,
                     VoucherCode = voucher.Code,
                     DiscountPercentage = 15,
-                    Description = $"🎁 Tặng ngay Mã giảm giá 15% khi bạn đặt lịch sang {bestAlt.Branch.Name} hôm nay!",
+                    Description = $"ðŸŽ Táº·ng ngay MÃ£ giáº£m giÃ¡ 15% khi báº¡n Ä‘áº·t lá»‹ch sang {bestAlt.Branch.Name} hÃ´m nay!",
                     ExpiresInHours = 24
                 };
             }
@@ -457,7 +457,7 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
             var todayInVN = DateTime.UtcNow.ToVnTime().Date;
             var activeBookings = await _context.Bookings
-                .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
+                .Where(b => b.LicensePlate == normalizedPlate
                          && b.BranchId == branchId
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
                 .Select(b => new AdminBookingResponseDTO
@@ -521,7 +521,7 @@ namespace AutoWashPro.BLL.Services
                 };
             }
             var preBookedCandidates = await _context.Bookings
-                .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
+                .Where(b => b.LicensePlate == normalizedPlate
                          && b.BranchId == branchId
                          && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .OrderBy(b => b.ScheduledTime)
@@ -588,7 +588,7 @@ namespace AutoWashPro.BLL.Services
             var fleetVehicle = await _context.FleetVehicles
                 .Include(fv => fv.BusinessProfile)
                 .Include(fv => fv.VehicleType)
-                .Where(fv => (fv.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
+                .Where(fv => fv.LicensePlate == normalizedPlate
                           && (fv.Status == "Approved" || fv.Status == "Active")
                           && fv.BusinessProfile != null
                           && fv.BusinessProfile.ApprovalStatus == "Approved"
@@ -622,7 +622,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(v => v.User)
                 .ThenInclude(u => u.CustomerProfile)
                     .ThenInclude(cp => cp.Tier)
-                .Where(v => v.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate && !v.IsDeleted && v.UserId != null)
+                .Where(v => v.LicensePlate == normalizedPlate && !v.IsDeleted && v.UserId != null)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
             if (registeredVehicle != null && registeredVehicle.User != null)
@@ -839,7 +839,7 @@ namespace AutoWashPro.BLL.Services
                     .ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
                 .Where(b => b.LicensePlate != null
-                    && b.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate)
+                    && b.LicensePlate == normalizedPlate)
                 .ToListAsync();
             if (matches.Count == 0)
             {
@@ -945,7 +945,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
-                .Where(b => (b.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
+                .Where(b => b.LicensePlate == normalizedPlate
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
                 .OrderByDescending(b => b.BookingId)
                 .FirstOrDefaultAsync();
@@ -954,7 +954,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(x => x.Booking)
                     .ThenInclude(b => b!.BookingDetails)
                         .ThenInclude(bd => bd.Service)
-                .Where(x => (x.FleetVehicle.LicensePlate ?? "").Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate
+                .Where(x => x.FleetVehicle.LicensePlate == normalizedPlate
                          && (x.Status == "CheckedIn" || x.Status == "Processing" || x.Status == "Assigned"))
                 .OrderByDescending(x => x.FleetWashLogId)
                 .FirstOrDefaultAsync();
@@ -1420,8 +1420,8 @@ namespace AutoWashPro.BLL.Services
                 
                 await _userNotificationService.CreateNotificationAsync(
                     userId,
-                    "Đặt lịch thành công",
-                    $"Lịch đặt rửa xe cho biển số {request.LicensePlate} vào lúc {targetDateTime:dd/MM/yyyy HH:mm} đã được ghi nhận.",
+                    "Äáº·t lá»‹ch thÃ nh cÃ´ng",
+                    $"Lá»‹ch Ä‘áº·t rá»­a xe cho biá»ƒn sá»‘ {request.LicensePlate} vÃ o lÃºc {targetDateTime:dd/MM/yyyy HH:mm} Ä‘Ã£ Ä‘Æ°á»£c ghi nháº­n.",
                     "Booking",
                     booking.BookingId.ToString()
                 );
@@ -2542,7 +2542,7 @@ namespace AutoWashPro.BLL.Services
                     .ThenInclude(bd => bd.Service)
                 .Where(b => b.BranchId == branchId
                     && b.LicensePlate != null
-                    && b.LicensePlate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper() == normalizedPlate)
+                    && b.LicensePlate == normalizedPlate)
                 .ToListAsync();
             if (matches.Count == 0)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No booking found for vehicle {licensePlate} at this branch.");
