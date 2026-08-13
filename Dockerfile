@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
-RUN usermod -a -G 1000 app
+RUN groupadd -g 1000 rendergroup && usermod -a -G 1000 app
 USER app
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
