@@ -11,5 +11,6 @@ namespace AutoWashPro.BLL.Services.Interface
         Task MarkAsReadAsync(int notificationId, int userId);
         Task MarkAllAsReadAsync(int userId);
         Task CreateNotificationAsync(int userId, string title, string body, string type, string? referenceId = null);
+        Task CreateNotificationsBulkAsync(List<int> userIds, string title, string body, string type, string? referenceId = null);
     }
 }

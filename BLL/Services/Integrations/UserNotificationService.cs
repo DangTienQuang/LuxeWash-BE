@@ -135,5 +135,64 @@ namespace AutoWashPro.BLL.Services
                 // Log exception if push fails, but don't stop the flow
             }
         }
+
+        public async Task CreateNotificationsBulkAsync(List<int> userIds, string title, string body, string type, string? referenceId = null)
+        {
+            if (userIds == null || !userIds.Any()) return;
+
+            var notifications = userIds.Select(userId => new UserNotification
+            {
+                UserId = userId,
+                Title = title,
+                Body = body,
+                Type = type,
+                ReferenceId = referenceId,
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            }).ToList();
+
+            _context.UserNotifications.AddRange(notifications);
+            await _context.SaveChangesAsync();
+
+            // Run networking in background to prevent blocking HTTP response
+            _ = Task.Run(async () =>
+            {
+                var options = new ParallelOptions { MaxDegreeOfParallelism = 10 };
+                await Parallel.ForEachAsync(notifications, options, async (notification, token) =>
+                {
+                    try
+                    {
+                        var notificationDto = new UserNotificationDTO
+                        {
+                            Id = notification.Id,
+                            Title = notification.Title,
+                            Body = notification.Body,
+                            Type = notification.Type,
+                            ReferenceId = notification.ReferenceId,
+                            IsRead = notification.IsRead,
+                            CreatedAt = notification.CreatedAt
+                        };
+                        await _hubContext.Clients.User(notification.UserId.ToString()).SendAsync("ReceiveNotification", notificationDto);
+                    }
+                    catch { }
+
+                    try
+                    {
+                        await _pushNotificationService.SendPushNotificationAsync(new PushNotificationRequest
+                        {
+                            UserId = notification.UserId,
+                            Title = notification.Title,
+                            Body = notification.Body,
+                            Data = new Dictionary<string, string>
+                            {
+                                { "type", notification.Type },
+                                { "referenceId", notification.ReferenceId ?? string.Empty }
+                            }
+                        });
+                    }
+                    catch { }
+                });
+            });
+        }
     }
 }

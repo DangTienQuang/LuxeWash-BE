@@ -185,17 +185,26 @@ namespace AutoWashPro.BLL.Services
             }
 
             await _context.SaveChangesAsync();
-            foreach (var item in emailItems)
+            var userIds = emailItems.Select(x => x.User.UserId).ToList();
+            if (userIds.Any())
             {
-                await SendVoucherEmailAsync(item.User, campaign, item.ExpiryDate);
-                
-                await _userNotificationService.CreateNotificationAsync(
-                    item.User.UserId,
+                await _userNotificationService.CreateNotificationsBulkAsync(
+                    userIds,
                     "Bạn nhận được Voucher mới!",
                     $"Chúc mừng! Bạn vừa được tặng voucher {campaign.Code} từ hệ thống. Hãy kiểm tra ví voucher của bạn ngay.",
                     "Voucher",
                     campaign.VoucherId.ToString()
                 );
+
+                // Run emails in background to prevent HTTP blocking
+                _ = Task.Run(async () =>
+                {
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = 5 };
+                    await Parallel.ForEachAsync(emailItems, options, async (item, token) =>
+                    {
+                        await SendVoucherEmailAsync(item.User, campaign, item.ExpiryDate);
+                    });
+                });
             }
 
             result.SkippedCount = result.ScannedUsers - result.GrantedCount;

@@ -98,8 +98,8 @@ namespace AutoWashPro.BLL.Services
 
                 await _userNotificationService.CreateNotificationAsync(
                     userId,
-                    "Đổi voucher thành công",
-                    $"Bạn đã đổi thành công voucher {voucher.Code} bằng điểm.",
+                    "Äá»•i voucher thÃ nh cÃ´ng",
+                    $"Báº¡n Ä‘Ã£ Ä‘á»•i thÃ nh cÃ´ng voucher {voucher.Code} báº±ng Ä‘iá»ƒm.",
                     "Voucher",
                     voucher.VoucherId.ToString()
                 );
@@ -156,20 +156,20 @@ namespace AutoWashPro.BLL.Services
             _context.UserVouchers.AddRange(userVouchers);
             await _context.SaveChangesAsync();
             
-            foreach (var userId in userIdsToGrant)
-            {
-                await _userNotificationService.CreateNotificationAsync(
-                    userId,
-                    "Bạn nhận được Voucher mới!",
-                    $"Chúc mừng! Bạn vừa được tặng voucher {voucher.Code}. Hãy kiểm tra ví voucher của bạn ngay.",
-                    "Voucher",
-                    voucher.VoucherId.ToString()
-                );
-            }
+            await _userNotificationService.CreateNotificationsBulkAsync(
+                userIdsToGrant,
+                "Bạn nhận được Voucher mới!",
+                $"Chúc mừng! Bạn vừa được tặng voucher {voucher.Code}. Hãy kiểm tra ví voucher của bạn ngay.",
+                "Voucher",
+                voucher.VoucherId.ToString()
+            );
         }
 
         public async Task<AdminVoucherDTO> CreateVoucherAsync(CreateOrUpdateVoucherDTO request)
         {
+            if (request.VehicleTypeId <= 0) request.VehicleTypeId = null;
+            if (request.RequiredTierId <= 0) request.RequiredTierId = null;
+
             if (request.ExpiryDate.ToUniversalTime() <= DateTime.UtcNow)
                 throw new BadRequestException("Expiration date must be in the future.");
 
@@ -210,6 +210,9 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<AdminVoucherDTO> UpdateVoucherAsync(int id, CreateOrUpdateVoucherDTO request)
         {
+            if (request.VehicleTypeId <= 0) request.VehicleTypeId = null;
+            if (request.RequiredTierId <= 0) request.RequiredTierId = null;
+
             if (request.ExpiryDate.ToUniversalTime() <= DateTime.UtcNow)
                 throw new BadRequestException("Expiration date must be in the future.");
 
