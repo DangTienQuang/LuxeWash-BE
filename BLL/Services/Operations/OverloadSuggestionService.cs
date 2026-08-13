@@ -59,13 +59,19 @@ namespace AutoWashPro.BLL.Services
             // Total booked weight in the current window
             var totalBookedWeight = impactedBookings.Sum(b => b.CapacityWeight > 0 ? b.CapacityWeight : 1);
 
-            // Get branch capacity for this window
-            var relevantCapacities = await _context.DailySlotCapacities
+            // Load only candidate dates, then calculate the exact overlap in memory.
+            // The previous OR condition selected almost every slot when the window
+            // started and ended on the same date, inflating maxCapacity.
+            var capacityCandidates = await _context.DailySlotCapacities
                 .Include(dsc => dsc.TimeSlot)
-                .Where(dsc => dsc.BranchId == branchId 
-                           && ((dsc.Date == nowVn.Date && dsc.TimeSlot.EndTime > nowVn.TimeOfDay)
-                               || (dsc.Date == windowEndVn.Date && dsc.TimeSlot.StartTime < windowEndVn.TimeOfDay)))
+                .Where(dsc => dsc.BranchId == branchId
+                           && dsc.Date >= nowVn.Date.AddDays(-1)
+                           && dsc.Date <= windowEndVn.Date)
                 .ToListAsync();
+
+            var relevantCapacities = capacityCandidates
+                .Where(c => SlotOverlapsWindow(c, nowVn, windowEndVn))
+                .ToList();
 
             var maxCapacity = relevantCapacities.Sum(c => c.TimeSlot.MaxCapacity);
 
@@ -210,8 +216,21 @@ namespace AutoWashPro.BLL.Services
 
                     try
                     {
-                        await _pushNotificationService.SendPushNotificationAsync(pushRequest);
-                        result.NotificationsSent++;
+                        var notificationSent = await _pushNotificationService
+                            .SendPushNotificationAsync(pushRequest);
+
+                        if (notificationSent)
+                        {
+                            result.NotificationsSent++;
+                        }
+                        else
+                        {
+                            result.NotificationsFailed++;
+                            _logger.LogWarning(
+                                "Overload suggestion {SuggestionId} was created for Booking {BookingId}, " +
+                                "but FCM did not accept the notification for any registered device.",
+                                suggestion.Id, booking.BookingId);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -228,11 +247,38 @@ namespace AutoWashPro.BLL.Services
                     _logger.LogError(ex,
                         "Error creating overload suggestion for Booking {BookingId}. Rolling back.",
                         booking.BookingId);
-                    try { await suggTx.RollbackAsync(); } catch { /* already rolled back */ }
+                    try { await suggTx.RollbackAsync(); } catch { }
+
+                    var addedEntries = _context.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList();
+                    foreach (var entry in addedEntries) entry.State = EntityState.Detached;
+
+                    var modifiedEntries = _context.ChangeTracker.Entries().Where(e => e.State == EntityState.Modified).ToList();
+                    foreach (var entry in modifiedEntries)
+                    {
+                        entry.CurrentValues.SetValues(entry.OriginalValues);
+                        entry.State = EntityState.Unchanged;
+                    }
                 }
             }
 
             return result;
+        }
+
+        private static bool SlotOverlapsWindow(
+            DailySlotCapacity capacity,
+            DateTime windowStart,
+            DateTime windowEnd)
+        {
+            var slotStart = capacity.Date.Date.Add(capacity.TimeSlot.StartTime);
+            var slotEnd = capacity.Date.Date.Add(capacity.TimeSlot.EndTime);
+
+            // Support a slot that crosses midnight.
+            if (slotEnd <= slotStart)
+            {
+                slotEnd = slotEnd.AddDays(1);
+            }
+
+            return slotStart < windowEnd && slotEnd > windowStart;
         }
 
         private static double CalculateHaversine(double lat1, double lon1, double lat2, double lon2)

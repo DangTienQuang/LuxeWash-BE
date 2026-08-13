@@ -377,7 +377,9 @@ namespace AutoWashPro.BLL.Services.Operations
             CancellationToken cancellationToken)
         {
             var ownsTransaction = _context.Database.CurrentTransaction == null;
-            var tx = ownsTransaction ? await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken) : null;
+            await using var tx = ownsTransaction
+                ? await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
+                : null;
 
             try
             {
@@ -393,6 +395,10 @@ namespace AutoWashPro.BLL.Services.Operations
 
                 if (occupancy == null)
                 {
+                    if (ownsTransaction && tx != null)
+                    {
+                        await tx.CommitAsync(cancellationToken);
+                    }
                     return new CheckOutResult();
                 }
 

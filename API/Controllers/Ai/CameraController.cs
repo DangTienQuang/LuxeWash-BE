@@ -146,24 +146,20 @@ namespace API.Controllers.AI
             if (string.IsNullOrWhiteSpace(plate)) return BadRequest("Plate is required");
             var normalizedPlate = plate.Replace("-", "").Replace(".", "").Replace(" ", "").ToUpper();
 
-            // DB-based Deduplication logic
-            var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
-            var isAlreadyCompleted = await _context.Bookings.AnyAsync(b => 
-                (b.LicensePlate == normalizedPlate || (b.Vehicle != null && b.Vehicle.LicensePlate == normalizedPlate))
-                && b.Status == "Completed" 
-                && b.CompletedTime >= fiveMinutesAgo);
-
-            if (isAlreadyCompleted)
-            {
-                return Ok(new { statusCode = 200, message = "Duplicate check-out skipped (recently completed).", isDuplicate = true });
-            }
-
             try
             {
                 var result = await _bookingService.AutoCheckOutByLicensePlateAsync(
                     normalizedPlate,
                     request.CheckOutImage);
-                return Ok(new { statusCode = 200, message = "Vehicle check-out completed, barrier opening!", data = result });
+                return Ok(new
+                {
+                    statusCode = 200,
+                    message = result.IsDuplicate
+                        ? "Duplicate check-out skipped (recently completed)."
+                        : "Vehicle check-out completed, barrier opening!",
+                    isDuplicate = result.IsDuplicate,
+                    data = result
+                });
             }
             catch (System.Exception ex)
             {

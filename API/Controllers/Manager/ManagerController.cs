@@ -179,7 +179,7 @@ namespace API.Controllers.Manager
         public async Task<IActionResult> ScanAndNotifyRelocation()
         {
             var result = await _managerService.ScanAndNotifyRelocationAsync(GetUserId());
-            return Ok(new { statusCode = 200, message = "Overload scan completed. OverloadSuggestion rows created and FCM notifications sent.", data = result });
+            return Ok(new { statusCode = 200, message = "Overload scan completed.", data = result });
         }
     }
 }

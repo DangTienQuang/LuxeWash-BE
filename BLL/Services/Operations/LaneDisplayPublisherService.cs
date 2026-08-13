@@ -195,22 +195,33 @@ namespace AutoWashPro.BLL.Services.Operations
                 Timestamp = DateTime.UtcNow
             };
 
+            var signalRPublished = false;
+            Exception? signalRError = null;
             try
             {
                 await _hubContext.Clients.Group($"branch:{branchId}:lane-display")
                     .SendAsync("ReceiveBarrierCommand", evt);
+                signalRPublished = true;
             }
             catch (Exception ex)
             {
+                signalRError = ex;
                 _logger.LogError(ex, "Failed to send barrier command via SignalR for BranchId={BranchId}", branchId);
             }
 
-            if (!TryGetFirebaseApp(out var app))
+            if (!TryGetFirebaseApp(out _))
             {
                 _logger.LogWarning(
                     "Firebase is not initialized; barrier command cannot be published via Firebase for BranchId={BranchId}. " +
                     "SignalR was used instead.", branchId);
-                return BarrierPublishResult.Published;
+                if (signalRPublished)
+                {
+                    return BarrierPublishResult.Published;
+                }
+
+                throw new InvalidOperationException(
+                    $"Barrier command could not be published for BranchId={branchId}.",
+                    signalRError);
             }
 
 
@@ -233,35 +244,71 @@ namespace AutoWashPro.BLL.Services.Operations
             }
             catch (FirebaseMessagingException ex)
             {
+                if (signalRPublished)
+                {
+                    _logger.LogWarning(ex,
+                        "Firebase barrier command publish failed for BranchId={BranchId}, Plate={Plate}. SignalR already succeeded.",
+                        branchId, licensePlate);
+                    return BarrierPublishResult.Published;
+                }
+
                 _logger.LogError(ex,
-                    "Firebase barrier command publish FAILED for BranchId={BranchId}, Plate={Plate}. Outbox will retry.",
+                    "Barrier command publish failed on both SignalR and Firebase for BranchId={BranchId}, Plate={Plate}.",
                     branchId, licensePlate);
-                throw; // Re-throw so outbox marks it for retry
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (signalRPublished)
+                {
+                    _logger.LogWarning(ex,
+                        "Unexpected Firebase barrier publish failure for BranchId={BranchId}, Plate={Plate}. SignalR already succeeded.",
+                        branchId, licensePlate);
+                    return BarrierPublishResult.Published;
+                }
+
+                _logger.LogError(ex,
+                    "Barrier command publish failed on both SignalR and Firebase for BranchId={BranchId}, Plate={Plate}.",
+                    branchId, licensePlate);
+                throw;
             }
         }
 
         public async Task<BarrierPublishResult> PublishBarrierCommandRawAsync(int branchId, string jsonPayload)
         {
+            var signalRPublished = false;
+            Exception? signalRError = null;
             try
             {
                 var payloadDoc = JsonDocument.Parse(jsonPayload);
-                if (payloadDoc.RootElement.TryGetProperty("data", out var dataElement))
+                if (!payloadDoc.RootElement.TryGetProperty("data", out var dataElement))
                 {
-                    await _hubContext.Clients.Group($"branch:{branchId}:lane-display")
-                        .SendAsync("ReceiveBarrierCommand", dataElement);
+                    throw new InvalidOperationException("Barrier command payload does not contain data.");
                 }
+
+                await _hubContext.Clients.Group($"branch:{branchId}:lane-display")
+                    .SendAsync("ReceiveBarrierCommand", dataElement);
+                signalRPublished = true;
             }
             catch (Exception ex)
             {
+                signalRError = ex;
                 _logger.LogError(ex, "Failed to send barrier command via SignalR for BranchId={BranchId}", branchId);
             }
 
-            if (!TryGetFirebaseApp(out var app))
+            if (!TryGetFirebaseApp(out _))
             {
                 _logger.LogWarning(
                     "Firebase is not initialized; barrier command cannot be published via Firebase for BranchId={BranchId}. " +
                     "SignalR was used instead.", branchId);
-                return BarrierPublishResult.Published;
+                if (signalRPublished)
+                {
+                    return BarrierPublishResult.Published;
+                }
+
+                throw new InvalidOperationException(
+                    $"Barrier command could not be published for BranchId={branchId}.",
+                    signalRError);
             }
 
             try
@@ -282,10 +329,33 @@ namespace AutoWashPro.BLL.Services.Operations
             }
             catch (FirebaseMessagingException ex)
             {
+                if (signalRPublished)
+                {
+                    _logger.LogWarning(ex,
+                        "Firebase barrier command publish failed for BranchId={BranchId}. SignalR already succeeded.",
+                        branchId);
+                    return BarrierPublishResult.Published;
+                }
+
                 _logger.LogError(ex,
-                    "Firebase barrier command raw publish FAILED for BranchId={BranchId}. Outbox will retry.",
+                    "Barrier command publish failed on both SignalR and Firebase for BranchId={BranchId}.",
                     branchId);
-                throw; // Re-throw so outbox marks it for retry
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (signalRPublished)
+                {
+                    _logger.LogWarning(ex,
+                        "Unexpected Firebase barrier publish failure for BranchId={BranchId}. SignalR already succeeded.",
+                        branchId);
+                    return BarrierPublishResult.Published;
+                }
+
+                _logger.LogError(ex,
+                    "Barrier command publish failed on both SignalR and Firebase for BranchId={BranchId}.",
+                    branchId);
+                throw;
             }
         }
     }

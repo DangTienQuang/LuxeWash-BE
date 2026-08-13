@@ -960,6 +960,12 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync();
             if (activeBooking == null && activeFleetLog == null)
             {
+                var recentCompletion = await GetRecentCameraCheckOutAsync(normalizedPlate);
+                if (recentCompletion != null)
+                {
+                    return recentCompletion;
+                }
+
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No active wash session (CheckedIn/Processing) found for vehicle {licensePlate} to complete check-out.");
             }
             Booking? targetBooking = activeBooking ?? activeFleetLog?.Booking;
@@ -1052,6 +1058,114 @@ namespace AutoWashPro.BLL.Services
             }
             throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No active wash session found for vehicle {licensePlate}.");
         }
+
+        private async Task<BookingResponseDTO?> GetRecentCameraCheckOutAsync(string normalizedPlate)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-5);
+            var recentBooking = await _context.Bookings
+                .AsNoTracking()
+                .Include(b => b.BookingDetails)
+                    .ThenInclude(detail => detail.Service)
+                .Where(b =>
+                    (b.LicensePlate == normalizedPlate ||
+                        (b.Vehicle != null && b.Vehicle.LicensePlate == normalizedPlate)) &&
+                    b.Status == "Completed" &&
+                    b.CompletedTime >= cutoff)
+                .OrderByDescending(b => b.CompletedTime)
+                .ThenByDescending(b => b.BookingId)
+                .FirstOrDefaultAsync();
+
+            if (recentBooking != null)
+            {
+                var command = await _context.BarrierCommands
+                    .AsNoTracking()
+                    .Where(c =>
+                        c.BookingId == recentBooking.BookingId &&
+                        c.BarrierId == "EXIT_GATE" &&
+                        c.Action == "OPEN")
+                    .OrderByDescending(c => c.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                return new BookingResponseDTO
+                {
+                    BookingId = recentBooking.BookingId,
+                    BranchId = recentBooking.BranchId,
+                    LicensePlate = normalizedPlate,
+                    ServiceNames = recentBooking.BookingDetails
+                        .Select(detail => detail.Service.ServiceName)
+                        .ToList(),
+                    ScheduledTime = recentBooking.ScheduledTime,
+                    Status = recentBooking.Status,
+                    OriginalPrice = recentBooking.OriginalPrice,
+                    PointDiscountAmount = recentBooking.PointDiscountAmount,
+                    VoucherDiscountAmount = recentBooking.VoucherDiscountAmount,
+                    FinalAmount = recentBooking.FinalAmount,
+                    ProcessingStartTime = recentBooking.ProcessingStartTime?.ToVnTime(),
+                    CompletedTime = recentBooking.CompletedTime?.ToVnTime(),
+                    ActualDurationMinutes = recentBooking.ActualDurationMinutes,
+                    CheckInImageUrl = recentBooking.CheckInImageUrl,
+                    CheckOutImageUrl = recentBooking.CheckOutImageUrl,
+                    IsWaitingForLane = false,
+                    ExitBarrierCommandId = command?.CommandId,
+                    BarrierId = command?.BarrierId,
+                    BarrierCommandExpiresAt = command?.ExpiresAt,
+                    BarrierCommandStatus = command?.Status,
+                    IsDuplicate = true
+                };
+            }
+
+            var recentFleetLog = await _context.FleetWashLogs
+                .AsNoTracking()
+                .Include(log => log.FleetVehicle)
+                .Where(log =>
+                    log.BookingId == null &&
+                    log.FleetVehicle.LicensePlate == normalizedPlate &&
+                    log.Status == "Completed" &&
+                    log.CompletedTime >= cutoff)
+                .OrderByDescending(log => log.CompletedTime)
+                .ThenByDescending(log => log.FleetWashLogId)
+                .FirstOrDefaultAsync();
+
+            if (recentFleetLog == null)
+            {
+                return null;
+            }
+
+            var fleetCommand = await _context.BarrierCommands
+                .AsNoTracking()
+                .Where(c =>
+                    c.FleetWashLogId == recentFleetLog.FleetWashLogId &&
+                    c.BarrierId == "EXIT_GATE" &&
+                    c.Action == "OPEN")
+                .OrderByDescending(c => c.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            return new BookingResponseDTO
+            {
+                BookingId = recentFleetLog.FleetWashLogId,
+                BranchId = recentFleetLog.BranchId,
+                LicensePlate = normalizedPlate,
+                ServiceNames = new List<string> { "Fleet Wash Service" },
+                ScheduledTime = recentFleetLog.CheckInTime,
+                Status = recentFleetLog.Status ?? "Completed",
+                OriginalPrice = recentFleetLog.WashCost,
+                FinalAmount = recentFleetLog.WashCost,
+                ProcessingStartTime = recentFleetLog.CheckInTime.ToVnTime(),
+                CompletedTime = recentFleetLog.CompletedTime?.ToVnTime(),
+                ActualDurationMinutes = recentFleetLog.CompletedTime.HasValue
+                    ? (int)Math.Max(1, Math.Round((recentFleetLog.CompletedTime.Value - recentFleetLog.CheckInTime).TotalMinutes))
+                    : null,
+                CheckInImageUrl = recentFleetLog.CheckInImageUrl,
+                CheckOutImageUrl = recentFleetLog.CheckOutImageUrl,
+                IsWaitingForLane = false,
+                ExitBarrierCommandId = fleetCommand?.CommandId,
+                BarrierId = fleetCommand?.BarrierId,
+                BarrierCommandExpiresAt = fleetCommand?.ExpiresAt,
+                BarrierCommandStatus = fleetCommand?.Status,
+                IsDuplicate = true
+            };
+        }
+
         public async Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus, bool allowOutsideScheduledTime = false)
         {
             var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == bookingId);
@@ -1086,6 +1200,13 @@ namespace AutoWashPro.BLL.Services
             else
             {
                 isCompletingNow = newStatus == "Completed" && booking.Status != "Completed";
+                if (isCompletingNow && !await _context.LaneOccupancies.AnyAsync(o => o.BookingId == booking.BookingId))
+                {
+                    throw new AutoWashPro.BLL.Exceptions.BadRequestException(
+                        "The vehicle does not have an active lane occupancy; check-out was not completed.",
+                        "LANE_OCCUPANCY_NOT_FOUND");
+                }
+
                 booking.Status = newStatus;
                 booking.UpdatedAt = DateTime.UtcNow;
                 if (newStatus == "Processing" && booking.BusinessProfileId.HasValue)
@@ -1107,39 +1228,43 @@ namespace AutoWashPro.BLL.Services
                 }
                 if (isCompletingNow)
                 {
-                booking.CompletedTime = DateTime.UtcNow;
-                if (booking.ProcessingStartTime.HasValue)
-                {
-                    var duration = (int)Math.Round((booking.CompletedTime.Value - booking.ProcessingStartTime.Value).TotalMinutes);
-                    booking.ActualDurationMinutes = duration < 1 ? 1 : duration;
-                }
-                if (booking.UserId > 0)
-                {
-                    var userProfile = await _context.CustomerProfiles
-                        .Include(cp => cp.Tier)
-                        .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
-                    if (userProfile?.Tier != null && booking.FinalAmount > 0)
+                    booking.CompletedTime = DateTime.UtcNow;
+                    if (booking.ProcessingStartTime.HasValue)
                     {
-                        int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
-                        if (pointsEarned > 0)
+                        var duration = (int)Math.Round((booking.CompletedTime.Value - booking.ProcessingStartTime.Value).TotalMinutes);
+                        booking.ActualDurationMinutes = duration < 1 ? 1 : duration;
+                    }
+                    if (booking.UserId > 0)
+                    {
+                        var userProfile = await _context.CustomerProfiles
+                            .Include(cp => cp.Tier)
+                            .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
+                        if (userProfile?.Tier != null && booking.FinalAmount > 0)
                         {
-                            await _walletService.AwardCompletionPointsAsync(
-                                booking.UserId.Value, pointsEarned, booking.BookingId);
+                            int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
+                            if (pointsEarned > 0)
+                            {
+                                await _walletService.AwardCompletionPointsAsync(
+                                    booking.UserId.Value, pointsEarned, booking.BookingId);
+                            }
+                        }
+                        if (userProfile != null)
+                        {
+                            userProfile.LastVisitDate = DateTime.UtcNow;
                         }
                     }
-                    if (userProfile != null)
-                        userProfile.LastVisitDate = DateTime.UtcNow;
                 }
-            } 
-            } 
+            }
+
             if (isCompletingNow)
             {
-                checkOutResult = await _laneCoordinator.CompletePhysicalCheckoutAsync(booking.BookingId, 0); 
+                checkOutResult = await _laneCoordinator.CompletePhysicalCheckoutAsync(booking.BookingId, 0);
             }
             else if (newStatus == "Cancelled" || newStatus == "CancelledBySystem" || newStatus == "Delayed")
             {
-                await _laneCoordinator.ReleaseLaneAsync(booking.BookingId, newStatus); 
+                await _laneCoordinator.ReleaseLaneAsync(booking.BookingId, newStatus);
             }
+
             await _context.SaveChangesAsync();
             if (isCompletingNow && booking.UserId.HasValue)
             {
