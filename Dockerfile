@@ -1,4 +1,4 @@
-﻿# Sử dụng bản tiêu chuẩn (không có chữ alpine)
+# Sử dụng bản tiêu chuẩn (không có chữ alpine)
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
 WORKDIR /app
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
+RUN usermod -a -G 1000 app
 USER app
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
