@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Configuration;
+using MimeKit;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using System;
 using System.IO;
-using System.Net;
-using System.Net.Mail;
 using System.Threading.Tasks;
 
 namespace AutoWashPro.BLL.Services
@@ -67,42 +68,35 @@ namespace AutoWashPro.BLL.Services
             if (string.IsNullOrWhiteSpace(password))
                 throw new InvalidOperationException("SMTP password is not configured.");
 
-            using var message = new MailMessage
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(senderName, senderEmail));
+            message.To.Add(new MailboxAddress("", toEmail));
+            message.Subject = subject;
+
+            var builder = new BodyBuilder
             {
-                From = new MailAddress(senderEmail, senderName),
-                Subject = subject,
-                Body = htmlMessage,
-                IsBodyHtml = true
+                HtmlBody = htmlMessage
             };
-            message.To.Add(new MailAddress(toEmail));
 
             if (attachment != null)
             {
-                var stream = new MemoryStream(attachment, writable: false);
-                message.Attachments.Add(new Attachment(
-                    stream,
-                    attachmentFileName ?? "invoice.pdf",
-                    attachmentContentType ?? "application/pdf"));
+                builder.Attachments.Add(attachmentFileName ?? "invoice.pdf", attachment, ContentType.Parse(attachmentContentType ?? "application/pdf"));
             }
 
-            using var smtpClient = new SmtpClient(smtpServer, port)
-            {
-                EnableSsl = true,
-                UseDefaultCredentials = false,
-                Credentials = new NetworkCredential(username, password),
-                DeliveryMethod = SmtpDeliveryMethod.Network,
-                Timeout = 20000
-            };
+            message.Body = builder.ToMessageBody();
+
+            using var smtpClient = new SmtpClient();
+            smtpClient.Timeout = 20000;
 
             try
             {
-                await smtpClient.SendMailAsync(message);
+                await smtpClient.ConnectAsync(smtpServer, port, SecureSocketOptions.Auto);
+                await smtpClient.AuthenticateAsync(username, password);
+                await smtpClient.SendAsync(message);
             }
-            catch (SmtpException ex)
+            finally
             {
-                throw new InvalidOperationException(
-                    $"SMTP email delivery failed ({ex.StatusCode}).",
-                    ex);
+                await smtpClient.DisconnectAsync(true);
             }
         }
     }

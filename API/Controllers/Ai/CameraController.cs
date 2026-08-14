@@ -32,6 +32,7 @@ namespace API.Controllers.AI
             _logger = logger;
         }
 
+        [AllowAnonymous]
         [HttpPost("check-in")]
         public async Task<IActionResult> AutoCheckInByCamera(
             [FromQuery] string plate,
@@ -138,6 +139,7 @@ namespace API.Controllers.AI
             }
         }
 
+        [AllowAnonymous]
         [HttpPost("check-out")]
         public async Task<IActionResult> AutoCheckOutByCamera(
             [FromQuery] string plate,

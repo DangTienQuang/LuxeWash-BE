@@ -109,6 +109,10 @@ namespace AutoWashPro.BLL.Services
             {
                 if (!existingVehicle.IsDeleted)
                 {
+                    if (existingVehicle.UserId == userId)
+                    {
+                        throw new BadRequestException("Biển số xe này đã có trong danh sách xe của bạn. Vui lòng tải lại trang (F5) nếu bạn không thấy.");
+                    }
                     throw new BadRequestException("This license plate already exists in the system.");
                 }
                 existingVehicle.IsDeleted = false;

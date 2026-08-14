@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
+#pragma warning disable CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1763,6 +1763,12 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
             if (booking.Status != "Pending") throw new AutoWashPro.BLL.Exceptions.BadRequestException("Can only cancel bookings in Pending status.");
+            
+            if ((booking.ScheduledTime - DateTime.UtcNow).TotalHours < 2)
+            {
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Quý khách chỉ có thể hủy lịch đặt trước ít nhất 2 tiếng so với giờ hẹn.");
+            }
+
             bool isRefundable = (booking.ScheduledTime - DateTime.UtcNow).TotalHours >= 4;
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
