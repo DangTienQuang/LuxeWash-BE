@@ -48,12 +48,13 @@ namespace AutoWashPro.BLL.Services
             if (string.IsNullOrWhiteSpace(plate)) return string.Empty;
             return new string(plate.Where(char.IsLetterOrDigit).ToArray()).ToUpper();
         }
-        public async Task<bool> AddVehicleAsync(int userId, CreateVehicleDTO request)
+        public async Task<VehicleDTO> AddVehicleAsync(int userId, CreateVehicleDTO request)
         {
             int? finalVehicleTypeId = request.VehicleTypeId > 0 ? request.VehicleTypeId : null;
+            CarModel? carModel = null;
             if (request.CarModelId.HasValue)
             {
-                var carModel = await _context.CarModels.FirstOrDefaultAsync(c => c.Id == request.CarModelId.Value && c.IsActive && c.Status != "Rejected");
+                carModel = await _context.CarModels.FirstOrDefaultAsync(c => c.Id == request.CarModelId.Value && c.IsActive && c.Status != "Rejected");
                 if (carModel == null)
                     throw new BadRequestException("Selected car model does not exist or is no longer supported.");
                 if (carModel.VehicleTypeId.HasValue)
@@ -147,7 +148,16 @@ namespace AutoWashPro.BLL.Services
                 normalizedPlate
             );
 
-            return true;
+            return new VehicleDTO
+            {
+                LicensePlate = normalizedPlate,
+                VehicleTypeId = finalVehicleTypeId.Value,
+                VehicleType = vehicleType.Name,
+                RegistrationPhotoUrl = finalPhotoUrl,
+                CarModel = finalCarModelId.HasValue ? carModel?.Name : finalCarModel,
+                Brand = finalCarModelId.HasValue ? carModel?.Brand : null,
+                UserNote = request.UserNote
+            };
         }
         public async Task<List<AdminOtherVehicleDTO>> GetOtherVehiclesAsync()
         {

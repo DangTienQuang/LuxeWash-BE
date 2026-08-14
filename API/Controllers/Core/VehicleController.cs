@@ -32,8 +32,8 @@ namespace AutoWashPro.API.Controllers
         public async Task<IActionResult> AddVehicle([FromForm] CreateVehicleDTO request)
         {
             int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            await _vehicleService.AddVehicleAsync(userId, request);
-            return Created("", new { statusCode = 201, message = "Vehicle added successfully." });
+            var newVehicle = await _vehicleService.AddVehicleAsync(userId, request);
+            return Created("", new { statusCode = 201, message = "Vehicle added successfully.", data = newVehicle });
         }
 
         [HttpPut("{licensePlate}")]

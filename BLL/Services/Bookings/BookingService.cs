@@ -1764,12 +1764,13 @@ namespace AutoWashPro.BLL.Services
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
             if (booking.Status != "Pending") throw new AutoWashPro.BLL.Exceptions.BadRequestException("Can only cancel bookings in Pending status.");
             
-            if ((booking.ScheduledTime - DateTime.UtcNow).TotalHours < 2)
+            var vietnamTime = DateTime.UtcNow.AddHours(7);
+            if ((booking.ScheduledTime - vietnamTime).TotalHours < 2)
             {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Quý khách chỉ có thể hủy lịch đặt trước ít nhất 2 tiếng so với giờ hẹn.");
             }
 
-            bool isRefundable = (booking.ScheduledTime - DateTime.UtcNow).TotalHours >= 4;
+            bool isRefundable = (booking.ScheduledTime - vietnamTime).TotalHours >= 4;
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
