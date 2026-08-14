@@ -1765,7 +1765,8 @@ namespace AutoWashPro.BLL.Services
             if (booking.Status != "Pending") throw new AutoWashPro.BLL.Exceptions.BadRequestException("Can only cancel bookings in Pending status.");
             
             var vietnamTime = DateTime.UtcNow.AddHours(7);
-            if ((booking.ScheduledTime - vietnamTime).TotalHours < 2)
+            var totalHours = (booking.ScheduledTime - vietnamTime).TotalHours;
+            if (totalHours > -1 && totalHours < 2)
             {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Quý khách chỉ có thể hủy lịch đặt trước ít nhất 2 tiếng so với giờ hẹn.");
             }
