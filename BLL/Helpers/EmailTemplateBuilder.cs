@@ -12,9 +12,9 @@ namespace BLL.Helpers
         {
             return $@"
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>
-                <h2 style='color: #007bff; text-align: center;'>SMARTWASH XÁC NHẬN ĐẶT LỊCH</h2>
+                <h2 style='color: #007bff; text-align: center;'>LUXEWASH XÁC NHẬN ĐẶT LỊCH</h2>
                 <p>Xin chào <b>{customerName}</b>,</p>
-                <p>Cảm ơn bạn đã sử dụng dịch vụ của SmartWash. Dưới đây là thông tin lịch hẹn của bạn:</p>
+                <p>Cảm ơn bạn đã sử dụng dịch vụ của LuxeWash. Dưới đây là thông tin lịch hẹn của bạn:</p>
 
                 <table style='width: 100%; border-collapse: collapse; margin-top: 15px;'>
                     <tr>
@@ -44,7 +44,7 @@ namespace BLL.Helpers
                 </table>
 
                 <p style='margin-top: 20px;'>Vui lòng đến trạm đúng giờ. Hãy đưa mã QR Check-in cho nhân viên nếu có sự cố với camera nhận diện.</p>
-                <p>Trân trọng,<br><b>Đội ngũ SmartWash</b></p>
+                <p>Trân trọng,<br><b>Đội ngũ LuxeWash</b></p>
             </div>";
         }
 
@@ -52,12 +52,12 @@ namespace BLL.Helpers
         {
             var title = voucher.CampaignType switch
             {
-                VoucherCampaignType.Birthday => "Happy Birthday from SmartWash",
-                VoucherCampaignType.Age => "SmartWash sent you a special voucher",
-                VoucherCampaignType.Winback => "Long time no see, SmartWash misses you",
+                VoucherCampaignType.Birthday => "Happy Birthday from LuxeWash",
+                VoucherCampaignType.Age => "LuxeWash sent you a special voucher",
+                VoucherCampaignType.Winback => "Long time no see, LuxeWash misses you",
                 VoucherCampaignType.Vip => "Exclusive gift for VIP members",
-                VoucherCampaignType.Milestone => "Thank you for accompanying SmartWash",
-                _ => "SmartWash sent you a new voucher"
+                VoucherCampaignType.Milestone => "Thank you for accompanying LuxeWash",
+                _ => "LuxeWash sent you a new voucher"
             };
 
             var reason = voucher.CampaignType switch
@@ -74,7 +74,7 @@ namespace BLL.Helpers
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>
                 <h2 style='color: #007bff; text-align: center;'>{title}</h2>
                 <p>Xin chào <b>{customerName}</b>,</p>
-                <p>SmartWash gửi tặng bạn một voucher {reason}.</p>
+                <p>LuxeWash gửi tặng bạn một voucher {reason}.</p>
                 <table style='width: 100%; border-collapse: collapse; margin-top: 15px;'>
                     <tr>
                         <td style='padding: 8px; border-bottom: 1px solid #eee;'><b>Mã voucher:</b></td>
@@ -94,7 +94,7 @@ namespace BLL.Helpers
                     </tr>
                 </table>
                 <p style='margin-top: 20px;'>Voucher đã được tự động thêm vào ví voucher của bạn. Hãy đặt lịch và chọn voucher khi thanh toán để sử dụng.</p>
-                <p>Trân trọng,<br><b>Đội ngũ SmartWash</b></p>
+                <p>Trân trọng,<br><b>Đội ngũ LuxeWash</b></p>
             </div>";
         }
     }

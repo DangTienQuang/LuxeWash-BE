@@ -219,7 +219,7 @@ namespace AutoWashPro.BLL.Services
             {
                 var customerName = user.CustomerProfile?.FullName ?? "Valued Customer";
                 var html = EmailTemplateBuilder.BuildVoucherCampaignEmail(voucher, customerName, userExpiryDate);
-                await _emailService.SendEmailAsync(user.Email, $"[SmartWash] New Voucher: {voucher.Code}", html);
+                await _emailService.SendEmailAsync(user.Email, $"[LuxeWash] New Voucher: {voucher.Code}", html);
             }
             catch (Exception ex)
             {

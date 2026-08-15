@@ -528,7 +528,7 @@ namespace AutoWashPro.BLL.Services.Operations
                         await _userNotificationService.CreateNotificationAsync(
                             b.UserId.Value,
                             "Hoàn thành dịch vụ",
-                            $"Cảm ơn bạn đã sử dụng dịch vụ tại SmartWash cho biển số {b.LicensePlate}. Hẹn gặp lại bạn!",
+                            $"Cảm ơn bạn đã sử dụng dịch vụ tại LuxeWash cho biển số {b.LicensePlate}. Hẹn gặp lại bạn!",
                             "Booking",
                             b.BookingId.ToString()
                         );

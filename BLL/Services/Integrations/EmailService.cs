@@ -52,7 +52,7 @@ namespace AutoWashPro.BLL.Services
         {
             var smtpServer = _config["EmailSettings:SmtpServer"];
             var senderEmail = _config["EmailSettings:SenderEmail"];
-            var senderName = _config["EmailSettings:SenderName"] ?? "SmartWash System";
+            var senderName = _config["EmailSettings:SenderName"] ?? "LuxeWash System";
             var username = _config["EmailSettings:Username"] ?? senderEmail;
             var password = _config["EmailSettings:Password"];
             var portValue = _config["EmailSettings:Port"];

@@ -1364,7 +1364,7 @@ namespace AutoWashPro.BLL.Services
                 );
                 await _emailService.SendEmailAsync(
                     booking.User.Email,
-                    $"[SmartWash] Booking Successful - #{booking.BookingId}",
+                    "[LuxeWash] Booking Successful - #" + booking.BookingId,
                     emailHtml
                 );
                 return true;
@@ -1536,7 +1536,7 @@ namespace AutoWashPro.BLL.Services
                         {
                             try
                             {
-                                await _emailService.SendEmailAsync(user.Email, $"[SmartWash] Booking Successful - #{booking.BookingId}", emailHtml);
+                                await _emailService.SendEmailAsync(user.Email, "[LuxeWash] Booking Successful - #" + booking.BookingId, emailHtml);
                             }
                             catch (Exception ex)
                             {
@@ -1549,7 +1549,7 @@ namespace AutoWashPro.BLL.Services
                 
                 await _userNotificationService.CreateNotificationAsync(
                     userId,
-                    "Äáº·t lá»‹ch thÃ nh cÃ´ng",
+                    "Ä áº·t lá»‹ch thÃ nh cÃ´ng",
                     $"Lá»‹ch Ä‘áº·t rá»­a xe cho biá»ƒn sá»‘ {request.LicensePlate} vÃ o lÃºc {targetDateTime:dd/MM/yyyy HH:mm} Ä‘Ã£ Ä‘Æ°á»£c ghi nháº­n.",
                     "Booking",
                     booking.BookingId.ToString()
@@ -2639,7 +2639,7 @@ namespace AutoWashPro.BLL.Services
                     {
                         try
                         {
-                            await _emailService.SendEmailAsync(booking.User.Email, $"[SmartWash] Appointment Reschedule Confirmation - #{booking.BookingId}", emailHtml);
+                            await _emailService.SendEmailAsync(booking.User.Email, "[LuxeWash] Appointment Reschedule Confirmation - #" + booking.BookingId, emailHtml);
                         }
                         catch (Exception ex)
                         {

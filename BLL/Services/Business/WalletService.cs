@@ -543,7 +543,7 @@ namespace AutoWashPro.BLL.Services
                     customerName);
                 await scopedEmailService.SendEmailAsync(
                     booking.User.Email,
-                    $"[SmartWash] Booking successful - #{booking.BookingId}",
+                    $@"[LuxeWash] Booking successful - #{booking.BookingId}",
                     emailHtml);
             }
             catch (Exception ex)

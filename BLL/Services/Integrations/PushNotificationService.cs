@@ -94,7 +94,7 @@ namespace AutoWashPro.BLL.Services
                     {
                         FcmOptions = new WebpushFcmOptions
                         {
-                            Link = "https://smartwash.vn/bookings/pending" // Example link for web push
+                            Link = "https://luxewash.vn/bookings/pending" // Example link for web push
                         }
                     }
                 };
