@@ -287,7 +287,6 @@ namespace AutoWashPro.BLL.Services
             voucher.StartDate = request.StartDate?.ToUniversalTime();
             voucher.PointsRequired = request.PointsRequired;
             voucher.VoucherType = (AutoWashPro.DAL.Enums.VoucherType)request.VoucherType;
-            voucher.CampaignType = VoucherCampaignType.Manual;
             voucher.ImageUrl = request.ImageUrl;
             voucher.MinOrderAmount = request.MinOrderAmount;
             voucher.IsActive = request.IsActive;
