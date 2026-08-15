@@ -275,6 +275,11 @@ namespace AutoWashPro.BLL.Services
                 s.Status == "Pending" && (s.FromAssignmentId == assignmentId || s.ToAssignmentId == assignmentId));
             if (hasPendingSwap)
                 throw new BadRequestException("Cannot delete shift assignment with a pending swap request.");
+            
+            var relatedSwaps = await _context.ShiftSwapRequests.Where(s => 
+                s.FromAssignmentId == assignmentId || s.ToAssignmentId == assignmentId).ToListAsync();
+            _context.ShiftSwapRequests.RemoveRange(relatedSwaps);
+
             _context.StaffShiftAssignments.Remove(assignment);
             await _context.SaveChangesAsync();
             return true;

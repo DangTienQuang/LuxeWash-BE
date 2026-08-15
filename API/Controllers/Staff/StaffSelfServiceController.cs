@@ -31,6 +31,13 @@ namespace API.Controllers.Staff
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
+        [HttpGet("work-shifts")]
+        public async Task<IActionResult> GetWorkShifts()
+        {
+            var result = await _staffService.GetWorkShiftsAsync(false);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
         [HttpGet("overtime-requests")]
         public async Task<IActionResult> GetMyOvertimeRequests()
         {
