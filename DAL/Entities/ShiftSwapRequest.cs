@@ -15,11 +15,17 @@ namespace AutoWashPro.DAL.Entities
         [ForeignKey("FromAssignmentId")]
         public StaffShiftAssignment FromAssignment { get; set; } = null!;
 
-        [Required]
-        public int ToAssignmentId { get; set; }
+        public int? ToAssignmentId { get; set; }
 
         [ForeignKey("ToAssignmentId")]
-        public StaffShiftAssignment ToAssignment { get; set; } = null!;
+        public StaffShiftAssignment? ToAssignment { get; set; }
+
+        public int? ToWorkShiftId { get; set; }
+
+        [ForeignKey("ToWorkShiftId")]
+        public WorkShift? ToWorkShift { get; set; }
+
+        public DateTime? ToWorkDate { get; set; }
 
         [Required]
         public int RequestedByUserId { get; set; }

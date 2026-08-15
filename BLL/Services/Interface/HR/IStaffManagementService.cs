@@ -18,6 +18,7 @@ namespace AutoWashPro.BLL.Services
         Task<bool> DeleteWorkShiftAsync(int workShiftId);
         Task<List<ShiftAssignmentResponseDTO>> GetShiftAssignmentsAsync(DateTime? fromDate, DateTime? toDate, int? staffUserId);
         Task<List<ShiftAssignmentResponseDTO>> GetMyShiftAssignmentsAsync(int staffUserId, DateTime? fromDate, DateTime? toDate);
+        Task<List<ShiftAssignmentResponseDTO>> GetOtherStaffShiftAssignmentsAsync(int currentStaffUserId, DateTime? date, int? workShiftId);
         Task<ShiftAssignmentResponseDTO> CreateShiftAssignmentAsync(CreateShiftAssignmentDTO request);
         Task<ShiftAssignmentResponseDTO> UpdateShiftAssignmentAsync(int assignmentId, UpdateShiftAssignmentDTO request);
         Task<bool> DeleteShiftAssignmentAsync(int assignmentId);

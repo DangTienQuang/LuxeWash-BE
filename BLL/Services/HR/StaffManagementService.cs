@@ -234,6 +234,14 @@ namespace AutoWashPro.BLL.Services
             var assignments = await query.OrderBy(a => a.WorkDate).ThenBy(a => a.WorkShift.StartTime).ToListAsync();
             return assignments.Select(MapAssignment).ToList();
         }
+        public async Task<List<ShiftAssignmentResponseDTO>> GetOtherStaffShiftAssignmentsAsync(int currentStaffUserId, DateTime? date, int? workShiftId)
+        {
+            var query = BaseAssignmentQuery().Where(a => a.StaffUserId != currentStaffUserId);
+            if (date.HasValue) query = query.Where(a => a.WorkDate == date.Value.Date);
+            if (workShiftId.HasValue) query = query.Where(a => a.WorkShiftId == workShiftId.Value);
+            var assignments = await query.OrderBy(a => a.WorkDate).ThenBy(a => a.WorkShift.StartTime).ToListAsync();
+            return assignments.Select(MapAssignment).ToList();
+        }
         public async Task<ShiftAssignmentResponseDTO> CreateShiftAssignmentAsync(CreateShiftAssignmentDTO request)
         {
             var staff = await GetStaffUserAsync(request.StaffUserId);
@@ -340,34 +348,63 @@ namespace AutoWashPro.BLL.Services
             var requests = await BaseSwapQuery()
                 .Where(s => s.RequestedByUserId == staffUserId
                     || s.FromAssignment.StaffUserId == staffUserId
-                    || s.ToAssignment.StaffUserId == staffUserId)
+                    || (s.ToAssignment != null && s.ToAssignment.StaffUserId == staffUserId))
                 .OrderByDescending(s => s.CreatedAt)
                 .ToListAsync();
             return requests.Select(MapSwap).ToList();
         }
         public async Task<ShiftSwapRequestResponseDTO> CreateShiftSwapRequestAsync(int staffUserId, CreateShiftSwapRequestDTO request)
         {
-            if (request.FromAssignmentId == request.ToAssignmentId)
-                throw new BadRequestException("Cannot swap the same shift.");
             var from = await BaseAssignmentQuery().FirstOrDefaultAsync(a => a.AssignmentId == request.FromAssignmentId);
-            var to = await BaseAssignmentQuery().FirstOrDefaultAsync(a => a.AssignmentId == request.ToAssignmentId);
-            if (from == null || to == null) throw new NotFoundException("Shift to swap not found.");
+            if (from == null) throw new NotFoundException("Shift to swap not found.");
             if (from.StaffUserId != staffUserId) throw new BadRequestException("You can only submit swap requests from your own shift.");
-            if (from.WorkDate == to.WorkDate && from.WorkShiftId == to.WorkShiftId)
-                throw new BadRequestException("Cannot swap two assignments in the same shift on the same day.");
-            if (from.Status != "Scheduled" || to.Status != "Scheduled")
-                throw new BadRequestException("Can only swap shifts in Scheduled status.");
-            var pendingExists = await _context.ShiftSwapRequests.AnyAsync(s =>
-                s.Status == "Pending" && (s.FromAssignmentId == request.FromAssignmentId || s.ToAssignmentId == request.ToAssignmentId));
-            if (pendingExists) throw new BadRequestException("One of the shifts currently has a pending swap request.");
+            if (from.Status != "Scheduled") throw new BadRequestException("Can only swap shifts in Scheduled status.");
+
             var swap = new ShiftSwapRequest
             {
                 FromAssignmentId = request.FromAssignmentId,
-                ToAssignmentId = request.ToAssignmentId,
                 RequestedByUserId = staffUserId,
                 Reason = request.Reason?.Trim(),
                 Status = "Pending"
             };
+
+            if (request.ToAssignmentId.HasValue)
+            {
+                if (request.FromAssignmentId == request.ToAssignmentId.Value)
+                    throw new BadRequestException("Cannot swap the same shift.");
+                var to = await BaseAssignmentQuery().FirstOrDefaultAsync(a => a.AssignmentId == request.ToAssignmentId.Value);
+                if (to == null) throw new NotFoundException("Target shift assignment not found.");
+                if (from.WorkDate == to.WorkDate && from.WorkShiftId == to.WorkShiftId)
+                    throw new BadRequestException("Cannot swap two assignments in the same shift on the same day.");
+                if (to.Status != "Scheduled")
+                    throw new BadRequestException("Can only swap shifts in Scheduled status.");
+
+                var pendingExists = await _context.ShiftSwapRequests.AnyAsync(s =>
+                    s.Status == "Pending" && (s.FromAssignmentId == request.FromAssignmentId || s.FromAssignmentId == request.ToAssignmentId.Value || s.ToAssignmentId == request.FromAssignmentId || s.ToAssignmentId == request.ToAssignmentId.Value));
+                if (pendingExists) throw new BadRequestException("One of the shifts currently has a pending swap request.");
+
+                swap.ToAssignmentId = request.ToAssignmentId.Value;
+            }
+            else
+            {
+                if (!request.ToWorkShiftId.HasValue || !request.ToWorkDate.HasValue)
+                    throw new BadRequestException("Must provide either target assignment or target work shift and date.");
+                
+                var workShift = await _context.WorkShifts.FindAsync(request.ToWorkShiftId.Value);
+                if (workShift == null || !workShift.IsActive) throw new NotFoundException("Active work shift not found.");
+                if (from.WorkDate == request.ToWorkDate.Value.Date && from.WorkShiftId == request.ToWorkShiftId.Value)
+                    throw new BadRequestException("Cannot swap to the same shift on the same day.");
+                
+                await EnsureNoAssignmentConflictAsync(staffUserId, request.ToWorkShiftId.Value, request.ToWorkDate.Value.Date, request.FromAssignmentId);
+
+                var pendingExists = await _context.ShiftSwapRequests.AnyAsync(s =>
+                    s.Status == "Pending" && (s.FromAssignmentId == request.FromAssignmentId || s.ToAssignmentId == request.FromAssignmentId));
+                if (pendingExists) throw new BadRequestException("This shift currently has a pending swap request.");
+
+                swap.ToWorkShiftId = request.ToWorkShiftId.Value;
+                swap.ToWorkDate = request.ToWorkDate.Value.Date;
+            }
+
             _context.ShiftSwapRequests.Add(swap);
             await _context.SaveChangesAsync();
             return await GetSwapDtoAsync(swap.ShiftSwapRequestId);
@@ -389,14 +426,24 @@ namespace AutoWashPro.BLL.Services
                 swap.ReviewNote = request.ReviewNote?.Trim();
                 if (request.IsApproved)
                 {
-                    var fromStaffId = swap.FromAssignment.StaffUserId;
-                    var toStaffId = swap.ToAssignment.StaffUserId;
-                    await EnsureNoAssignmentConflictAsync(toStaffId, swap.FromAssignment.WorkShiftId, swap.FromAssignment.WorkDate, swap.ToAssignmentId);
-                    await EnsureNoAssignmentConflictAsync(fromStaffId, swap.ToAssignment.WorkShiftId, swap.ToAssignment.WorkDate, swap.FromAssignmentId);
-                    swap.FromAssignment.StaffUserId = swap.ToAssignment.StaffUserId;
-                    swap.ToAssignment.StaffUserId = fromStaffId;
-                    swap.FromAssignment.UpdatedAt = DateTime.UtcNow;
-                    swap.ToAssignment.UpdatedAt = DateTime.UtcNow;
+                    if (swap.ToAssignmentId.HasValue && swap.ToAssignment != null)
+                    {
+                        var fromStaffId = swap.FromAssignment.StaffUserId;
+                        var toStaffId = swap.ToAssignment.StaffUserId;
+                        await EnsureNoAssignmentConflictAsync(toStaffId, swap.FromAssignment.WorkShiftId, swap.FromAssignment.WorkDate, swap.ToAssignmentId);
+                        await EnsureNoAssignmentConflictAsync(fromStaffId, swap.ToAssignment.WorkShiftId, swap.ToAssignment.WorkDate, swap.FromAssignmentId);
+                        swap.FromAssignment.StaffUserId = swap.ToAssignment.StaffUserId;
+                        swap.ToAssignment.StaffUserId = fromStaffId;
+                        swap.FromAssignment.UpdatedAt = DateTime.UtcNow;
+                        swap.ToAssignment.UpdatedAt = DateTime.UtcNow;
+                    }
+                    else if (swap.ToWorkShiftId.HasValue && swap.ToWorkDate.HasValue)
+                    {
+                        await EnsureNoAssignmentConflictAsync(swap.FromAssignment.StaffUserId, swap.ToWorkShiftId.Value, swap.ToWorkDate.Value, swap.FromAssignmentId);
+                        swap.FromAssignment.WorkShiftId = swap.ToWorkShiftId.Value;
+                        swap.FromAssignment.WorkDate = swap.ToWorkDate.Value;
+                        swap.FromAssignment.UpdatedAt = DateTime.UtcNow;
+                    }
                 }
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -463,7 +510,8 @@ namespace AutoWashPro.BLL.Services
                 .Include(s => s.FromAssignment).ThenInclude(a => a.WorkShift)
                 .Include(s => s.ToAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.StaffProfile)
                 .Include(s => s.ToAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.ManagerProfile)
-                .Include(s => s.ToAssignment).ThenInclude(a => a.WorkShift);
+                .Include(s => s.ToAssignment).ThenInclude(a => a.WorkShift)
+                .Include(s => s.ToWorkShift);
         }
         private async Task<ShiftAssignmentResponseDTO> GetAssignmentDtoAsync(int assignmentId)
         {
@@ -543,14 +591,15 @@ namespace AutoWashPro.BLL.Services
             ShiftSwapRequestId = request.ShiftSwapRequestId,
             FromAssignmentId = request.FromAssignmentId,
             ToAssignmentId = request.ToAssignmentId,
+            ToWorkShiftId = request.ToWorkShiftId,
             RequestedByUserId = request.RequestedByUserId,
             RequestedByName = request.FromAssignment.StaffUserId == request.RequestedByUserId
                 ? GetPersonnelName(request.FromAssignment.StaffUser)
-                : GetPersonnelName(request.ToAssignment.StaffUser),
+                : (request.ToAssignment != null ? GetPersonnelName(request.ToAssignment.StaffUser) : "Unknown"),
             FromStaffName = GetPersonnelName(request.FromAssignment.StaffUser),
-            ToStaffName = GetPersonnelName(request.ToAssignment.StaffUser),
+            ToStaffName = request.ToAssignment != null ? GetPersonnelName(request.ToAssignment.StaffUser) : null,
             FromWorkDate = request.FromAssignment.WorkDate,
-            ToWorkDate = request.ToAssignment.WorkDate,
+            ToWorkDate = request.ToAssignment != null ? request.ToAssignment.WorkDate : request.ToWorkDate,
             Reason = request.Reason,
             Status = request.Status,
             ReviewNote = request.ReviewNote,

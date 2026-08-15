@@ -31,6 +31,13 @@ namespace API.Controllers.Staff
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
+        [HttpGet("available-shifts-for-swap")]
+        public async Task<IActionResult> GetAvailableShiftsForSwap([FromQuery] DateTime? date = null, [FromQuery] int? workShiftId = null)
+        {
+            var result = await _staffService.GetOtherStaffShiftAssignmentsAsync(GetUserId(), date, workShiftId);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
         [HttpGet("work-shifts")]
         public async Task<IActionResult> GetWorkShifts()
         {

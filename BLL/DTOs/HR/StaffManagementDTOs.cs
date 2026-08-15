@@ -131,13 +131,14 @@ namespace AutoWashPro.BLL.DTOs
     {
         public int ShiftSwapRequestId { get; set; }
         public int FromAssignmentId { get; set; }
-        public int ToAssignmentId { get; set; }
+        public int? ToAssignmentId { get; set; }
+        public int? ToWorkShiftId { get; set; }
         public int RequestedByUserId { get; set; }
         public string RequestedByName { get; set; } = string.Empty;
         public string FromStaffName { get; set; } = string.Empty;
-        public string ToStaffName { get; set; } = string.Empty;
+        public string? ToStaffName { get; set; }
         public DateTime FromWorkDate { get; set; }
-        public DateTime ToWorkDate { get; set; }
+        public DateTime? ToWorkDate { get; set; }
         public string? Reason { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? ReviewNote { get; set; }
@@ -147,8 +148,9 @@ namespace AutoWashPro.BLL.DTOs
     {
         [Required]
         public int FromAssignmentId { get; set; }
-        [Required]
-        public int ToAssignmentId { get; set; }
+        public int? ToAssignmentId { get; set; }
+        public int? ToWorkShiftId { get; set; }
+        public DateTime? ToWorkDate { get; set; }
         public string? Reason { get; set; }
     }
 }
