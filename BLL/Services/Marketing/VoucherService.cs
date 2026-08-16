@@ -66,6 +66,9 @@ namespace AutoWashPro.BLL.Services
                 .Select(uv => uv.VoucherId);
             var userTierMinimumPoints = userProfile.Tier?.MinAccumulatedPoints ?? 0;
 
+            // IMPORTANT: Only vouchers that customers manually redeem with points are returned here.
+            // Auto-granted vouchers from AI Revenue-Stimulus (Winback), Birthday, Age, Weather, etc.
+            // are intentionally excluded — they are distributed automatically by the system, never by redeeming points.
             return await _context.Vouchers
                 .Include(v => v.RequiredTier)
                 .AsNoTracking()

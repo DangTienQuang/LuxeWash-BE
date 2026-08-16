@@ -426,7 +426,7 @@ namespace BLL.Services
                     IsActive = false,
                     PointsRequired = 0,
                     VoucherType = VoucherType.Discount,
-                    CampaignType = VoucherCampaignType.Manual,
+                    CampaignType = VoucherCampaignType.Winback,
                     BranchId = branchId,
                     ApprovalStatus = "Proposed",
                     ProposalNote = $"[Phân tích AI] Đối chiếu doanh thu tháng {month:D2}/{year} {(eval.IsRevenueDropped ? $"sụt giảm {eval.RevenueDropPercentage}%" : "ổn định")}, phát hiện lưu lượng vào {slowestDaysStr} rất thấp (trung bình ~{avgDaily} xe/ngày). Đề xuất giảm {weekdayDiscount}% cho các ngày vắng khách nhằm tối ưu công suất xưởng."
