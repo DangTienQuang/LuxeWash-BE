@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using AutoWashPro.DAL.Data;
+using AutoWashPro.DAL.Entities;
 
 namespace AutoWashPro.BLL.Services.Operations
 {
@@ -446,6 +447,125 @@ namespace AutoWashPro.BLL.Services.Operations
             command.Status = string.IsNullOrWhiteSpace(status) ? "Completed" : status;
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<bool> AckBarrierCommandAsync(
+            int branchId,
+            string commandId,
+            string? status,
+            CancellationToken cancellationToken = default)
+        {
+            var command = await _context.BarrierCommands
+                .FirstOrDefaultAsync(
+                    c => c.BranchId == branchId && c.CommandId == commandId,
+                    cancellationToken);
+
+            if (command == null) return false;
+
+            var normalizedStatus = string.IsNullOrWhiteSpace(status)
+                ? "Completed"
+                : status.Trim();
+            if (normalizedStatus is not ("Completed" or "Failed" or "Acknowledged"))
+                normalizedStatus = "Failed";
+
+            command.Status = normalizedStatus;
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        public async Task<BarrierCommandDTO?> GetNextBarrierCommandAsync(
+            int branchId,
+            CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+            var expired = await _context.BarrierCommands
+                .Where(c => c.BranchId == branchId
+                    && (c.Status == "Pending" || c.Status == "Published")
+                    && c.ExpiresAt <= now)
+                .ToListAsync(cancellationToken);
+
+            foreach (var command in expired) command.Status = "Expired";
+            if (expired.Count > 0) await _context.SaveChangesAsync(cancellationToken);
+
+            return await _context.BarrierCommands
+                .AsNoTracking()
+                .Where(c => c.BranchId == branchId
+                    && (c.Status == "Pending" || c.Status == "Published")
+                    && c.ExpiresAt > now)
+                .OrderBy(c => c.CreatedAt)
+                .Select(c => ToBarrierCommandDto(c))
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public Task<BarrierCommandDTO?> GetBarrierCommandAsync(
+            int branchId,
+            string commandId,
+            CancellationToken cancellationToken = default)
+        {
+            return _context.BarrierCommands
+                .AsNoTracking()
+                .Where(c => c.BranchId == branchId && c.CommandId == commandId)
+                .Select(c => ToBarrierCommandDto(c))
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<BarrierCommandDTO> CreateManualBarrierCommandAsync(
+            int userId,
+            string barrierId,
+            string action,
+            CancellationToken cancellationToken = default)
+        {
+            var branchId = await GetEmployeeBranchIdAsync(userId, cancellationToken)
+                ?? throw new InvalidOperationException("Employee is not assigned to a branch.");
+            var normalizedBarrierId = barrierId.Trim().ToUpperInvariant();
+            var normalizedAction = action.Trim().ToUpperInvariant();
+            var allowedBarriers = new[] { "ENTRY_REGULAR_GATE", "ENTRY_VIP_GATE", "EXIT_GATE" };
+
+            if (!allowedBarriers.Contains(normalizedBarrierId))
+                throw new ArgumentException("Unsupported barrierId.", nameof(barrierId));
+            if (normalizedAction is not ("OPEN" or "CLOSE"))
+                throw new ArgumentException("Action must be OPEN or CLOSE.", nameof(action));
+
+            var now = DateTime.UtcNow;
+            var command = new BarrierCommand
+            {
+                CommandId = Guid.NewGuid().ToString(),
+                BranchId = branchId,
+                BarrierId = normalizedBarrierId,
+                Action = normalizedAction,
+                CreatedAt = now,
+                ExpiresAt = now.AddMinutes(1),
+                Status = "Pending"
+            };
+            _context.BarrierCommands.Add(command);
+            await _context.SaveChangesAsync(cancellationToken);
+            return ToBarrierCommandDto(command);
+        }
+
+        public Task<int?> GetEmployeeBranchIdAsync(
+            int userId,
+            CancellationToken cancellationToken = default)
+        {
+            return _context.EmployeeProfiles
+                .AsNoTracking()
+                .Where(profile => profile.EmployeeId == userId)
+                .Select(profile => profile.BranchId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        private static BarrierCommandDTO ToBarrierCommandDto(BarrierCommand command)
+        {
+            return new BarrierCommandDTO
+            {
+                CommandId = command.CommandId,
+                BarrierId = command.BarrierId,
+                Action = command.Action,
+                LicensePlate = command.LicensePlate ?? string.Empty,
+                LaneId = command.LaneId,
+                CreatedAt = command.CreatedAt,
+                ExpiresAt = command.ExpiresAt,
+                Status = command.Status
+            };
         }
 
         public async Task<bool> IsEmployeeInBranchAsync(int userId, int branchId)

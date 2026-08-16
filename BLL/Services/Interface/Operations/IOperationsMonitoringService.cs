@@ -10,6 +10,11 @@ namespace AutoWashPro.BLL.Services.Operations
         Task<List<BarrierCommandDTO>> GetFailedOrExpiredBarrierCommandsAsync(int branchId, CancellationToken cancellationToken = default);
         Task<List<ReconciliationAlertDTO>> RunReconciliationCheckAsync(int branchId, CancellationToken cancellationToken = default);
         Task<bool> AckBarrierCommandAsync(string commandId, string? status);
+        Task<bool> AckBarrierCommandAsync(int branchId, string commandId, string? status, CancellationToken cancellationToken = default);
+        Task<BarrierCommandDTO?> GetNextBarrierCommandAsync(int branchId, CancellationToken cancellationToken = default);
+        Task<BarrierCommandDTO?> GetBarrierCommandAsync(int branchId, string commandId, CancellationToken cancellationToken = default);
+        Task<BarrierCommandDTO> CreateManualBarrierCommandAsync(int userId, string barrierId, string action, CancellationToken cancellationToken = default);
+        Task<int?> GetEmployeeBranchIdAsync(int userId, CancellationToken cancellationToken = default);
         Task<bool> IsEmployeeInBranchAsync(int userId, int branchId);
     }
     public class QueueMonitoringDashboardDTO

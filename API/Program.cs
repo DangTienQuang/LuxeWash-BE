@@ -56,6 +56,9 @@ builder.Services.AddControllers()
             });
         };
     });
+builder.Services.AddMemoryCache();
+builder.Services.Configure<API.Controllers.Operations.BarrierDeviceOptions>(
+    builder.Configuration.GetSection("BarrierDevice"));
 
 // ==============================================================================
 // 2. CORS CONFIGURATION (Frontend Connection)
