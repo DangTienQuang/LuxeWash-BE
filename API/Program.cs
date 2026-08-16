@@ -348,7 +348,6 @@ builder.Services.AddSwaggerGen(c =>
 // ==============================================================================
 builder.Services.AddScoped<IBusinessService, BusinessService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-builder.Services.AddScoped<IBookingAttendanceService, BookingAttendanceService>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.Configure<BLL.Helpers.CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
 

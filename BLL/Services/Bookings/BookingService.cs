@@ -832,40 +832,36 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<BookingResponseDTO> UpdateBookingStatusByLicensePlateAsync(string licensePlate, string newStatus, IFormFile? checkInImage = null, bool allowOutsideScheduledTime = false)
         {
-            var allowedStatuses = new[] { "Pending", "CheckedIn", "Processing", "Completed", "Cancelled", "Delayed", "CancelledBySystem" };
-            if (!allowedStatuses.Contains(newStatus))
+            if (!BookingStatuses.IsAllowed(newStatus))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid status.");
+
             var normalizedPlate = NormalizeLicensePlate(licensePlate);
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
+
             var matches = await _context.Bookings
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
-                .Where(b => b.LicensePlate != null
-                    && b.LicensePlate == normalizedPlate)
+                .Where(b => b.LicensePlate != null && b.LicensePlate == normalizedPlate)
                 .ToListAsync();
             if (matches.Count == 0)
-            {
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"No recent booking found for vehicle {licensePlate}.");
-            }
+
             var todayInVN = DateTime.UtcNow.ToVnTime().Date;
-            var todaysBookings = matches
-                .Where(b => b.ScheduledTime.Date == todayInVN &&
-                    (newStatus == "CheckedIn"
-                        ? b.Status == "Pending" || b.Status == "Confirmed"
-                        : newStatus == "Processing"
-                            ? b.Status == "CheckedIn"
-                            : newStatus == "Completed"
-                                ? b.Status == "CheckedIn" || b.Status == "Processing"
-                                : true))
+            var candidates = matches
+                .Where(b => b.ScheduledTime.Date == todayInVN)
                 .ToList();
+            var todaysBookings = candidates
+                .Where(b => BookingStatuses.CanTransitionFrom(b.Status, newStatus))
+                .ToList();
+
             if (todaysBookings.Count == 0)
             {
-                if (newStatus == "CheckedIn")
+                if (newStatus == BookingStatuses.CheckedIn)
                 {
                     var nearestBooking = matches
-                        .Where(b => b.Status == "Pending" || b.Status == "Confirmed")
+                        .Where(b => b.Status == BookingStatuses.Pending || b.Status == BookingStatuses.Confirmed)
                         .OrderBy(b => Math.Abs((b.ScheduledTime - DateTime.UtcNow.ToVnTime()).Ticks))
                         .FirstOrDefault();
                     if (nearestBooking != null)
@@ -879,33 +875,20 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Vehicle {licensePlate} has a booking, but it is not scheduled for today ({todayInVN:dd/MM/yyyy}).");
             }
             if (todaysBookings.Count > 1)
-            {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Multiple bookings ({todaysBookings.Count}) detected for vehicle {licensePlate} today. Please use the Booking ID to proceed.");
-            }
+
             var booking = todaysBookings.First();
             if (booking.Status == newStatus)
-            {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"The current status of the order is already '{newStatus}'.");
-            }
-            bool isStatusValid = false;
-            if (newStatus == "CheckedIn" && (booking.Status == "Pending" || booking.Status == "Confirmed")) isStatusValid = true;
-            else if (newStatus == "Processing" && booking.Status == "CheckedIn") isStatusValid = true;
-            else if (newStatus == "Completed" && (booking.Status == "CheckedIn" || booking.Status == "Processing")) isStatusValid = true;
-            else if ((newStatus == "Cancelled" || newStatus == "Delayed") && (booking.Status == "Pending" || booking.Status == "CheckedIn")) isStatusValid = true;
-            if (!isStatusValid)
-            {
-                throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Cannot change status from '{booking.Status}' to '{newStatus}'.");
-            }
-            if (newStatus == "CheckedIn")
+
+            if (newStatus == BookingStatuses.CheckedIn)
             {
                 await BookingCheckInPolicy.ValidateAsync(
                     _context,
                     booking,
                     allowOutsideScheduledTime);
                 if (checkInImage == null || checkInImage.Length == 0)
-                {
                     throw new AutoWashPro.BLL.Exceptions.BadRequestException("Check-in image is required.");
-                }
                 booking.CheckInImageUrl = await _photoService.UploadImageAsync(checkInImage);
             }
             var (isUpdated, checkInResult, checkOutResult) = await UpdateBookingStatusAsync(
@@ -913,9 +896,8 @@ namespace AutoWashPro.BLL.Services
                 newStatus,
                 allowOutsideScheduledTime);
             if (!isUpdated)
-            {
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Status update failed due to system error.");
-            }
+
             return new BookingResponseDTO
             {
                 BookingId = booking.BookingId,
@@ -930,9 +912,11 @@ namespace AutoWashPro.BLL.Services
                 ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
                 CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value.ToVnTime() : (DateTime?)null,
                 ActualDurationMinutes = booking.ActualDurationMinutes,
+                CheckInImageUrl = booking.CheckInImageUrl,
+                CheckOutImageUrl = booking.CheckOutImageUrl,
                 ProcessingLaneId = booking.ProcessingLaneId,
                 ProcessingLaneName = booking.ProcessingLane?.Name,
-                IsWaitingForLane = booking.ProcessingLaneId == null && newStatus == "CheckedIn",
+                IsWaitingForLane = booking.ProcessingLaneId == null && newStatus == BookingStatuses.CheckedIn,
                 BarrierCommandId = checkInResult?.BarrierCommandId,
                 BarrierId = checkInResult?.BarrierId,
                 BarrierCommandExpiresAt = checkInResult?.BarrierCommandExpiresAt
@@ -946,20 +930,17 @@ namespace AutoWashPro.BLL.Services
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
             var activeBooking = await _context.Bookings
-                .Include(b => b.BookingDetails)
-                    .ThenInclude(bd => bd.Service)
+                .Include(b => b.BookingDetails).ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
                 .Where(b => b.LicensePlate == normalizedPlate
-                         && (b.Status == "CheckedIn" || b.Status == "Processing"))
+                         && (b.Status == BookingStatuses.CheckedIn || b.Status == BookingStatuses.Processing))
                 .OrderByDescending(b => b.BookingId)
                 .FirstOrDefaultAsync();
             var activeFleetLog = await _context.FleetWashLogs
                 .Include(x => x.FleetVehicle)
-                .Include(x => x.Booking)
-                    .ThenInclude(b => b!.BookingDetails)
-                        .ThenInclude(bd => bd.Service)
+                .Include(x => x.Booking).ThenInclude(b => b!.BookingDetails).ThenInclude(bd => bd.Service)
                 .Where(x => x.FleetVehicle.LicensePlate == normalizedPlate
-                         && (x.Status == "CheckedIn" || x.Status == "Processing" || x.Status == "Assigned"))
+                         && (x.Status == BookingStatuses.CheckedIn || x.Status == BookingStatuses.Processing || x.Status == "Assigned"))
                 .OrderByDescending(x => x.FleetWashLogId)
                 .FirstOrDefaultAsync();
             if (activeBooking == null && activeFleetLog == null)
@@ -985,10 +966,10 @@ namespace AutoWashPro.BLL.Services
                 {
                     activeFleetLog.CheckOutImageUrl = checkOutImageUrl;
                 }
-                var (isUpdated, _, checkOutResult) = await UpdateBookingStatusAsync(targetBooking.BookingId, "Completed");
-                if (activeFleetLog != null && activeFleetLog.Status != "Completed")
+                var (isUpdated, _, checkOutResult) = await UpdateBookingStatusAsync(targetBooking.BookingId, BookingStatuses.Completed);
+                if (activeFleetLog != null && activeFleetLog.Status != BookingStatuses.Completed)
                 {
-                    activeFleetLog.Status = "Completed";
+                    activeFleetLog.Status = BookingStatuses.Completed;
                     activeFleetLog.CompletedTime = DateTime.UtcNow;
                     await _context.SaveChangesAsync();
                     if (activeFleetLog.LaneId > 0)
@@ -997,8 +978,7 @@ namespace AutoWashPro.BLL.Services
                     }
                 }
                 var updatedBooking = await _context.Bookings
-                    .Include(b => b.BookingDetails)
-                        .ThenInclude(bd => bd.Service)
+                    .Include(b => b.BookingDetails).ThenInclude(bd => bd.Service)
                     .Include(b => b.ProcessingLane)
                     .FirstOrDefaultAsync(b => b.BookingId == targetBooking.BookingId) ?? targetBooking;
                 return new BookingResponseDTO
@@ -1007,7 +987,7 @@ namespace AutoWashPro.BLL.Services
                     LicensePlate = normalizedPlate,
                     ServiceNames = updatedBooking.BookingDetails.Select(d => d.Service.ServiceName).ToList(),
                     ScheduledTime = updatedBooking.ScheduledTime,
-                    Status = "Completed",
+                    Status = BookingStatuses.Completed,
                     OriginalPrice = updatedBooking.OriginalPrice,
                     PointDiscountAmount = updatedBooking.PointDiscountAmount,
                     VoucherDiscountAmount = updatedBooking.VoucherDiscountAmount,
@@ -1028,7 +1008,7 @@ namespace AutoWashPro.BLL.Services
             else if (activeFleetLog != null)
             {
                 activeFleetLog.CheckOutImageUrl = await _photoService.UploadImageAsync(checkOutImage);
-                activeFleetLog.Status = "Completed";
+                activeFleetLog.Status = BookingStatuses.Completed;
                 activeFleetLog.CompletedTime = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 AutoWashPro.BLL.Services.Operations.CheckOutResult? checkOutResult = null;
@@ -1042,7 +1022,7 @@ namespace AutoWashPro.BLL.Services
                     LicensePlate = normalizedPlate,
                     ServiceNames = new List<string> { "Fleet Wash Service" },
                     ScheduledTime = activeFleetLog.CheckInTime,
-                    Status = "Completed",
+                    Status = BookingStatuses.Completed,
                     OriginalPrice = activeFleetLog.WashCost,
                     PointDiscountAmount = 0,
                     VoucherDiscountAmount = 0,
@@ -2036,33 +2016,37 @@ namespace AutoWashPro.BLL.Services
             booking.Status = "NoShow";
             await _context.SaveChangesAsync();
         }
-        private async Task<decimal> GetPriceFromDb(int serviceId, int vehicleTypeId, VehicleCondition condition, int branchId)
-        {
-            var servicePrice = await _context.ServicePrices
-                .FirstOrDefaultAsync(sp => sp.ServiceId == serviceId && sp.VehicleTypeId == vehicleTypeId && sp.BranchId == branchId);
-            if (servicePrice == null) return 0;
-            decimal price = servicePrice.Price;
-            if (condition == VehicleCondition.VeryDirty)
-                price *= 1.2m;
-            return price;
-        }
         public async Task ReportMismatchAsync(int bookingId, AutoWashPro.BLL.Enums.VehicleConditionEnum condition, int actualTypeId)
         {
-            var booking = await _context.Bookings.Include(b => b.BookingDetails).FirstOrDefaultAsync(b => b.BookingId == bookingId);
+            var booking = await _context.Bookings
+                .Include(b => b.BookingDetails)
+                .FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
-            booking.VehicleCondition = (AutoWashPro.DAL.Entities.VehicleCondition)condition;
+
+            var entityCondition = (AutoWashPro.DAL.Entities.VehicleCondition)condition;
+            booking.VehicleCondition = entityCondition;
             booking.ActualVehicleTypeId = actualTypeId;
-            decimal totalNewPrice = 0;
-            decimal totalOldPrice = 0;
-            foreach (var detail in booking.BookingDetails)
-            {
-                totalOldPrice += detail.Price;
-                totalNewPrice += await GetPriceFromDb(detail.ServiceId, actualTypeId, (AutoWashPro.DAL.Entities.VehicleCondition)condition, booking.BranchId);
-            }
+
+            var serviceIds = booking.BookingDetails.Select(d => d.ServiceId).ToHashSet();
+            var prices = await _context.ServicePrices
+                .Where(sp => serviceIds.Contains(sp.ServiceId)
+                          && sp.VehicleTypeId == actualTypeId
+                          && sp.BranchId == booking.BranchId)
+                .Select(sp => new { sp.ServiceId, sp.Price })
+                .AsNoTracking()
+                .ToDictionaryAsync(x => x.ServiceId, x => x.Price);
+
+            var multiplier = entityCondition == AutoWashPro.DAL.Entities.VehicleCondition.VeryDirty ? 1.2m : 1.0m;
+            var totalOldPrice = booking.BookingDetails.Sum(d => d.Price);
+            var totalNewPrice = booking.BookingDetails.Sum(d =>
+                prices.TryGetValue(d.ServiceId, out var p) ? p * multiplier : 0m);
+
             if (totalNewPrice > totalOldPrice)
             {
                 booking.MismatchSurcharge = totalNewPrice - totalOldPrice;
-                Console.WriteLine($"[PUSH] Notification to User: Incurred surcharge of {booking.MismatchSurcharge} VND due to vehicle type/dirtiness mismatch.");
+                _logger.LogInformation(
+                    "Vehicle mismatch surcharge of {Surcharge} VND applied to booking {BookingId}.",
+                    booking.MismatchSurcharge, booking.BookingId);
             }
             await _context.SaveChangesAsync();
         }
@@ -2493,43 +2477,56 @@ namespace AutoWashPro.BLL.Services
         {
             if (!request.TimeSlotId.HasValue && !request.AffectedDate.HasValue)
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Please select a date or time slot to cancel the booking.");
+
+            TimeSlot? slot = null;
+            if (request.TimeSlotId.HasValue)
+            {
+                slot = await _context.TimeSlots.FindAsync(request.TimeSlotId.Value);
+            }
+
             var query = _context.Bookings
                 .Include(b => b.User)
-                .Where(b => b.Status == "Pending" && b.BranchId == request.BranchId);
+                .Where(b => b.Status == BookingStatuses.Pending && b.BranchId == request.BranchId);
             if (request.AffectedDate.HasValue)
             {
                 var targetDate = request.AffectedDate.Value.Date;
                 query = query.Where(b => b.ScheduledTime.Date == targetDate);
             }
-            if (request.TimeSlotId.HasValue)
+            if (slot != null)
             {
-                var slot = await _context.TimeSlots.FindAsync(request.TimeSlotId.Value);
-                if (slot != null)
-                {
-                    query = query.Where(b => b.ScheduledTime.TimeOfDay >= slot.StartTime && b.ScheduledTime.TimeOfDay <= slot.EndTime);
-                }
+                query = query.Where(b => b.ScheduledTime.TimeOfDay >= slot.StartTime && b.ScheduledTime.TimeOfDay <= slot.EndTime);
             }
             var bookings = await query.ToListAsync();
             if (!bookings.Any()) return;
+
+            var bookingIds = bookings.Select(b => b.BookingId).ToList();
+            var pendingTxs = await _context.Transactions
+                .Where(t => t.ReferenceBookingId.HasValue
+                         && bookingIds.Contains(t.ReferenceBookingId.Value)
+                         && t.Status == "Pending"
+                         && (t.TransactionType == "BookingPayment" || t.TransactionType == "WalkInPayment"))
+                .ToListAsync();
+            var pendingTxsByBooking = pendingTxs
+                .Where(t => t.ReferenceBookingId.HasValue)
+                .ToLookup(t => t.ReferenceBookingId!.Value, t => t);
+
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
             try
             {
                 foreach (var booking in bookings)
                 {
-                    booking.Status = "CancelledBySystem";
-                    var pendingPaymentTransactions = await _context.Transactions
-                        .Where(t => t.ReferenceBookingId == booking.BookingId
-                                 && (t.TransactionType == "BookingPayment" || t.TransactionType == "WalkInPayment")
-                                 && t.Status == "Pending")
-                        .ToListAsync();
-                    foreach (var pendingPaymentTransaction in pendingPaymentTransactions)
+                    booking.Status = BookingStatuses.CancelledBySystem;
+                    foreach (var pendingPaymentTransaction in pendingTxsByBooking[booking.BookingId])
                     {
                         pendingPaymentTransaction.Status = "Expired";
                     }
                     if (booking.UserId.HasValue)
                     {
                         var userId = booking.UserId.Value;
-                        if (booking.FinalAmount > 0 && await HasCompletedBookingPaymentAsync(booking.BookingId)) { await _walletService.RefundBalanceAsync(userId, booking.FinalAmount, $"Automatic booking cancellation refund: {request.Reason}"); }
+                        if (booking.FinalAmount > 0 && await HasCompletedBookingPaymentAsync(booking.BookingId))
+                        {
+                            await _walletService.RefundBalanceAsync(userId, booking.FinalAmount, $"Automatic booking cancellation refund: {request.Reason}");
+                        }
                         if (booking.PointsUsed > 0)
                         {
                             await _walletService.RefundSpendablePointsAsync(userId, booking.PointsUsed, $"Automatic booking cancellation point refund: {request.Reason}", booking.BookingId);
@@ -2537,11 +2534,24 @@ namespace AutoWashPro.BLL.Services
                         await _voucherService.GenerateCompensationVoucherAsync(userId);
                         if (booking.User != null && !string.IsNullOrEmpty(booking.User.Email))
                         {
-                            _ = Task.Run(() => _emailService.SendEmailAsync(
-                                booking.User.Email,
-                                "AutoWashPro - Booking Cancellation Notice Due to Incident",
-                                $"Dear Customer,<br/><br/>We regret to inform you that your appointment on {booking.ScheduledTime:dd/MM/yyyy HH:mm} has been cancelled due to an unexpected incident.<br/>Reason: {request.Reason}<br/><br/>We have refunded the full amount of <b>{booking.FinalAmount:N0} VND</b> and loyalty points (if any) to your wallet.<br/>As an apology, we have also credited a 30,000 VND discount voucher (valid for 7 days) to your account.<br/><br/>Best regards,<br/>AutoWashPro"
-                            ));
+                            var email = booking.User.Email;
+                            var scheduledTime = booking.ScheduledTime;
+                            var finalAmount = booking.FinalAmount;
+                            var reason = request.Reason;
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await _emailService.SendEmailAsync(
+                                        email,
+                                        "AutoWashPro - Booking Cancellation Notice Due to Incident",
+                                        $"Dear Customer,<br/><br/>We regret to inform you that your appointment on {scheduledTime:dd/MM/yyyy HH:mm} has been cancelled due to an unexpected incident.<br/>Reason: {reason}<br/><br/>We have refunded the full amount of <b>{finalAmount:N0} VND</b> and loyalty points (if any) to your wallet.<br/>As an apology, we have also credited a 30,000 VND discount voucher (valid for 7 days) to your account.<br/><br/>Best regards,<br/>AutoWashPro");
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Failed to send cancellation email for booking {BookingId}.", booking.BookingId);
+                                }
+                            });
                         }
                     }
                 }

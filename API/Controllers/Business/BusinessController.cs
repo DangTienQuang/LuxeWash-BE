@@ -17,18 +17,16 @@ namespace API.Controllers
     {
         private readonly IBusinessService _businessService;
         private readonly IInvoiceService _invoiceService;
-        private readonly IBookingAttendanceService _attendanceService;
         private readonly IFleetService _fleetService;
         private readonly IBusinessBookingService _businessBookingService;
         private readonly IInvoicePdfService _invoicePdfService;
 
         public BusinessController(IBusinessService businessService, IInvoiceService invoiceService,
-            IBookingAttendanceService attendanceService, IFleetService fleetService, IBusinessBookingService businessBookingService,
+            IFleetService fleetService, IBusinessBookingService businessBookingService,
                 IInvoicePdfService invoicePdfService)
         {
             _businessService = businessService;
             _invoiceService = invoiceService;
-            _attendanceService = attendanceService;
             _fleetService = fleetService;
             _businessBookingService = businessBookingService;
             _invoicePdfService = invoicePdfService;
