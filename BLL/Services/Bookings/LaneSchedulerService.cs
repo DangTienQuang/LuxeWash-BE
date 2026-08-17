@@ -24,6 +24,14 @@ namespace BLL.Services
                 .Where(x => x.BranchId == branchId && x.IsActive && x.IsBusinessLane == isBusinessLane)
                 .ToListAsync();
             var occupancies = await _context.LaneOccupancies
+                .Include(o => o.Booking)
+                    .ThenInclude(b => b!.BookingDetails)
+                .Include(o => o.Booking)
+                    .ThenInclude(b => b!.FleetVehicle)
+                .Include(o => o.Booking)
+                    .ThenInclude(b => b!.Vehicle)
+                .Include(o => o.FleetWashLog)
+                    .ThenInclude(f => f!.FleetVehicle)
                 .Where(o => o.BranchId == branchId)
                 .ToListAsync();
             var result = new Dictionary<int, DateTime>();
@@ -36,7 +44,25 @@ namespace BLL.Services
                 }
                 else
                 {
-                    var projectedFree = occupancy.OccupiedAt.AddMinutes(15);
+                    var duration = 15;
+                    if (occupancy.Booking != null && occupancy.Booking.BookingDetails.Any())
+                    {
+                        var vehicleTypeId = occupancy.Booking.FleetVehicle?.VehicleTypeId ?? occupancy.Booking.Vehicle?.VehicleTypeId;
+                        if (vehicleTypeId != null)
+                        {
+                            var serviceIds = occupancy.Booking.BookingDetails.Select(x => x.ServiceId).ToList();
+                            var prices = await _context.ServicePrices
+                                .Where(x => x.BranchId == branchId && x.VehicleTypeId == vehicleTypeId && serviceIds.Contains(x.ServiceId))
+                                .ToListAsync();
+                            duration = WashTimeEstimator.EstimateMinutes(prices);
+                        }
+                    }
+                    else if (occupancy.FleetWashLog != null && occupancy.FleetWashLog.FleetVehicle != null)
+                    {
+                        duration = 30; // Better fallback for fleet
+                    }
+                    
+                    var projectedFree = occupancy.OccupiedAt.AddMinutes(duration);
                     result[lane.LaneId] = projectedFree > slotStart ? projectedFree : slotStart;
                 }
             }
@@ -125,9 +151,10 @@ namespace BLL.Services
             var existingBookings = await _context.Bookings
                 .Include(x => x.BookingDetails)
                 .Include(x => x.FleetVehicle)
+                .Include(x => x.Vehicle)
                 .Where(x =>
                     x.BranchId == branchId &&
-                    x.BookingType == "Business" &&
+                    (x.BookingType == "Business" || x.BookingType == "Fleet") &&
                     x.BookingId != excludedBookingId &&
                     (x.Status == "Pending" || x.Status == "Confirmed") &&
                     x.ScheduledTime >= dayStart &&
@@ -137,13 +164,17 @@ namespace BLL.Services
                 .ToListAsync();
             foreach (var booking in existingBookings)
             {
-                if (booking.FleetVehicle == null || booking.BookingDetails.Count == 0)
+                if (booking.BookingDetails.Count == 0)
                     continue;
+                var vehicleTypeId = booking.FleetVehicle?.VehicleTypeId ?? booking.Vehicle?.VehicleTypeId;
+                if (vehicleTypeId == null)
+                    continue;
+                    
                 var serviceIds = booking.BookingDetails.Select(x => x.ServiceId).ToList();
                 var prices = await _context.ServicePrices
                     .Where(x =>
                         x.BranchId == branchId &&
-                        x.VehicleTypeId == booking.FleetVehicle.VehicleTypeId &&
+                        x.VehicleTypeId == vehicleTypeId &&
                         serviceIds.Contains(x.ServiceId))
                     .ToListAsync();
                 var duration = WashTimeEstimator.EstimateMinutes(prices);

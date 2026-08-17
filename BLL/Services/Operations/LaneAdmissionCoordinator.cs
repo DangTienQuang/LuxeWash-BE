@@ -645,7 +645,7 @@ namespace AutoWashPro.BLL.Services.Operations
             AdmissionResult? admission = null;
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
-            if (waitingBookingObj != null && (waitingFleet == null || waitingBookingObj.WaitTime < waitingFleet.CheckInTime))
+            if (waitingBookingObj != null && (waitingBookingObj.IsVip || waitingFleet == null || waitingBookingObj.WaitTime < waitingFleet.CheckInTime))
             {
                 if (string.IsNullOrEmpty(waitingBookingObj.LicensePlate) || waitingBookingObj.LicensePlate == "UNKNOWN")
                 {

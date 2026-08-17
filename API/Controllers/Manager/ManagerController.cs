@@ -15,10 +15,12 @@ namespace API.Controllers.Manager
     public class ManagerController : ControllerBase
     {
         private readonly IManagerService _managerService;
+        private readonly AutoWashPro.BLL.Services.IBookingService _bookingService;
 
-        public ManagerController(IManagerService managerService)
+        public ManagerController(IManagerService managerService, AutoWashPro.BLL.Services.IBookingService bookingService)
         {
             _managerService = managerService;
+            _bookingService = bookingService;
         }
 
         private int GetUserId()
@@ -96,6 +98,13 @@ namespace API.Controllers.Manager
         {
             await _managerService.ConfirmCheckInAndAssignLaneAsync(GetUserId(), bookingId, assignment);
             return Ok(new { Message = "Booking checked in and lanes assigned successfully." });
+        }
+
+        [HttpPut("bookings/{bookingId}/no-show")]
+        public async Task<IActionResult> MarkBookingNoShow(int bookingId)
+        {
+            await _bookingService.MarkAsNoShowAsync(bookingId);
+            return Ok(new { statusCode = 200, message = "Customer marked as No-Show successfully." });
         }
 
         [HttpPut("lanes/{laneId}")]
