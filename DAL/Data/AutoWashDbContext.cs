@@ -38,7 +38,6 @@ namespace AutoWashPro.DAL.Data
         public DbSet<CarModel> CarModels { get; set; }
         public DbSet<Branch> Branches { get; set; }
         public DbSet<Lane> Lanes { get; set; }
-        public DbSet<StaffLaneAssignment> StaffLaneAssignments { get; set; }
         public DbSet<EmployeeProfile> EmployeeProfiles { get; set; }
         public DbSet<BusinessProfile> BusinessProfiles { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
@@ -272,18 +271,6 @@ namespace AutoWashPro.DAL.Data
                 .WithMany(br => br.Bookings)
                 .HasForeignKey(b => b.BranchId)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<StaffLaneAssignment>()
-                .HasOne(sla => sla.Staff)
-                .WithMany(u => u.LaneAssignments)
-                .HasForeignKey(sla => sla.StaffId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<StaffLaneAssignment>()
-                .HasOne(sla => sla.Lane)
-                .WithMany(l => l.StaffAssignments)
-                .HasForeignKey(sla => sla.LaneId)
-                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<EmployeeProfile>()
                 .HasOne(e => e.Branch)

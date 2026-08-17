@@ -43,17 +43,10 @@ namespace API.Controllers.Manager
         }
 
         [HttpGet("lanes")]
-        public async Task<IActionResult> GetLanesInBranch([FromQuery] DateTime? date)
+        public async Task<IActionResult> GetLanesInBranch()
         {
-            var lanes = await _managerService.GetLanesInBranchAsync(GetUserId(), date);
+            var lanes = await _managerService.GetLanesInBranchAsync(GetUserId());
             return Ok(lanes);
-        }
-
-        [HttpGet("lanes/{laneId}/staff")]
-        public async Task<IActionResult> GetStaffAssignedToLane(int laneId, [FromQuery] DateTime? date)
-        {
-            var staffList = await _managerService.GetStaffAssignedToLaneAsync(GetUserId(), laneId, date);
-            return Ok(staffList);
         }
 
         [HttpGet("timeslots")]
@@ -75,20 +68,6 @@ namespace API.Controllers.Manager
         {
             var timeSlot = await _managerService.CreateTimeSlotAsync(GetUserId(), dto);
             return CreatedAtAction(nameof(GetTimeSlotsInBranch), new { }, timeSlot);
-        }
-
-        [HttpPost("lanes/assign-staff")]
-        public async Task<IActionResult> AssignStaffToLane([FromBody] AssignStaffToLaneDTO dto)
-        {
-            await _managerService.AssignStaffToLaneAsync(GetUserId(), dto);
-            return Ok(new { Message = "Staff assigned to lane successfully." });
-        }
-
-        [HttpDelete("lanes/{laneId}/staff/{staffId}")]
-        public async Task<IActionResult> UnassignStaffFromLane(int laneId, int staffId, [FromQuery] DateTime? date)
-        {
-            await _managerService.UnassignStaffFromLaneAsync(GetUserId(), laneId, staffId, date);
-            return Ok(new { Message = "Staff unassigned from lane successfully." });
         }
 
         [HttpGet("bookings")]

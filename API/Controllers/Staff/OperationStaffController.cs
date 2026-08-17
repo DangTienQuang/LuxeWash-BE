@@ -24,17 +24,6 @@ namespace API.Controllers.Staff
             return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         }
 
-        [HttpGet("lane-assignment")]
-        public async Task<IActionResult> GetTodayLaneAssignment()
-        {
-            var assignment = await _staffService.GetTodayLaneAssignmentAsync(GetUserId());
-            if (assignment == null)
-            {
-                return Ok(new { Message = "No lane assigned for today." });
-            }
-            return Ok(assignment);
-        }
-
         [HttpGet("tasks")]
         [HttpGet("/api/v1/staff/tasks/bookings")]
         public async Task<IActionResult> GetAssignedTasks([FromQuery] System.DateTime? date)
@@ -43,12 +32,7 @@ namespace API.Controllers.Staff
             return Ok(tasks);
         }
 
-        [HttpPost("lanes/swap")]
-        public async Task<IActionResult> SwapShiftByPhone([FromBody] SwapLaneByPhoneDTO dto)
-        {
-            await _staffService.SwapShiftByPhoneAsync(GetUserId(), dto);
-            return Ok(new { Message = "Shift swapped successfully." });
-        }
+
         [HttpPost("bookings/{bookingId}/checkin")]
         public async Task<IActionResult> StaffCheckin(int bookingId, [FromForm] CheckInRequestDTO dto)
         {

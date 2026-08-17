@@ -23,7 +23,6 @@ namespace AutoWashPro.DAL.Entities
         public bool IsBusinessLane { get; set; }
         public bool IsVipLane { get; set; } = false;
 
-        public ICollection<StaffLaneAssignment> StaffAssignments { get; set; } = new List<StaffLaneAssignment>();
         public ICollection<Booking> ProcessingBookings { get; set; } = new List<Booking>();
     }
 }

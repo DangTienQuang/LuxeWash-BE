@@ -141,6 +141,9 @@ namespace AutoWashPro.BLL.DTOs
     public class CreateVipVouchersDTO : CreateAutomatedVoucherBaseDTO
     {
     }
+    public class CreateWelcomeVouchersDTO : CreateAutomatedVoucherBaseDTO
+    {
+    }
     public class CampaignVoucherResponseDTO
     {
         public int VoucherId { get; set; }

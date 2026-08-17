@@ -31,30 +31,6 @@ namespace AutoWashPro.BLL.Services
             _laneCoordinator = laneCoordinator;
             _photoService = photoService;
         }
-        public async Task<StaffLaneTaskDTO?> GetTodayLaneAssignmentAsync(int staffUserId, DateTime? date = null)
-        {
-            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
-            var assignment = await _context.StaffLaneAssignments
-                .Include(a => a.Lane)
-                .Where(a => a.StaffId == staffUserId && a.AssignedDate.Date == targetDate)
-                .OrderByDescending(a => a.AssignmentId)
-                .FirstOrDefaultAsync();
-            if (assignment == null)
-            {
-                return new StaffLaneTaskDTO
-                {
-                    LaneId = 0,
-                    LaneName = "All Lanes",
-                    AssignedDate = targetDate
-                };
-            }
-            return new StaffLaneTaskDTO
-            {
-                LaneId = assignment.LaneId,
-                LaneName = assignment.Lane.Name,
-                AssignedDate = assignment.AssignedDate
-            };
-        }
         public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null, bool allowOutsideScheduledTime = false)
         {
             var booking = await _context.Bookings
@@ -369,27 +345,7 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
             return true;
         }
-        public async Task<bool> SwapShiftByPhoneAsync(int currentStaffId, SwapLaneByPhoneDTO dto)
-        {
-            var targetStaff = await _context.Users
-                .FirstOrDefaultAsync(u => u.PhoneNumber == dto.TargetPhoneNumber && u.Role == "Staff" && u.Status == "Active");
-            if (targetStaff == null)
-            {
-                throw new BadRequestException("Employee with this phone number not found or unavailable.");
-            }
-            var targetDate = dto.Date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
-            var currentAssignment = await _context.StaffLaneAssignments
-                .FirstOrDefaultAsync(a => a.StaffId == currentStaffId && a.AssignedDate.Date == targetDate);
-            var targetAssignment = await _context.StaffLaneAssignments
-                .FirstOrDefaultAsync(a => a.StaffId == targetStaff.UserId && a.AssignedDate.Date == targetDate);
-            if (currentAssignment == null || targetAssignment == null)
-            {
-                throw new BadRequestException("One of the two employees does not have a shift assigned on this date to swap.");
-            }
-            (currentAssignment.LaneId, targetAssignment.LaneId) = (targetAssignment.LaneId, currentAssignment.LaneId);
-            await _context.SaveChangesAsync();
-            return true;
-        }
+
         public async Task<List<AutoWashPro.BLL.Services.Operations.LaneOccupancyDTO>> GetActiveLaneOccupanciesAsync(int staffUserId)
         {
             var staffBranchId = await _context.EmployeeProfiles

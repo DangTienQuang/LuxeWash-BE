@@ -61,63 +61,6 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
             return staffList;
         }
-        public async Task<bool> AssignStaffToLaneAsync(int managerUserId, AssignStaffToLaneDTO assignDto)
-        {
-            var managerProfile = await GetManagerProfileAsync(managerUserId);
-            var staffProfile = await _context.EmployeeProfiles
-                .Include(e => e.User)
-                .FirstOrDefaultAsync(e => e.EmployeeId == assignDto.StaffId && e.BranchId == managerProfile.BranchId && e.User.Role == "Staff");
-            if (staffProfile == null)
-            {
-                throw new BadRequestException("Staff not found in your branch.");
-            }
-            var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == assignDto.LaneId && l.BranchId == managerProfile.BranchId);
-            if (lane == null)
-            {
-                throw new BadRequestException("Lane not found in your branch.");
-            }
-            var hasScheduledShift = await _context.StaffShiftAssignments
-                .AnyAsync(s => s.StaffUserId == staffProfile.EmployeeId && s.WorkDate.Date == assignDto.AssignedDate.Date && s.WorkShiftId == assignDto.WorkShiftId);
-            if (!hasScheduledShift)
-            {
-                throw new BadRequestException("Employee does not have a work schedule in this shift on the selected date.");
-            }
-            var existingAssignment = await _context.StaffLaneAssignments
-                .AnyAsync(a => a.StaffId == assignDto.StaffId && a.AssignedDate.Date == assignDto.AssignedDate.Date && a.WorkShiftId == assignDto.WorkShiftId);
-            if (existingAssignment)
-            {
-                throw new BadRequestException("This employee is already assigned to another lane in this shift.");
-            }
-            var assignment = new StaffLaneAssignment
-            {
-                StaffId = assignDto.StaffId,
-                LaneId = assignDto.LaneId,
-                AssignedDate = assignDto.AssignedDate.Date,
-                WorkShiftId = assignDto.WorkShiftId
-            };
-            _context.StaffLaneAssignments.Add(assignment);
-            await _context.SaveChangesAsync();
-            return true;
-        }
-        public async Task<bool> UnassignStaffFromLaneAsync(int managerUserId, int laneId, int staffId, System.DateTime? date = null)
-        {
-            var managerProfile = await GetManagerProfileAsync(managerUserId);
-            var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == laneId && l.BranchId == managerProfile.BranchId);
-            if (lane == null)
-            {
-                throw new NotFoundException("Lane not found in your branch.");
-            }
-            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
-            var assignment = await _context.StaffLaneAssignments
-                .FirstOrDefaultAsync(a => a.LaneId == laneId && a.StaffId == staffId && a.AssignedDate.Date == targetDate);
-            if (assignment == null)
-            {
-                throw new NotFoundException("Active staff assignment not found for the specified date in this lane.");
-            }
-            _context.StaffLaneAssignments.Remove(assignment);
-            await _context.SaveChangesAsync();
-            return true;
-        }
         public async Task<List<ManagerBookingListDTO>> GetCheckInBookingsInBranchAsync(int managerUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
@@ -232,13 +175,12 @@ namespace AutoWashPro.BLL.Services
                 IsVipOnly = timeSlot.IsVipOnly
             };
         }
-        public async Task<List<LaneStaffAssignmentDTO>> GetLanesInBranchAsync(int managerUserId, System.DateTime? date = null)
+        public async Task<List<LaneDTO>> GetLanesInBranchAsync(int managerUserId)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var lanes = await _context.Lanes
                 .Where(l => l.BranchId == managerProfile.BranchId)
-                .Select(l => new LaneStaffAssignmentDTO
+                .Select(l => new LaneDTO
                 {
                     LaneId = l.LaneId,
                     Name = l.Name,
@@ -248,51 +190,7 @@ namespace AutoWashPro.BLL.Services
                     IsVipLane = l.IsVipLane
                 })
                 .ToListAsync();
-            var laneIds = lanes.Select(l => l.LaneId).ToList();
-            var assignments = await _context.StaffLaneAssignments
-                .Include(a => a.Staff)
-                    .ThenInclude(s => s.EmployeeProfile)
-                .Include(a => a.WorkShift)
-                .Where(a => laneIds.Contains(a.LaneId) && a.AssignedDate.Date == targetDate)
-                .ToListAsync();
-            foreach (var lane in lanes)
-            {
-                lane.AssignedStaff = assignments.Where(a => a.LaneId == lane.LaneId).Select(a => new ManagerStaffDTO
-                {
-                    UserId = a.Staff.UserId,
-                    FullName = a.Staff.EmployeeProfile!.FullName,
-                    PhoneNumber = a.Staff.PhoneNumber,
-                    Status = a.Staff.Status,
-                    ShiftId = a.WorkShiftId,
-                    ShiftName = a.WorkShift.ShiftName
-                }).ToList();
-            }
             return lanes;
-        }
-        public async Task<List<ManagerStaffDTO>> GetStaffAssignedToLaneAsync(int managerUserId, int laneId, System.DateTime? date = null)
-        {
-            var managerProfile = await GetManagerProfileAsync(managerUserId);
-            var lane = await _context.Lanes.FirstOrDefaultAsync(l => l.LaneId == laneId && l.BranchId == managerProfile.BranchId);
-            if (lane == null)
-            {
-                throw new NotFoundException("Lane not found in your branch.");
-            }
-            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
-            var assignments = await _context.StaffLaneAssignments
-                .Include(a => a.Staff)
-                    .ThenInclude(s => s.EmployeeProfile)
-                .Include(a => a.WorkShift)
-                .Where(a => a.LaneId == laneId && a.AssignedDate.Date == targetDate)
-                .ToListAsync();
-            return assignments.Select(a => new ManagerStaffDTO
-            {
-                UserId = a.Staff.UserId,
-                FullName = a.Staff.EmployeeProfile!.FullName,
-                PhoneNumber = a.Staff.PhoneNumber,
-                Status = a.Staff.Status,
-                ShiftId = a.WorkShiftId,
-                ShiftName = a.WorkShift.ShiftName
-            }).ToList();
         }
         public async Task<bool> ConfirmCheckInAndAssignLaneAsync(int managerUserId, int bookingId, AssignBookingToLaneDTO assignment)
         {

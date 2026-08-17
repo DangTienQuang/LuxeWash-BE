@@ -80,6 +80,13 @@ namespace API.Controllers.Admin
             return Created("", new { statusCode = 201, message = "VIP voucher rule created successfully.", data = result });
         }
 
+        [HttpPost("welcome")]
+        public async Task<IActionResult> CreateWelcomeVouchers([FromBody] CreateWelcomeVouchersDTO request)
+        {
+            var result = await _voucherCampaignService.CreateWelcomeVouchersAsync(request);
+            return Created("", new { statusCode = 201, message = "Welcome voucher rule created successfully.", data = result });
+        }
+
 
         [HttpPost("process-campaigns")]
         public async Task<IActionResult> ProcessCampaignsNow()

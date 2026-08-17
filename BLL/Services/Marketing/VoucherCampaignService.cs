@@ -50,6 +50,12 @@ namespace AutoWashPro.BLL.Services
             return response;
         }
 
+        public async Task<CampaignVoucherResponseDTO> CreateWelcomeVouchersAsync(CreateWelcomeVouchersDTO request)
+        {
+            var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Welcome);
+            return MapCampaignDto(voucher);
+        }
+
         public async Task<List<VoucherCampaignProcessResultDTO>> ProcessDailyCampaignsAsync(DateTime? targetDate = null)
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
