@@ -16,11 +16,16 @@ namespace API.Controllers.Manager
     {
         private readonly IManagerService _managerService;
         private readonly AutoWashPro.BLL.Services.IBookingService _bookingService;
+        private readonly AutoWashPro.BLL.Services.ICRMCampaignService _crmCampaignService;
 
-        public ManagerController(IManagerService managerService, AutoWashPro.BLL.Services.IBookingService bookingService)
+        public ManagerController(
+            IManagerService managerService, 
+            AutoWashPro.BLL.Services.IBookingService bookingService,
+            AutoWashPro.BLL.Services.ICRMCampaignService crmCampaignService)
         {
             _managerService = managerService;
             _bookingService = bookingService;
+            _crmCampaignService = crmCampaignService;
         }
 
         private int GetUserId()
@@ -147,6 +152,13 @@ namespace API.Controllers.Manager
         {
             var result = await _managerService.CheckRevenueStimulusCampaignAsync(GetUserId(), month, year);
             return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
+        [HttpPost("trigger-weather")]
+        public async Task<IActionResult> TriggerWeatherCampaign()
+        {
+            var result = await _crmCampaignService.TriggerWeatherCampaignAsync();
+            return Ok(new { statusCode = 200, message = result });
         }
 
         [HttpGet("revenue-stimulus/proposals")]
