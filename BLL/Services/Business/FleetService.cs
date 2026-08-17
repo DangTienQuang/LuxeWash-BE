@@ -447,7 +447,7 @@ namespace BLL.Services
             {
                 throw new NotFoundException("Business profile not found.");
             }
-            var today = DateTime.Today;
+            var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
             var totalVehicles =
                 await _context.FleetVehicles

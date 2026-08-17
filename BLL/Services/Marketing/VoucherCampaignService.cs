@@ -306,8 +306,8 @@ namespace AutoWashPro.BLL.Services
             }
 
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var startDate = request.StartDate?.ToUniversalTime() ?? now;
-            var endDate = request.EndDate?.ToUniversalTime() ?? startDate.AddDays(request.ExpiryDays);
+            var startDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.StartDate) ?? now;
+            var endDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.EndDate) ?? startDate.AddDays(request.ExpiryDays);
             if (endDate <= now) throw new BadRequestException("Expiration date must be in the future.");
 
             var voucher = new Voucher

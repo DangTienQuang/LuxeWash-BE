@@ -972,7 +972,7 @@ namespace BLL.Services
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
             if (business == null) throw new NotFoundException("Business profile not found.");
-            var today = DateTime.Today;
+            var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
             var vehicleIds = await _context.FleetVehicles
                 .Where(x => x.BusinessProfileId == business.BusinessProfileId)

@@ -376,7 +376,7 @@ namespace AutoWashPro.BLL.Services
                     <p>Xin chào <b>{fullName}</b>,</p>
                     <p>Mã OTP đăng ký tài khoản LuxeWash của bạn là:</p>
                     <div style='font-size: 32px; font-weight: bold; letter-spacing: 6px; text-align: center; padding: 16px; background: #f3f7ff; border-radius: 8px;'>{otp}</div>
-                    <p>Mã này có hiệu lực trong 10 phút, đến <b>{otpExpiresAt.ToLocalTime():dd/MM/yyyy HH:mm}</b>.</p>
+                    <p>Mã này có hiệu lực trong 10 phút, đến <b>{otpExpiresAt:dd/MM/yyyy HH:mm}</b>.</p>
                     <p>Nếu bạn không thực hiện đăng ký, vui lòng bỏ qua email này.</p>
                     <p>Trân trọng,<br><b>Đội ngũ LuxeWash</b></p>
                 </div>";
@@ -532,7 +532,7 @@ namespace AutoWashPro.BLL.Services
                     <p>Xin chào <b>{fullName}</b>,</p>
                     <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản LuxeWash của bạn. Mã OTP xác thực:</p>
                     <div style='font-size: 32px; font-weight: bold; letter-spacing: 6px; text-align: center; padding: 16px; background: #fff3f3; border-radius: 8px; color: #dc3545;'>{otp}</div>
-                    <p>Mã này có hiệu lực trong 10 phút, đến <b>{otpExpiresAt.ToLocalTime():dd/MM/yyyy HH:mm}</b>.</p>
+                    <p>Mã này có hiệu lực trong 10 phút, đến <b>{otpExpiresAt:dd/MM/yyyy HH:mm}</b>.</p>
                     <p style='color: #888;'>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email và đổi mật khẩu ngay lập tức nếu bạn nghi ngờ tài khoản bị xâm phạm.</p>
                     <p>Trân trọng,<br><b>Đội ngũ LuxeWash</b></p>
                 </div>";

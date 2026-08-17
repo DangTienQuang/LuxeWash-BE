@@ -226,7 +226,7 @@ namespace AutoWashPro.BLL.Services
             if (request.VehicleTypeId <= 0) request.VehicleTypeId = null;
             if (request.RequiredTierId <= 0) request.RequiredTierId = null;
 
-            if (request.ExpiryDate.ToUniversalTime() <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
+            if (AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.ExpiryDate) <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("Expiration date must be in the future.");
 
             var code = request.Code.Trim().ToUpperInvariant();
@@ -243,8 +243,8 @@ namespace AutoWashPro.BLL.Services
                 MaxUsages = request.MaxUsages,
                 CurrentUsageCount = 0,
                 MaxUsagePerUser = request.MaxUsagePerUser,
-                ExpiryDate = request.ExpiryDate.ToUniversalTime(),
-                StartDate = request.StartDate?.ToUniversalTime(),
+                ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.ExpiryDate),
+                StartDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.StartDate),
                 CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                 PointsRequired = request.PointsRequired,
                 VoucherType = (AutoWashPro.DAL.Enums.VoucherType)request.VoucherType,
@@ -269,7 +269,7 @@ namespace AutoWashPro.BLL.Services
             if (request.VehicleTypeId <= 0) request.VehicleTypeId = null;
             if (request.RequiredTierId <= 0) request.RequiredTierId = null;
 
-            if (request.ExpiryDate.ToUniversalTime() <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
+            if (AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.ExpiryDate) <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("Expiration date must be in the future.");
 
             var voucher = await _context.Vouchers.Include(v => v.RequiredTier).FirstOrDefaultAsync(v => v.VoucherId == id);
@@ -286,8 +286,8 @@ namespace AutoWashPro.BLL.Services
             voucher.DiscountAmount = request.DiscountAmount;
             voucher.MaxUsages = request.MaxUsages;
             voucher.MaxUsagePerUser = request.MaxUsagePerUser;
-            voucher.ExpiryDate = request.ExpiryDate.ToUniversalTime();
-            voucher.StartDate = request.StartDate?.ToUniversalTime();
+            voucher.ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.ExpiryDate);
+            voucher.StartDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.StartDate);
             voucher.PointsRequired = request.PointsRequired;
             voucher.VoucherType = (AutoWashPro.DAL.Enums.VoucherType)request.VoucherType;
             voucher.ImageUrl = request.ImageUrl;
