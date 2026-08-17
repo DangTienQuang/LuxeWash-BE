@@ -93,7 +93,7 @@ namespace AutoWashPro.BLL.Services
                 Quantity = dto.Quantity,
                 Reason = dto.Note,
                 Status = "Pending",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.ExtraMaterialUsageRequests.Add(request);
             await _context.SaveChangesAsync();
@@ -127,7 +127,7 @@ namespace AutoWashPro.BLL.Services
             await ConsumeMaterialAsync(branchWarehouse, request.Booking, null, request.MaterialId, request.Quantity, "Extra", managerUserId, request.Reason);
             request.Status = "Approved";
             request.ReviewedByManagerId = managerUserId;
-            request.ReviewedAt = DateTime.UtcNow;
+            request.ReviewedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             request.ManagerNote = dto.ManagerNote;
             await _context.SaveChangesAsync();
             await tx.CommitAsync();
@@ -148,7 +148,7 @@ namespace AutoWashPro.BLL.Services
             }
             request.Status = "Rejected";
             request.ReviewedByManagerId = managerUserId;
-            request.ReviewedAt = DateTime.UtcNow;
+            request.ReviewedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             request.ManagerNote = dto.ManagerNote;
             await _context.SaveChangesAsync();
             return await GetExtraUsageRequestDtoAsync(request.RequestId);
@@ -185,7 +185,7 @@ namespace AutoWashPro.BLL.Services
                     && b.MaterialId == materialId
                     && b.RemainingQuantity > 0
                     && b.Status == "Active"
-                    && (b.ExpiryDate == null || b.ExpiryDate.Value.Date > DateTime.UtcNow.Date))
+                    && (b.ExpiryDate == null || b.ExpiryDate.Value.Date > AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date))
                 .OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue)
                 .ThenBy(b => b.ImportedAt)
                 .ToListAsync();
@@ -204,7 +204,7 @@ namespace AutoWashPro.BLL.Services
                     MaterialId = materialId,
                     CurrentQuantity = 0,
                     MinStockLevel = material.DefaultMinStockLevel,
-                    UpdatedAt = DateTime.UtcNow
+                    UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 };
                 _context.WarehouseStocks.Add(stock);
                 await _context.SaveChangesAsync();
@@ -229,7 +229,7 @@ namespace AutoWashPro.BLL.Services
                 batch.RemainingQuantity -= used;
                 if (batch.RemainingQuantity == 0) batch.Status = "Depleted";
                 stock.CurrentQuantity -= used;
-                stock.UpdatedAt = DateTime.UtcNow;
+                stock.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 var cost = used * batch.UnitCost;
                 _context.BookingMaterialUsages.Add(new BookingMaterialUsage
                 {
@@ -243,7 +243,7 @@ namespace AutoWashPro.BLL.Services
                     CostAmount = cost,
                     IsCostPending = false,
                     UsageType = usageType,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 });
                 _context.InventoryTransactions.Add(new InventoryTransaction
                 {
@@ -268,7 +268,7 @@ namespace AutoWashPro.BLL.Services
                 var estimatedUnitCost = await EstimateUnitCostAsync(materialId);
                 var before = stock.CurrentQuantity;
                 stock.CurrentQuantity -= remaining;
-                stock.UpdatedAt = DateTime.UtcNow;
+                stock.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 var cost = remaining * estimatedUnitCost;
                 _context.BookingMaterialUsages.Add(new BookingMaterialUsage
                 {
@@ -283,7 +283,7 @@ namespace AutoWashPro.BLL.Services
                     CostAmount = cost,
                     IsCostPending = true,
                     UsageType = usageType,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 });
                 _context.InventoryTransactions.Add(new InventoryTransaction
                 {

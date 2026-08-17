@@ -69,7 +69,7 @@ namespace AutoWashPro.BLL.Services
 
                 var otp = GenerateOtp();
                 var otpHash = HashOtp(otp);
-                var otpExpiresAt = DateTime.UtcNow.AddMinutes(10);
+                var otpExpiresAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddMinutes(10);
 
                 User user;
                 if (existingUser != null)
@@ -180,7 +180,7 @@ namespace AutoWashPro.BLL.Services
             var refreshToken = GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(7);
             await _context.SaveChangesAsync();
 
             return new AuthResponseDTO
@@ -205,7 +205,7 @@ namespace AutoWashPro.BLL.Services
             if (user.Status != UserStatuses.Pending) throw new BadRequestException("This account is not in a pending verification state.");
             if (string.IsNullOrWhiteSpace(user.EmailVerificationOtpHash) || user.EmailVerificationOtpExpiresAt == null)
                 throw new BadRequestException("Account does not have a verification OTP code. Please register again.");
-            if (user.EmailVerificationOtpExpiresAt <= DateTime.UtcNow)
+            if (user.EmailVerificationOtpExpiresAt <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("OTP code has expired. Please register again to receive a new code.");
             if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(request.Otp), StringComparison.Ordinal))
                 throw new BadRequestException("Incorrect OTP code.");
@@ -217,24 +217,24 @@ namespace AutoWashPro.BLL.Services
             var token = CreateJwtToken(user);
             var refreshToken = GenerateRefreshToken();
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(7);
 
             var welcomeVouchers = await _context.Vouchers
                 .Where(v => v.CampaignType == AutoWashPro.DAL.Enums.VoucherCampaignType.Welcome && v.IsActive &&
-                            (!v.StartDate.HasValue || v.StartDate <= DateTime.UtcNow) &&
-                            v.ExpiryDate > DateTime.UtcNow)
+                            (!v.StartDate.HasValue || v.StartDate <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow) &&
+                            v.ExpiryDate > AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 .ToListAsync();
 
             foreach(var voucher in welcomeVouchers)
             {
-                var expiry = voucher.ExpiryDays.HasValue ? DateTime.UtcNow.AddDays(voucher.ExpiryDays.Value) : voucher.ExpiryDate;
+                var expiry = voucher.ExpiryDays.HasValue ? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(voucher.ExpiryDays.Value) : voucher.ExpiryDate;
                 _context.UserVouchers.Add(new UserVoucher
                 {
                     UserId = user.UserId,
                     VoucherId = voucher.VoucherId,
                     IsUsed = false,
                     UsageCount = 0,
-                    ReceivedDate = DateTime.UtcNow,
+                    ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                     ExpiryDate = expiry <= voucher.ExpiryDate ? expiry : voucher.ExpiryDate
                 });
             }
@@ -268,7 +268,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(u => u.EmployeeProfile)
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
-            if (user == null || user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            if (user == null || user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiryTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new UnauthorizedException("Refresh token is invalid or expired. Please log in again.");
 
             var newAccessToken = CreateJwtToken(user);
@@ -326,7 +326,7 @@ namespace AutoWashPro.BLL.Services
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(30),
+                Expires = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddMinutes(30),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
             var token = tokenHandler.CreateToken(tokenDescriptor);
@@ -401,7 +401,7 @@ namespace AutoWashPro.BLL.Services
             // Sinh OTP mới và set lại thời gian 10 phút
             var otp = GenerateOtp();
             var otpHash = HashOtp(otp);
-            var otpExpiresAt = DateTime.UtcNow.AddMinutes(10);
+            var otpExpiresAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddMinutes(10);
 
             user.EmailVerificationOtpHash = otpHash;
             user.EmailVerificationOtpExpiresAt = otpExpiresAt;
@@ -477,7 +477,7 @@ namespace AutoWashPro.BLL.Services
 
             var otp = GenerateOtp();
             var otpHash = HashOtp(otp);
-            var otpExpiresAt = DateTime.UtcNow.AddMinutes(10);
+            var otpExpiresAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddMinutes(10);
 
             user.EmailVerificationOtpHash = otpHash;
             user.EmailVerificationOtpExpiresAt = otpExpiresAt;
@@ -510,7 +510,7 @@ namespace AutoWashPro.BLL.Services
             if (string.IsNullOrWhiteSpace(user.EmailVerificationOtpHash) || user.EmailVerificationOtpExpiresAt == null)
                 throw new BadRequestException("No password reset request found. Please submit a forgot password request first.");
 
-            if (user.EmailVerificationOtpExpiresAt <= DateTime.UtcNow)
+            if (user.EmailVerificationOtpExpiresAt <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("OTP code has expired. Please submit another forgot password request.");
 
             if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(request.Otp), StringComparison.Ordinal))

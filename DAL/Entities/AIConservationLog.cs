@@ -24,6 +24,6 @@ namespace DAL.Entities
 
         public bool Blocked { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

@@ -87,7 +87,7 @@ namespace AutoWashPro.BLL.Services
                 {
                     FullName = request.FullName.Trim(),
                     Position = request.Position?.Trim(),
-                    HiredDate = request.HiredDate?.Date ?? DateTime.UtcNow.Date
+                    HiredDate = request.HiredDate?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date
                 };
             }
             else
@@ -96,7 +96,7 @@ namespace AutoWashPro.BLL.Services
                 {
                     FullName = request.FullName.Trim(),
                     Position = request.Position?.Trim(),
-                    HiredDate = request.HiredDate?.Date ?? DateTime.UtcNow.Date
+                    HiredDate = request.HiredDate?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date
                 };
             }
             _context.Users.Add(user);
@@ -271,7 +271,7 @@ namespace AutoWashPro.BLL.Services
             assignment.WorkDate = request.WorkDate.Date;
             assignment.Status = request.Status;
             assignment.Note = request.Note?.Trim();
-            assignment.UpdatedAt = DateTime.UtcNow;
+            assignment.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             await _context.SaveChangesAsync();
             return await GetAssignmentDtoAsync(assignment.AssignmentId);
         }
@@ -331,7 +331,7 @@ namespace AutoWashPro.BLL.Services
             if (overtime.Status != "Pending") throw new BadRequestException("This request has already been processed.");
             overtime.Status = request.IsApproved ? "Approved" : "Rejected";
             overtime.ReviewedByUserId = managerUserId;
-            overtime.ReviewedAt = DateTime.UtcNow;
+            overtime.ReviewedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             overtime.ReviewNote = request.ReviewNote?.Trim();
             await _context.SaveChangesAsync();
             return await GetOvertimeDtoAsync(overtime.OvertimeRequestId);
@@ -422,7 +422,7 @@ namespace AutoWashPro.BLL.Services
             {
                 swap.Status = request.IsApproved ? "Approved" : "Rejected";
                 swap.ReviewedByUserId = managerUserId;
-                swap.ReviewedAt = DateTime.UtcNow;
+                swap.ReviewedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 swap.ReviewNote = request.ReviewNote?.Trim();
                 if (request.IsApproved)
                 {
@@ -434,15 +434,15 @@ namespace AutoWashPro.BLL.Services
                         await EnsureNoAssignmentConflictAsync(fromStaffId, swap.ToAssignment.WorkShiftId, swap.ToAssignment.WorkDate, swap.FromAssignmentId);
                         swap.FromAssignment.StaffUserId = swap.ToAssignment.StaffUserId;
                         swap.ToAssignment.StaffUserId = fromStaffId;
-                        swap.FromAssignment.UpdatedAt = DateTime.UtcNow;
-                        swap.ToAssignment.UpdatedAt = DateTime.UtcNow;
+                        swap.FromAssignment.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+                        swap.ToAssignment.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                     }
                     else if (swap.ToWorkShiftId.HasValue && swap.ToWorkDate.HasValue)
                     {
                         await EnsureNoAssignmentConflictAsync(swap.FromAssignment.StaffUserId, swap.ToWorkShiftId.Value, swap.ToWorkDate.Value, swap.FromAssignmentId);
                         swap.FromAssignment.WorkShiftId = swap.ToWorkShiftId.Value;
                         swap.FromAssignment.WorkDate = swap.ToWorkDate.Value;
-                        swap.FromAssignment.UpdatedAt = DateTime.UtcNow;
+                        swap.FromAssignment.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                     }
                 }
                 await _context.SaveChangesAsync();

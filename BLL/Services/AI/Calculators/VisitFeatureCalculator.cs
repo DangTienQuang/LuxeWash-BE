@@ -52,7 +52,7 @@ namespace BLL.Services.AI.Calculators
             }
 
             profile.DaysSinceLastVisit =
-                (DateTime.UtcNow - bookings.Last().ScheduledTime).Days;
+                (AutoWashPro.DAL.Helpers.TimeHelper.VnNow - bookings.Last().ScheduledTime).Days;
         }
 
         private void CalculateVisitGap(CustomerFeatureProfile profile, List<Booking> bookings)

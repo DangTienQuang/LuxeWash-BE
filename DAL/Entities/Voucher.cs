@@ -26,7 +26,7 @@ namespace AutoWashPro.DAL.Entities
         public DateTime ExpiryDate { get; set; }
         public int? ExpiryDays { get; set; }
         public DateTime? StartDate { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
         public bool IsActive { get; set; } = true;
 
         public int PointsRequired { get; set; }

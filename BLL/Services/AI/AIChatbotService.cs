@@ -474,7 +474,7 @@ namespace BLL.Services
                 if (profile.LastVisitDate.HasValue)
                 {
                     var daysSinceLastVisit =
-                        (DateTime.UtcNow
+                        (AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                          - profile.LastVisitDate.Value).Days;
 
                     if (daysSinceLastVisit > 30)
@@ -626,7 +626,7 @@ namespace BLL.Services
                     Message = message,
                     Response = response,
                     Blocked = blocked,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 };
 
                 _context.AIConversationLogs.Add(log);

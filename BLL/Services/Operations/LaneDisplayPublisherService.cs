@@ -123,12 +123,12 @@ namespace AutoWashPro.BLL.Services.Operations
             var response = new LaneDisplayLatestResponseDTO
             {
                 BranchId = branchId,
-                ServerTime = DateTime.UtcNow
+                ServerTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
 
             if (_latestBranchEvent.TryGetValue(branchId, out var latestEvent))
             {
-                if (latestEvent.DisplayUntil == null || latestEvent.DisplayUntil >= DateTime.UtcNow)
+                if (latestEvent.DisplayUntil == null || latestEvent.DisplayUntil >= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 {
                     response.LatestEvent = latestEvent;
                 }
@@ -192,7 +192,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 Type = "BarrierOpenCommand",
                 LicensePlate = licensePlate,
                 LaneName = laneName,
-                Timestamp = DateTime.UtcNow
+                Timestamp = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
 
             var signalRPublished = false;

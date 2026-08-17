@@ -29,7 +29,7 @@ namespace BLL.Services
             {
                 throw new NotFoundException($"Branch with ID {branchId} not found.");
             }
-            var now = DateTime.UtcNow.ToVnTime();
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             int month = targetMonth ?? now.Month;
             int year = targetYear ?? now.Year;
             var currentMonthStart = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -107,8 +107,8 @@ namespace BLL.Services
                     IsActive = false, 
                     ApprovalStatus = "Proposed",
                     ProposalNote = $"Doanh thu tháng {eval.TargetMonth:D2}/{eval.TargetYear} của {eval.BranchName} giảm {eval.RevenueDropPercentage}% (còn {eval.CurrentMonthRevenue:N0}đ so với {eval.PreviousMonthRevenue:N0}đ). Đề xuất Voucher giảm {eval.CalculatedVoucherDiscountPercent}% để kéo khách hàng trở lại.",
-                    StartDate = DateTime.UtcNow,
-                    ExpiryDate = DateTime.UtcNow.AddDays(30)
+                    StartDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                    ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(30)
                 };
                 _context.Vouchers.Add(voucher);
                 await _context.SaveChangesAsync();
@@ -168,7 +168,7 @@ namespace BLL.Services
                 branchCustomerCount = await _context.Users.CountAsync(u => u.Status == "Active" && u.Role == "Customer");
             }
             var list = new List<VoucherProposalDTO>();
-            var now = DateTime.UtcNow.ToVnTime();
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             foreach (var v in proposals)
             {
                 list.Add(new VoucherProposalDTO
@@ -215,7 +215,7 @@ namespace BLL.Services
             if (dto.ExpiryDays.HasValue && dto.ExpiryDays.Value > 0)
             {
                 voucher.ExpiryDays = dto.ExpiryDays.Value;
-                voucher.ExpiryDate = DateTime.UtcNow.AddDays(dto.ExpiryDays.Value);
+                voucher.ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(dto.ExpiryDays.Value);
             }
             if (dto.ProposalNote != null)
             {
@@ -224,7 +224,7 @@ namespace BLL.Services
             await _context.SaveChangesAsync();
             _logger.LogInformation("Modified voucher proposal #{VoucherId} for branch {BranchId}", voucherId, branchId);
             var branch = await _context.Branches.FirstAsync(b => b.BranchId == branchId);
-            var now = DateTime.UtcNow.ToVnTime();
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             return new VoucherProposalDTO
             {
                 VoucherId = voucher.VoucherId,
@@ -251,8 +251,8 @@ namespace BLL.Services
             }
             voucher.ApprovalStatus = "Approved";
             voucher.IsActive = true;
-            voucher.StartDate = DateTime.UtcNow;
-            voucher.ExpiryDate = DateTime.UtcNow.AddDays(voucher.ExpiryDays ?? 30);
+            voucher.StartDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            voucher.ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(voucher.ExpiryDays ?? 30);
             var branchCustomerIds = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.UserId != null)
                 .Select(b => b.UserId!.Value)
@@ -279,8 +279,8 @@ namespace BLL.Services
                     {
                         UserId = userId,
                         VoucherId = voucher.VoucherId,
-                        ReceivedDate = DateTime.UtcNow,
-                        ExpiryDate = DateTime.UtcNow.AddDays(voucher.ExpiryDays ?? 30),
+                        ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                        ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(voucher.ExpiryDays ?? 30),
                         IsUsed = false,
                         TriggerKey = $"RevenueWinback_BR{branchId}_Approved"
                     };
@@ -291,7 +291,7 @@ namespace BLL.Services
             await _context.SaveChangesAsync();
             _logger.LogInformation("Approved winback proposal #{VoucherId} ({Code}) for branch {BranchId}. Distributed to {Count} users.", voucherId, voucher.Code, branchId, grantedCount);
             var branch = await _context.Branches.FirstAsync(b => b.BranchId == branchId);
-            var now = DateTime.UtcNow.ToVnTime();
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             return new MonthlyRevenueCampaignResultDTO
             {
                 BranchId = branchId,
@@ -345,7 +345,7 @@ namespace BLL.Services
         {
             var branch = await _context.Branches.FindAsync(branchId);
             if (branch == null) throw new NotFoundException($"Branch with ID {branchId} not found.");
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             int month = targetMonth ?? now.Month;
             int year = targetYear ?? now.Year;
             var eval = await EvaluateBranchMonthlyRevenueAsync(branchId, month, year);
@@ -374,7 +374,7 @@ namespace BLL.Services
                 var names = dayGroups.Take(2).Select(g => GetVietnameseDayOfWeek(g.Day)).ToList();
                 slowestDaysStr = string.Join(", ", names);
             }
-            var fortyFiveDaysAgo = DateTime.UtcNow.AddDays(-45);
+            var fortyFiveDaysAgo = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(-45);
             var loyalCustomers = await _context.Bookings
                 .Where(b => b.BranchId == branchId && b.UserId != null && b.Status == "Completed")
                 .GroupBy(b => b.UserId!.Value)
@@ -422,7 +422,7 @@ namespace BLL.Services
                     CurrentUsageCount = 0,
                     MaxUsagePerUser = 2,
                     ExpiryDays = 30,
-                    ExpiryDate = DateTime.UtcNow.AddDays(30),
+                    ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(30),
                     IsActive = false,
                     PointsRequired = 0,
                     VoucherType = VoucherType.Discount,
@@ -467,7 +467,7 @@ namespace BLL.Services
                     CurrentUsageCount = 0,
                     MaxUsagePerUser = 1,
                     ExpiryDays = 20,
-                    ExpiryDate = DateTime.UtcNow.AddDays(20),
+                    ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(20),
                     IsActive = false,
                     PointsRequired = 0,
                     VoucherType = VoucherType.Discount,

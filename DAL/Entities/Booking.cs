@@ -78,7 +78,7 @@ namespace AutoWashPro.DAL.Entities
         [Required]
         public decimal FinalAmount { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
         public DateTime? UpdatedAt { get; set; }
 
         public DateTime? ProcessingStartTime { get; set; }

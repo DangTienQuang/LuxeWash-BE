@@ -96,7 +96,7 @@ namespace BLL.Services.AI.Services
 
             await _engagement.CalculateAsync(snapshot);
 
-            profile.LastFeatureCalculation = DateTime.UtcNow;
+            profile.LastFeatureCalculation = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             await _context.SaveChangesAsync();
         }

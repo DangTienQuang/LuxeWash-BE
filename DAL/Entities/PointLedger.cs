@@ -19,7 +19,7 @@ namespace AutoWashPro.DAL.Entities
 
         public string Reason { get; set; } = null!;
 
-        public DateTime TransactionDate { get; set; } = DateTime.UtcNow;
+        public DateTime TransactionDate { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
         public DateTime? ExpiryDate { get; set; }
 

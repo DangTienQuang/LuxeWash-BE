@@ -96,7 +96,7 @@ namespace AutoWashPro.BLL.Services
             unit.DisplayName = dto.DisplayName.Trim();
             unit.MeasurementType = dto.MeasurementType.Trim();
             unit.IsActive = dto.IsActive;
-            unit.UpdatedAt = DateTime.UtcNow;
+            unit.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             await _context.SaveChangesAsync();
             return MapMaterialUnit(unit);
@@ -146,7 +146,7 @@ namespace AutoWashPro.BLL.Services
             material.DefaultMinStockLevel = dto.DefaultMinStockLevel;
             material.ExpiryWarningDays = dto.ExpiryWarningDays;
             material.IsActive = dto.IsActive;
-            material.UpdatedAt = DateTime.UtcNow;
+            material.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             await _context.SaveChangesAsync();
             return MapMaterial(material);
@@ -181,7 +181,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<List<MaterialBatchDTO>> GetBatchesAsync(int? branchId = null, bool expiringOnly = false)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             return await _context.MaterialBatches
                 .Include(b => b.Material)
                 .Include(b => b.Warehouse)
@@ -240,7 +240,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             stock.CurrentQuantity -= discardQuantity;
-            stock.UpdatedAt = DateTime.UtcNow;
+            stock.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             batch.RemainingQuantity = 0;
             batch.Status = "Discarded";
 

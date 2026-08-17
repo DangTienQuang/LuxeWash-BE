@@ -27,6 +27,6 @@ namespace AutoWashPro.DAL.Entities
 
         public int? ReportedByUserId { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

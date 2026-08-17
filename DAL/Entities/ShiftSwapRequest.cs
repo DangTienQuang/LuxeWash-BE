@@ -43,6 +43,6 @@ namespace AutoWashPro.DAL.Entities
         [MaxLength(500)]
         public string? ReviewNote { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

@@ -87,7 +87,7 @@ namespace API.Controllers.Operations
                 });
             }
 
-            var online = DateTime.UtcNow - snapshot.LastSeenAt
+            var online = AutoWashPro.DAL.Helpers.TimeHelper.VnNow - snapshot.LastSeenAt
                 <= TimeSpan.FromSeconds(Math.Max(5, _deviceOptions.OfflineAfterSeconds));
             return Ok(new
             {
@@ -134,7 +134,7 @@ namespace API.Controllers.Operations
             var snapshot = new BarrierDeviceHeartbeatSnapshot
             {
                 DeviceId = _deviceOptions.DeviceId,
-                LastSeenAt = DateTime.UtcNow,
+                LastSeenAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                 IpAddress = request.IpAddress,
                 WifiRssi = request.WifiRssi,
                 UptimeMs = request.UptimeMs,

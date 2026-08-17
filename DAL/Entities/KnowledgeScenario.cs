@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
@@ -40,9 +40,9 @@ namespace AutoWashPro.DAL.Entities
         public DateTime? LastTriggeredAt { get; set; }
         public int TriggerCount { get; set; }
         public string? RuleVersion { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
         public virtual ICollection<ScenarioCondition> Conditions { get; set; }
             = new List<ScenarioCondition>();

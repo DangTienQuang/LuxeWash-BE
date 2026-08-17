@@ -15,7 +15,7 @@ namespace BLL.Helpers
             Booking booking,
             bool allowOutsideScheduledTime = false)
         {
-            var nowVn = DateTime.UtcNow.ToVnTime();
+            var nowVn = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             // ScheduledTime is stored as the branch's local wall-clock time.
             // Do not add the UTC+7 offset again or the displayed booking date/time
             // and the validation window will differ by seven hours.

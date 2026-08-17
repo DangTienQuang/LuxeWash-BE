@@ -59,12 +59,12 @@ namespace BLL.Services
                     ApprovalStatus = "Pending",
                     BusinessLicenseFileUrl = businessLicenseUrl,
                     AuthorizationLetterFileUrl = authorizationLetterUrl,
-                    CreatedAt = DateTime.UtcNow,
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                     MonthlyCreditLimit = request.MonthlyCreditLimit,
                     CurrentMonthUsage = 0,
                     DiscountPercent = 0,
-                    ContractStartDate = DateTime.UtcNow,
-                    ContractEndDate = DateTime.UtcNow.AddYears(1),
+                    ContractStartDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                    ContractEndDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddYears(1),
                     IsContractActive = false, 
                 };
                 _context.BusinessProfiles.Add(profile);
@@ -114,7 +114,7 @@ namespace BLL.Services
 
             if (profile == null) return null;
 
-            var startOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var startOfMonth = new DateTime(AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Year, AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Month, 1);
             var startOfNextMonth = startOfMonth.AddMonths(1);
             profile.CurrentMonthUsage = await _context.FleetWashLogs
                 .Where(log =>
@@ -141,7 +141,7 @@ namespace BLL.Services
                 throw new BadRequestException("Application has already been reviewed.");
             }
             profile.ReviewedByUserId = reviewerId;
-            profile.ReviewedAt = DateTime.UtcNow;
+            profile.ReviewedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             if (dto.IsApproved)
             {
                 profile.ApprovalStatus = "Approved";
@@ -283,7 +283,7 @@ namespace BLL.Services
             // business and month. Each new statement only includes completed
             // washes that have not appeared on an earlier monthly statement.
             var invoiceCode =
-                $"MONTHLY-{businessProfileId}-{year}{month:00}-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Random.Shared.Next(100, 999)}";
+                $"MONTHLY-{businessProfileId}-{year}{month:00}-{AutoWashPro.DAL.Helpers.TimeHelper.VnNow:yyyyMMddHHmmssfff}-{Random.Shared.Next(100, 999)}";
             var startDate = new DateTime(year, month, 1);
             var endDate = startDate.AddMonths(1);
             var alreadyInvoicedBookingIds = _context.InvoiceItems
@@ -316,7 +316,7 @@ namespace BLL.Services
                 BusinessProfileId = businessProfileId,
                 InvoiceType = "MonthlyStatement",
                 Status = "Issued",
-                IssuedAt = DateTime.UtcNow
+                IssuedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.Invoices.Add(invoice);
             await _context.SaveChangesAsync();

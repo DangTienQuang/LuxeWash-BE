@@ -48,6 +48,6 @@ namespace AutoWashPro.DAL.Entities
         [MaxLength(20)]
         public string UsageType { get; set; } = "Standard";
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

@@ -92,7 +92,7 @@ namespace BLL.Services.AI.Services
             if (!scenario.LastTriggeredAt.HasValue)
                 return true;
 
-            return DateTime.UtcNow >
+            return AutoWashPro.DAL.Helpers.TimeHelper.VnNow >
                    scenario.LastTriggeredAt.Value.AddDays(
                        scenario.CooldownDays);
         }

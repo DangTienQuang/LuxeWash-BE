@@ -19,7 +19,7 @@ namespace AutoWashPro.DAL.Entities
         [MaxLength(255)]
         public string Token { get; set; } = null!;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
         public DateTime? LastUsedAt { get; set; }
     }
 }

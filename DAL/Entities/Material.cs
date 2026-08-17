@@ -32,7 +32,7 @@ namespace AutoWashPro.DAL.Entities
 
         public bool IsActive { get; set; } = true;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
         public DateTime? UpdatedAt { get; set; }
 

@@ -38,8 +38,8 @@ namespace AutoWashPro.BLL.Services
         {
             var result = new OverloadScanResultDTO();
 
-            var nowUtc = DateTime.UtcNow;
-            var nowVn = nowUtc.ToVnTime();
+            var nowUtc = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            var nowVn = nowUtc;
             var windowEndVn = nowVn.AddHours(2);
 
             // 1. Check if branch is overloaded
@@ -127,7 +127,7 @@ namespace AutoWashPro.BLL.Services
                 {
                     // Re-check inside the transaction
                     var activeSuggestion = await _context.OverloadSuggestions
-                        .Where(s => s.BookingId == booking.BookingId && !s.IsProcessed && s.ExpiresAt > DateTime.UtcNow)
+                        .Where(s => s.BookingId == booking.BookingId && !s.IsProcessed && s.ExpiresAt > AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                         .FirstOrDefaultAsync();
 
                     if (activeSuggestion != null)
@@ -187,12 +187,12 @@ namespace AutoWashPro.BLL.Services
                         SuggestedBranchName = bestBranch.Name,
                         SuggestedSlotId = bestSlotId,
                         SuggestedTime = booking.ScheduledTime,
-                        ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+                        ExpiresAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddMinutes(5)
                     };
                     _context.OverloadSuggestions.Add(suggestion);
                     await _context.SaveChangesAsync(); // Flush to generate suggestion.Id
 
-                    booking.OverloadNotifiedAt = DateTime.UtcNow;
+                    booking.OverloadNotifiedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                     await _context.SaveChangesAsync();
                     await suggTx.CommitAsync();
 

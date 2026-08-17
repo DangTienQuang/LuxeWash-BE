@@ -72,7 +72,7 @@ namespace AutoWashPro.BLL.Services.Operations
 
         public async Task<List<BarrierCommandDTO>> GetFailedOrExpiredBarrierCommandsAsync(int branchId, CancellationToken cancellationToken = default)
         {
-            var cutoff = DateTime.UtcNow;
+            var cutoff = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             return await _context.BarrierCommands
                 .Where(c => c.BranchId == branchId && (c.Status == "Failed" || (c.Status == "Pending" && c.ExpiresAt < cutoff)))
@@ -94,7 +94,7 @@ namespace AutoWashPro.BLL.Services.Operations
         public async Task<List<ReconciliationAlertDTO>> RunReconciliationCheckAsync(int branchId, CancellationToken cancellationToken = default)
         {
             var alerts = new List<ReconciliationAlertDTO>();
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var terminalOccupancyGraceCutoff = now.AddMinutes(-2);
 
             var expiredCommands = await _context.BarrierCommands
@@ -263,7 +263,7 @@ namespace AutoWashPro.BLL.Services.Operations
                             BookingId = admission.BookingId,
                             LicensePlate = admission.LicensePlate,
                             LaneId = laneId,
-                            DetectedAt = DateTime.UtcNow
+                            DetectedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                         });
                     }
                 }
@@ -340,7 +340,7 @@ namespace AutoWashPro.BLL.Services.Operations
                                 BookingId = admission.BookingId,
                                 LicensePlate = admission.LicensePlate,
                                 LaneId = lane.LaneId,
-                                DetectedAt = DateTime.UtcNow
+                                DetectedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                             });
                         }
                     }
@@ -477,7 +477,7 @@ namespace AutoWashPro.BLL.Services.Operations
             int branchId,
             CancellationToken cancellationToken = default)
         {
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var expired = await _context.BarrierCommands
                 .Where(c => c.BranchId == branchId
                     && (c.Status == "Pending" || c.Status == "Published")
@@ -526,7 +526,7 @@ namespace AutoWashPro.BLL.Services.Operations
             if (normalizedAction is not ("OPEN" or "CLOSE"))
                 throw new ArgumentException("Action must be OPEN or CLOSE.", nameof(action));
 
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var command = new BarrierCommand
             {
                 CommandId = Guid.NewGuid().ToString(),

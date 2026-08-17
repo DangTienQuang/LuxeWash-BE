@@ -20,7 +20,7 @@ namespace AutoWashPro.API.Workers
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                var now = DateTime.UtcNow;
+                var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
                 // Chạy vào 23:59 ngày 31/12
                 if (now.Month == 12 && now.Day == 31 && now.Hour == 23)

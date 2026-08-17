@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
@@ -53,7 +53,7 @@ namespace AutoWashPro.DAL.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal EstimatedRevenue { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
         public DateTime? RedeemedAt { get; set; }
     }

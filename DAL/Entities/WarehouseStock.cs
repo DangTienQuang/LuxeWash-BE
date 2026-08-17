@@ -23,6 +23,6 @@ namespace AutoWashPro.DAL.Entities
 
         public decimal? MinStockLevel { get; set; }
 
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

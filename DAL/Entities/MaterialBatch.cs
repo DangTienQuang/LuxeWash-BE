@@ -42,6 +42,6 @@ namespace AutoWashPro.DAL.Entities
         [MaxLength(20)]
         public string Status { get; set; } = "Active";
 
-        public DateTime ImportedAt { get; set; } = DateTime.UtcNow;
+        public DateTime ImportedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

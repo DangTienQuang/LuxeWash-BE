@@ -105,7 +105,7 @@ namespace AutoWashPro.BLL.Services
                 Type = type,
                 ReferenceId = referenceId,
                 IsRead = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
 
             _context.UserNotifications.Add(notification);
@@ -169,7 +169,7 @@ namespace AutoWashPro.BLL.Services
                 Type = type,
                 ReferenceId = referenceId,
                 IsRead = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             }).ToList();
 
             _context.UserNotifications.AddRange(notifications);

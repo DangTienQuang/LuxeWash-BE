@@ -60,7 +60,7 @@ namespace AutoWashPro.BLL.Services
                 .FirstOrDefaultAsync(cp => cp.UserId == userId);
             if (userProfile == null) throw new NotFoundException("User profile not found.");
 
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var ownedVoucherIds = _context.UserVouchers
                 .Where(uv => uv.UserId == userId)
                 .Select(uv => uv.VoucherId);
@@ -145,8 +145,8 @@ namespace AutoWashPro.BLL.Services
                     VoucherId = voucherId,
                     IsUsed = false,
                     UsageCount = 0,
-                    ReceivedDate = DateTime.UtcNow,
-                    ExpiryDate = CalculateUserVoucherExpiry(voucher, DateTime.UtcNow)
+                    ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                    ExpiryDate = CalculateUserVoucherExpiry(voucher, AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 });
 
                 await _context.SaveChangesAsync();
@@ -205,8 +205,8 @@ namespace AutoWashPro.BLL.Services
                 VoucherId = voucherId,
                 IsUsed = false,
                 UsageCount = 0,
-                ReceivedDate = DateTime.UtcNow,
-                ExpiryDate = CalculateUserVoucherExpiry(voucher, DateTime.UtcNow)
+                ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                ExpiryDate = CalculateUserVoucherExpiry(voucher, AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
             });
 
             _context.UserVouchers.AddRange(userVouchers);
@@ -226,7 +226,7 @@ namespace AutoWashPro.BLL.Services
             if (request.VehicleTypeId <= 0) request.VehicleTypeId = null;
             if (request.RequiredTierId <= 0) request.RequiredTierId = null;
 
-            if (request.ExpiryDate.ToUniversalTime() <= DateTime.UtcNow)
+            if (request.ExpiryDate.ToUniversalTime() <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("Expiration date must be in the future.");
 
             var code = request.Code.Trim().ToUpperInvariant();
@@ -245,7 +245,7 @@ namespace AutoWashPro.BLL.Services
                 MaxUsagePerUser = request.MaxUsagePerUser,
                 ExpiryDate = request.ExpiryDate.ToUniversalTime(),
                 StartDate = request.StartDate?.ToUniversalTime(),
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                 PointsRequired = request.PointsRequired,
                 VoucherType = (AutoWashPro.DAL.Enums.VoucherType)request.VoucherType,
                 CampaignType = VoucherCampaignType.Manual,
@@ -269,7 +269,7 @@ namespace AutoWashPro.BLL.Services
             if (request.VehicleTypeId <= 0) request.VehicleTypeId = null;
             if (request.RequiredTierId <= 0) request.RequiredTierId = null;
 
-            if (request.ExpiryDate.ToUniversalTime() <= DateTime.UtcNow)
+            if (request.ExpiryDate.ToUniversalTime() <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("Expiration date must be in the future.");
 
             var voucher = await _context.Vouchers.Include(v => v.RequiredTier).FirstOrDefaultAsync(v => v.VoucherId == id);
@@ -329,7 +329,7 @@ namespace AutoWashPro.BLL.Services
                 MaxUsages = 1,
                 CurrentUsageCount = 0,
                 MaxUsagePerUser = 1,
-                ExpiryDate = DateTime.UtcNow.AddDays(7),
+                ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(7),
                 PointsRequired = 0,
                 IsActive = true
             };
@@ -343,7 +343,7 @@ namespace AutoWashPro.BLL.Services
                 VoucherId = voucher.VoucherId,
                 IsUsed = false,
                 UsageCount = 0,
-                ReceivedDate = DateTime.UtcNow,
+                ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                 ExpiryDate = voucher.ExpiryDate
             });
 
@@ -361,14 +361,14 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("This voucher is not a physical gift voucher.");
 
             ValidateVoucherAvailability(userVoucher.Voucher);
-            if (userVoucher.ExpiryDate < DateTime.UtcNow) throw new BadRequestException("This voucher has expired.");
+            if (userVoucher.ExpiryDate < AutoWashPro.DAL.Helpers.TimeHelper.VnNow) throw new BadRequestException("This voucher has expired.");
             if (userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser)
                 throw new BadRequestException("This voucher code has run out of usage limit.");
 
             userVoucher.UsageCount += 1;
             userVoucher.IsUsed = userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser;
-            userVoucher.UsedDate = DateTime.UtcNow;
-            userVoucher.LastUsedDate = DateTime.UtcNow;
+            userVoucher.UsedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            userVoucher.LastUsedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             userVoucher.Voucher.CurrentUsageCount += 1;
 
             await _context.SaveChangesAsync();
@@ -378,8 +378,8 @@ namespace AutoWashPro.BLL.Services
         private static void ValidateVoucherAvailability(Voucher voucher)
         {
             if (!voucher.IsActive) throw new BadRequestException("Voucher is not activated.");
-            if (voucher.StartDate.HasValue && voucher.StartDate.Value > DateTime.UtcNow) throw new BadRequestException("Voucher is not yet valid.");
-            if (voucher.ExpiryDate < DateTime.UtcNow) throw new BadRequestException("Voucher has expired.");
+            if (voucher.StartDate.HasValue && voucher.StartDate.Value > AutoWashPro.DAL.Helpers.TimeHelper.VnNow) throw new BadRequestException("Voucher is not yet valid.");
+            if (voucher.ExpiryDate < AutoWashPro.DAL.Helpers.TimeHelper.VnNow) throw new BadRequestException("Voucher has expired.");
             if (voucher.MaxUsages > 0 && voucher.CurrentUsageCount >= voucher.MaxUsages) throw new BadRequestException("Voucher usage limit has been reached.");
         }
 

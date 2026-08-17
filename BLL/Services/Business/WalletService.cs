@@ -220,7 +220,7 @@ namespace AutoWashPro.BLL.Services
                 ReferenceBookingId = referenceBookingId,
                 OrderCode = orderCode.ToString(),
                 Status = "Pending",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.Transactions.Add(transaction);
             try
@@ -379,7 +379,7 @@ namespace AutoWashPro.BLL.Services
                         Description = $"Invoice payment {currentInvoice.InvoiceCode}",
                         PaymentMethod = "Wallet",
                         Status = "Completed",
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                     });
                     await _context.SaveChangesAsync();
                     await dbTransaction.CommitAsync();
@@ -425,7 +425,7 @@ namespace AutoWashPro.BLL.Services
                 PaymentMethod = "PayOS",
                 OrderCode = orderCode.ToString(),
                 Status = "Pending",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.Transactions.Add(transaction);
             await _context.SaveChangesAsync();
@@ -580,7 +580,7 @@ namespace AutoWashPro.BLL.Services
                     UserId = userId,
                     PointsDeducted = pointsToDeduct,
                     Reason = reason,
-                    TransactionDate = DateTime.UtcNow
+                    TransactionDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 });
                 await _context.SaveChangesAsync();
             }
@@ -603,7 +603,7 @@ namespace AutoWashPro.BLL.Services
                     PointsAdded = pointsToRefund,
                     Reason = reason,
                     ReferenceBookingId = referenceBookingId,
-                    TransactionDate = DateTime.UtcNow
+                    TransactionDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 });
                 await _context.SaveChangesAsync();
             }
@@ -653,7 +653,7 @@ namespace AutoWashPro.BLL.Services
                     var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == transaction.ReferenceBookingId.Value);
                     if (booking != null)
                     {
-                        booking.UpdatedAt = DateTime.UtcNow;
+                        booking.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                         var otherPendingBookingPayments = await _context.Transactions
                             .Where(t => t.ReferenceBookingId == booking.BookingId
                                      && t.TransactionId != transaction.TransactionId
@@ -722,9 +722,9 @@ namespace AutoWashPro.BLL.Services
                     UserId = userId,
                     PointsAdded = pointsEarned,
                     Reason = $"{PointConstants.CompletionReasonPrefix} #{bookingId}",
-                    ExpiryDate = DateTime.UtcNow.AddYears(1),
+                    ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddYears(1),
                     ReferenceBookingId = bookingId,
-                    TransactionDate = DateTime.UtcNow
+                    TransactionDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 });
                 profile.CurrentYearTierPoints += pointsEarned;
                 await _tierService.EvaluateTierForProfileAsync(profile.UserId);
@@ -749,7 +749,7 @@ namespace AutoWashPro.BLL.Services
                 TransactionType = "Refund",
                 Description = reason,
                 Status = "Completed",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.Transactions.Add(transaction);
             await _context.SaveChangesAsync();

@@ -61,7 +61,7 @@ namespace AutoWashPro.API.Workers
         private static TimeSpan GetDelayUntilNextVnMidnight()
         {
             var vnTimeZone = GetVnTimeZone();
-            var nowUtc = DateTime.UtcNow;
+            var nowUtc = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var nowVn = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, vnTimeZone);
             var nextVnMidnight = nowVn.Date.AddDays(1);
             var nextUtc = TimeZoneInfo.ConvertTimeToUtc(nextVnMidnight, vnTimeZone);

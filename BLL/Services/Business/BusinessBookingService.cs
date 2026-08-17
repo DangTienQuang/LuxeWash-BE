@@ -68,8 +68,8 @@ namespace BLL.Services
             TimeZoneInfo vnTimeZone;
             try { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
             catch { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
-            DateTime todayInVN = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone).Date;
-            TimeSpan currentTimeInVN = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone).TimeOfDay;
+            DateTime todayInVN = TimeZoneInfo.ConvertTimeFromUtc(AutoWashPro.DAL.Helpers.TimeHelper.VnNow, vnTimeZone).Date;
+            TimeSpan currentTimeInVN = TimeZoneInfo.ConvertTimeFromUtc(AutoWashPro.DAL.Helpers.TimeHelper.VnNow, vnTimeZone).TimeOfDay;
             if (request.TargetDate.Date < todayInVN)
                 throw new BadRequestException("Cannot book for a date in the past.");
             var simRequests = new List<VehicleScheduleRequest>();
@@ -378,7 +378,7 @@ namespace BLL.Services
                 throw new NotFoundException("Booking not found.");
             if (booking.Status != "Pending")
                 throw new BadRequestException("Can only reschedule bookings in pending status.");
-            if (booking.ScheduledTime <= DateTime.UtcNow.AddHours(24))
+            if (booking.ScheduledTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddHours(24))
                 throw new BadRequestException(
                     "Cannot reschedule within 24 hours of the appointment time. " +
                     "Please contact the branch for support.");
@@ -389,7 +389,7 @@ namespace BLL.Services
             if (newSlot == null)
                 throw new NotFoundException("New time slot not found.");
             DateTime newScheduledTime = dto.NewScheduledDate.Date.Add(newSlot.StartTime);
-            if (newScheduledTime <= DateTime.UtcNow.AddHours(24))
+            if (newScheduledTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddHours(24))
                 throw new BadRequestException(
                     "The new time slot must be at least 24 hours from the current time.");
             bool isSameSlot =
@@ -474,7 +474,7 @@ namespace BLL.Services
                 newDailyCapacity.BookedWeight += booking.CapacityWeight;
                 DateTime oldScheduledTime = booking.ScheduledTime;
                 booking.ScheduledTime = newAssignment.EstimatedStart;
-                booking.UpdatedAt = DateTime.UtcNow;
+                booking.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return new RescheduleBusinessResponseDTO
@@ -611,7 +611,7 @@ namespace BLL.Services
                 }
             }
             booking.Status = "Cancelled";
-            booking.UpdatedAt = DateTime.UtcNow;
+            booking.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             await _context.SaveChangesAsync();
         }
         public async Task<FleetWashLogDTO> CheckInAsync(int bookingId)
@@ -630,7 +630,7 @@ namespace BLL.Services
                 FleetVehicleId = booking.FleetVehicleId!.Value,
                 BranchId = booking.BranchId,
                 BookingId = booking.BookingId,
-                CheckInTime = DateTime.UtcNow,
+                CheckInTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                 WashCost = booking.FinalAmount,
                 Status = "CheckedIn"
             };
@@ -642,7 +642,7 @@ namespace BLL.Services
                 bookingId: booking.BookingId,
                 fleetWashLogId: washLog.FleetWashLogId);
             booking.Status = "CheckedIn";
-            booking.UpdatedAt = DateTime.UtcNow;
+            booking.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             await _context.SaveChangesAsync();
             return new FleetWashLogDTO
             {
@@ -692,7 +692,7 @@ namespace BLL.Services
                 .ThenBy(x => x.BookingId)
                 .FirstOrDefaultAsync();
 
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var washLog = new FleetWashLog
             {
                 FleetVehicleId = vehicle.FleetVehicleId,
@@ -741,7 +741,7 @@ namespace BLL.Services
                 throw new BadRequestException("Vehicle must be in processing status.");
             }
             washLog.Status = "Completed";
-            washLog.CompletedTime = DateTime.UtcNow;
+            washLog.CompletedTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var vehicle = await _context.FleetVehicles.FindAsync(washLog.FleetVehicleId);
             if (vehicle != null)
             {
@@ -769,7 +769,7 @@ namespace BLL.Services
             {
                 throw new NotFoundException("Wash lane not found.");
             }
-            var startedAt = DateTime.UtcNow;
+            var startedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             washLog.Status = "Processing";
             var occupancy = await _context.LaneOccupancies
                 .FirstOrDefaultAsync(x => x.FleetWashLogId == washLogId);
@@ -842,14 +842,14 @@ namespace BLL.Services
             if (washLog.Status != "Completed")
             {
                 washLog.Status = "Completed";
-                washLog.CompletedTime = DateTime.UtcNow;
+                washLog.CompletedTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 washLog.LaneId = null;
                 if (washLog.Booking != null)
                 {
                     washLog.Booking.Status = "Completed";
                     washLog.Booking.CompletedTime = washLog.CompletedTime;
                     washLog.Booking.ProcessingLaneId = null;
-                    washLog.Booking.UpdatedAt = DateTime.UtcNow;
+                    washLog.Booking.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 }
             }
             if (washLog.BookingId.HasValue)
@@ -947,12 +947,12 @@ namespace BLL.Services
                 LicensePlate = x.LicensePlate,
                 VehicleType = x.VehicleType,
                 BranchName = x.BranchName,
-                CheckInTime = x.CheckInTime.ToVnTime(),
+                CheckInTime = x.CheckInTime,
                 ProcessingStartTime = x.ProcessingStartTime.HasValue
-                    ? x.ProcessingStartTime.Value.ToVnTime()
+                    ? x.ProcessingStartTime.Value
                     : null,
                 CompletedTime = x.CompletedTime.HasValue
-                    ? x.CompletedTime.Value.ToVnTime()
+                    ? x.CompletedTime.Value
                     : null,
                 ActualDurationMinutes = x.ActualDurationMinutes,
                 Status = x.Status,

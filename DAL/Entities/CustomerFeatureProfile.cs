@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
@@ -115,7 +115,7 @@ namespace AutoWashPro.DAL.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal PredictedLifetimeValue { get; set; }
         public DateTime? ExpectedNextVisit { get; set; }
-        public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
-        public DateTime LastFeatureCalculation { get; set; } = DateTime.UtcNow;
+        public DateTime GeneratedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+        public DateTime LastFeatureCalculation { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

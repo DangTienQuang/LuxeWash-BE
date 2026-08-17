@@ -17,7 +17,7 @@ namespace AutoWashPro.DAL.Entities
         [Required]
         public string Payload { get; set; } = null!;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
         public DateTime? ProcessedAt { get; set; }
         

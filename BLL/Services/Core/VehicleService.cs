@@ -378,7 +378,7 @@ namespace AutoWashPro.BLL.Services
                 throw new NotFoundException("License plate is not registered in the system.");
             if (vehicle.User == null || vehicle.User.CustomerProfile == null)
                 throw new BadRequestException("Data error: Vehicle has no owner information.");
-            var today = DateTime.UtcNow.Date;
+            var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var activeBooking = await _context.Bookings
                 .Include(b => b.BookingDetails)
                 .Where(b => b.LicensePlate == licensePlate

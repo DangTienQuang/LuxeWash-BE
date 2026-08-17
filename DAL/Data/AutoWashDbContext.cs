@@ -77,6 +77,45 @@ namespace AutoWashPro.DAL.Data
         public DbSet<UserNotification> UserNotifications { get; set; }
 
 
+        public override int SaveChanges()
+        {
+            UpdateTimestamps();
+            return base.SaveChanges();
+        }
+
+        public override System.Threading.Tasks.Task<int> SaveChangesAsync(System.Threading.CancellationToken cancellationToken = default)
+        {
+            UpdateTimestamps();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
+        private void UpdateTimestamps()
+        {
+            var entries = ChangeTracker.Entries();
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+
+            foreach (var entry in entries)
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    var createdAtProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "CreatedAt");
+                    if (createdAtProp != null && createdAtProp.CurrentValue is DateTime date && (date == default || date.Kind == DateTimeKind.Utc))
+                    {
+                        createdAtProp.CurrentValue = now;
+                    }
+                }
+                
+                if (entry.State == EntityState.Modified)
+                {
+                    var updatedAtProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "UpdatedAt");
+                    if (updatedAtProp != null)
+                    {
+                        updatedAtProp.CurrentValue = now;
+                    }
+                }
+            }
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder); modelBuilder.Entity<LaneOccupancy>().HasIndex(lo => lo.LaneId).IsUnique();

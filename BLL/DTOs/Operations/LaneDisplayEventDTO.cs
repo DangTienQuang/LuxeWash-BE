@@ -4,7 +4,7 @@ namespace AutoWashPro.BLL.DTOs.Operations
     {
         public string EventId { get; set; } = Guid.NewGuid().ToString();
         public int BranchId { get; set; }
-        public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
+        public DateTime OccurredAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
         public string Type { get; set; } = null!;
         public int? BookingId { get; set; }
         public string? LicensePlate { get; set; }

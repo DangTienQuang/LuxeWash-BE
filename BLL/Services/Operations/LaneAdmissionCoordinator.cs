@@ -171,7 +171,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     LicensePlate = licensePlate
                 };
 
-                var now = DateTime.UtcNow;
+                var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
                 if (selectedLane != null)
                 {
@@ -402,7 +402,7 @@ namespace AutoWashPro.BLL.Services.Operations
                     return new CheckOutResult();
                 }
 
-                var now = DateTime.UtcNow;
+                var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
                 if (occupancy.BookingId.HasValue)
                 {
@@ -643,7 +643,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 .FirstOrDefaultAsync(cancellationToken);
 
             AdmissionResult? admission = null;
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             if (waitingBookingObj != null && (waitingFleet == null || waitingBookingObj.WaitTime < waitingFleet.CheckInTime))
             {
@@ -699,7 +699,7 @@ namespace AutoWashPro.BLL.Services.Operations
         private async Task<AdmissionResult> GrantAdmissionAsync(int laneId, int branchId, int? bookingId, int? fleetId, string licensePlate, bool isVip, CancellationToken cancellationToken)
         {
             var lane = await _context.Lanes.FindAsync(new object[] { laneId }, cancellationToken);
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             var occupancy = new LaneOccupancy
             {

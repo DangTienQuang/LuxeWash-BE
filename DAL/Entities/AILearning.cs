@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
@@ -44,6 +44,6 @@ namespace AutoWashPro.DAL.Entities
 
         public double AcceptanceRate { get; set; }
 
-        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+        public DateTime LastUpdated { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

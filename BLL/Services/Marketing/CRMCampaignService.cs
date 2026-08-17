@@ -63,8 +63,8 @@ namespace AutoWashPro.BLL.Services
                     IsActive = true,
                     MaxUsagePerUser = 1,
                     MaxUsages = 999999, // Large number to prevent it from running out
-                    StartDate = DateTime.UtcNow,
-                    ExpiryDate = DateTime.UtcNow.AddYears(1) // General template expiry, UserVoucher will enforce 1 day
+                    StartDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                    ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddYears(1) // General template expiry, UserVoucher will enforce 1 day
                 };
 
                 _context.Vouchers.Add(voucher);
@@ -72,7 +72,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             var activeUsers = await _context.Users.Where(u => u.Status == "Active").ToListAsync();
-            var today = DateTime.UtcNow.Date;
+            var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var assignedCount = 0;
 
             var usersReceivedToday = await _context.UserVouchers
@@ -92,8 +92,8 @@ namespace AutoWashPro.BLL.Services
                     {
                         UserId = user.UserId,
                         VoucherId = voucher.VoucherId,
-                        ReceivedDate = DateTime.UtcNow,
-                        ExpiryDate = DateTime.UtcNow.AddDays(1),
+                        ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                        ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(1),
                         IsUsed = false,
                         TriggerKey = "WeatherCampaign"
                     };
@@ -113,7 +113,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<string> TriggerSmartWeatherCampaignAsync()
         {
-            var targetDate = DateTime.UtcNow;
+            var targetDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var today = targetDate.Date;
             var branches = await _context.Branches.Where(b => b.IsActive).ToListAsync();
             int totalVouchersIssued = 0;
@@ -172,8 +172,8 @@ namespace AutoWashPro.BLL.Services
                         IsActive = true,
                         MaxUsagePerUser = 1,
                         MaxUsages = 999999,
-                        StartDate = DateTime.UtcNow,
-                        ExpiryDate = DateTime.UtcNow.AddYears(1)
+                        StartDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                        ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddYears(1)
                     };
                     _context.Vouchers.Add(newVoucher);
                     existingVouchers[voucherCode] = newVoucher;
@@ -237,8 +237,8 @@ namespace AutoWashPro.BLL.Services
                         {
                             UserId = customerId,
                             VoucherId = voucher.VoucherId,
-                            ReceivedDate = DateTime.UtcNow,
-                            ExpiryDate = DateTime.UtcNow.AddDays(1),
+                            ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                            ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(1),
                             IsUsed = false,
                             TriggerKey = "SmartWeatherCampaign"
                         };
@@ -252,7 +252,7 @@ namespace AutoWashPro.BLL.Services
                             ActionType = "Issue Weather Voucher",
                             DecisionReason = "Prolonged rain + Occupancy below 50%",
                             Confidence = 0.95,
-                            CreatedAt = DateTime.UtcNow
+                            CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                         };
                         _context.AIDecisionHistories.Add(decisionHistory);
 
@@ -288,7 +288,7 @@ namespace AutoWashPro.BLL.Services
                 return $"Simulation: Branch {request.BranchId} not found or inactive. No vouchers issued.";
             }
 
-            var today = DateTime.UtcNow.Date;
+            var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             int totalVouchersIssued = 0;
 
             var scenario = await GetOrCreateWeatherCampaignScenarioAsync();
@@ -308,8 +308,8 @@ namespace AutoWashPro.BLL.Services
                     IsActive = true,
                     MaxUsagePerUser = 1,
                     MaxUsages = 999999,
-                    StartDate = DateTime.UtcNow,
-                    ExpiryDate = DateTime.UtcNow.AddYears(1)
+                    StartDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                    ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddYears(1)
                 };
                 _context.Vouchers.Add(voucher);
                 await _context.SaveChangesAsync();
@@ -340,8 +340,8 @@ namespace AutoWashPro.BLL.Services
                     {
                         UserId = customerId,
                         VoucherId = voucher.VoucherId,
-                        ReceivedDate = DateTime.UtcNow,
-                        ExpiryDate = DateTime.UtcNow.AddDays(1),
+                        ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                        ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(1),
                         IsUsed = false,
                         TriggerKey = "SmartWeatherCampaign"
                     };
@@ -355,7 +355,7 @@ namespace AutoWashPro.BLL.Services
                         ActionType = "Issue Weather Voucher",
                         DecisionReason = "Prolonged rain + Occupancy below 50%",
                         Confidence = 0.95,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                     };
                     _context.AIDecisionHistories.Add(decisionHistory);
 
@@ -396,8 +396,8 @@ namespace AutoWashPro.BLL.Services
                     ScenarioName = "Smart Weather Campaign",
                     Enabled = true,
                     CategoryId = category.CategoryId,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                    UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 };
                 _context.KnowledgeScenarios.Add(scenario);
                 await _context.SaveChangesAsync();

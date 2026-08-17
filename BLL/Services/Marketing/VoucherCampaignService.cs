@@ -55,7 +55,7 @@ namespace AutoWashPro.BLL.Services
 
             if (CanProcessCampaignNow(voucher))
             {
-                var result = await ProcessCampaignAsync(voucher, DateTime.UtcNow.ToVnTime().Date);
+                var result = await ProcessCampaignAsync(voucher, AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date);
                 response.ScannedUsers = result.ScannedUsers;
                 response.GrantedCount = result.GrantedCount;
                 response.SkippedCount = result.SkippedCount;
@@ -73,8 +73,8 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<List<VoucherCampaignProcessResultDTO>> ProcessDailyCampaignsAsync(DateTime? targetDate = null)
         {
-            var now = DateTime.UtcNow;
-            var date = (targetDate ?? DateTime.UtcNow.ToVnTime()).Date;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            var date = (targetDate ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow).Date;
             var activeCampaigns = await GetActiveCampaignsQuery(now)
                 .Where(v => v.CampaignType == VoucherCampaignType.Birthday
                          || v.CampaignType == VoucherCampaignType.Age
@@ -93,8 +93,8 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<VoucherCampaignProcessResultDTO?> ProcessMilestoneCampaignsAsync(int userId)
         {
-            var now = DateTime.UtcNow;
-            var date = DateTime.UtcNow.ToVnTime().Date;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            var date = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var campaigns = await GetActiveCampaignsQuery(now)
                 .Where(v => v.CampaignType == VoucherCampaignType.Milestone)
                 .OrderBy(v => v.MilestoneUsageCount)
@@ -147,7 +147,7 @@ namespace AutoWashPro.BLL.Services
                     continue;
                 }
 
-                var receivedDate = DateTime.UtcNow;
+                var receivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 var userExpiryDate = CalculateUserVoucherExpiry(campaign, receivedDate);
                 var userVoucher = new UserVoucher
                 {
@@ -305,7 +305,7 @@ namespace AutoWashPro.BLL.Services
                 if (!tierExists) throw new BadRequestException("Required tier does not exist.");
             }
 
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var startDate = request.StartDate?.ToUniversalTime() ?? now;
             var endDate = request.EndDate?.ToUniversalTime() ?? startDate.AddDays(request.ExpiryDays);
             if (endDate <= now) throw new BadRequestException("Expiration date must be in the future.");
@@ -359,7 +359,7 @@ namespace AutoWashPro.BLL.Services
 
         private static bool CanProcessCampaignNow(Voucher campaign)
         {
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             return campaign.IsActive
                 && campaign.VoucherType == VoucherType.Discount
                 && (campaign.StartDate == null || campaign.StartDate <= now)

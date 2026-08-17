@@ -262,7 +262,7 @@ namespace AutoWashPro.BLL.Services
         public async Task SyncCustomerProfilePointsAsync()
         {
             const string completionPrefix = "Service completion";
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             // Get users with 0 TotalPoint & 0 PromotionPoint
             var targetUsersQuery = _context.CustomerProfiles

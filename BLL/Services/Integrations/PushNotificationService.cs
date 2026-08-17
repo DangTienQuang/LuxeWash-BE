@@ -159,8 +159,8 @@ namespace AutoWashPro.BLL.Services
                 {
                     UserId = userId,
                     Token = token,
-                    CreatedAt = System.DateTime.UtcNow,
-                    LastUsedAt = System.DateTime.UtcNow
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
+                    LastUsedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 });
             }
             else
@@ -169,7 +169,7 @@ namespace AutoWashPro.BLL.Services
                 if (existing.UserId != userId)
                     existing.UserId = userId;
 
-                existing.LastUsedAt = System.DateTime.UtcNow;
+                existing.LastUsedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             }
 
             await _context.SaveChangesAsync();

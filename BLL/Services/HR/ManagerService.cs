@@ -107,7 +107,7 @@ namespace AutoWashPro.BLL.Services
             {
                 throw new NotFoundException("Lane not found in your branch.");
             }
-            var targetDate = date?.Date ?? System.DateTime.UtcNow.ToVnTime().Date;
+            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var assignment = await _context.StaffLaneAssignments
                 .FirstOrDefaultAsync(a => a.LaneId == laneId && a.StaffId == staffId && a.AssignedDate.Date == targetDate);
             if (assignment == null)
@@ -148,8 +148,8 @@ namespace AutoWashPro.BLL.Services
                 ProcessingStaffId = b.ProcessingStaffId,
                 ProcessingStaffName = b.ProcessingStaff?.EmployeeProfile?.FullName,
                 IsBusinessLane = b.ProcessingLane != null && b.ProcessingLane.IsBusinessLane,
-                ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
-                CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value.ToVnTime() : (DateTime?)null,
+                ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value : (DateTime?)null,
+                CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value : (DateTime?)null,
                 ActualDurationMinutes = b.ActualDurationMinutes
             }).ToList();
         }
@@ -235,7 +235,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<List<LaneStaffAssignmentDTO>> GetLanesInBranchAsync(int managerUserId, System.DateTime? date = null)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-            var targetDate = date?.Date ?? System.DateTime.UtcNow.ToVnTime().Date;
+            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var lanes = await _context.Lanes
                 .Where(l => l.BranchId == managerProfile.BranchId)
                 .Select(l => new LaneStaffAssignmentDTO
@@ -277,7 +277,7 @@ namespace AutoWashPro.BLL.Services
             {
                 throw new NotFoundException("Lane not found in your branch.");
             }
-            var targetDate = date?.Date ?? System.DateTime.UtcNow.ToVnTime().Date;
+            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var assignments = await _context.StaffLaneAssignments
                 .Include(a => a.Staff)
                     .ThenInclude(s => s.EmployeeProfile)
@@ -365,7 +365,7 @@ namespace AutoWashPro.BLL.Services
                                 BookingId = booking.BookingId,
                                 FleetVehicleId = booking.FleetVehicleId.Value,
                                 BranchId = booking.BranchId,
-                                CheckInTime = DateTime.UtcNow,
+                                CheckInTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                                 WashCost = booking.FinalAmount,
                                 Status = "CheckedIn"
                             };
@@ -396,7 +396,7 @@ namespace AutoWashPro.BLL.Services
                     {
                         throw new BadRequestException("LANE_UNAVAILABLE");
                     }
-                    booking.UpdatedAt = DateTime.UtcNow;
+                    booking.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                     await _context.SaveChangesAsync();
                     await dbTransaction.CommitAsync();
                     return true;

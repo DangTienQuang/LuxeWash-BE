@@ -1,4 +1,4 @@
-﻿using AutoWashPro.DAL.Data;
+using AutoWashPro.DAL.Data;
 using BLL.Services.AI.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -28,9 +28,9 @@ namespace BLL.Services.AI.Services
 
             scenario.TriggerCount++;
 
-            scenario.LastTriggeredAt = DateTime.UtcNow;
+            scenario.LastTriggeredAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
-            scenario.UpdatedAt = DateTime.UtcNow;
+            scenario.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             await _context.SaveChangesAsync();
         }

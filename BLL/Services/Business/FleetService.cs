@@ -104,7 +104,7 @@ namespace BLL.Services
                 BusinessProfileId = business.BusinessProfileId,
                 FileUrl = fileUrl,
                 Status = "Processing",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.FleetImportBatches.Add(batch);
             await _context.SaveChangesAsync();
@@ -221,7 +221,7 @@ namespace BLL.Services
                     DriverName = driverName,
                     EmployeeCode = employeeCode,
                     Status = vehicleStatus,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
                 };
                 _context.FleetVehicles.Add(fleetVehicle);
                 

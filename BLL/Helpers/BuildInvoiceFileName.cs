@@ -1,4 +1,4 @@
-﻿using BLL.DTOs.Business;
+using BLL.DTOs.Business;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +13,7 @@ namespace BLL.Helpers
         {
             var businessName = SanitizeFileName(invoice.BusinessName);
 
-            var generateDate = DateTime.UtcNow.ToString("yyyyMMdd");
+            var generateDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.ToString("yyyyMMdd");
 
             return
                 $"invoice-{invoice.BillingPeriod}-{generateDate}-{businessName}.pdf";

@@ -1,4 +1,4 @@
-﻿using AutoWashPro.BLL.DTOs;
+using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Exceptions;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
@@ -42,7 +42,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<List<MaterialBatchDTO>> GetManagerExpiringBatchesAsync(int managerUserId)
         {
             var branchId = await GetManagerBranchIdAsync(managerUserId);
-            var today = DateTime.UtcNow.Date;
+            var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var batches = await QueryBatches()
                 .Where(b => b.Warehouse.BranchId == branchId
                     && b.ExpiryDate != null
@@ -81,7 +81,7 @@ namespace AutoWashPro.BLL.Services
                 ExpiryDate = expiryDate,
                 SupplierName = dto.SupplierName,
                 Status = "Active",
-                ImportedAt = DateTime.UtcNow
+                ImportedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.MaterialBatches.Add(batch);
             await _context.SaveChangesAsync();
@@ -89,7 +89,7 @@ namespace AutoWashPro.BLL.Services
             var stock = await GetOrCreateStockAsync(warehouse.WarehouseId, material.MaterialId, material.DefaultMinStockLevel);
             var before = stock.CurrentQuantity;
             stock.CurrentQuantity += dto.Quantity;
-            stock.UpdatedAt = DateTime.UtcNow;
+            stock.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
             _context.InventoryTransactions.Add(new InventoryTransaction
             {
@@ -141,7 +141,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             stock.CurrentQuantity -= discardQuantity;
-            stock.UpdatedAt = DateTime.UtcNow;
+            stock.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             batch.RemainingQuantity = 0;
             batch.Status = "Discarded";
 
@@ -209,13 +209,13 @@ namespace AutoWashPro.BLL.Services
                     {
                         MaterialId = material.MaterialId,
                         WarehouseId = warehouse.WarehouseId,
-                        BatchCode = $"ADJ-{material.MaterialId}-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
+                        BatchCode = $"ADJ-{material.MaterialId}-{AutoWashPro.DAL.Helpers.TimeHelper.VnNow:yyyyMMddHHmmssfff}",
                         ImportedQuantity = dto.QuantityChange,
                         RemainingQuantity = dto.QuantityChange,
                         UnitCost = estimatedUnitCost,
                         TotalCost = dto.QuantityChange * estimatedUnitCost,
                         Status = "Active",
-                        ImportedAt = DateTime.UtcNow,
+                        ImportedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                         SupplierName = "Inventory adjustment"
                     };
                     _context.MaterialBatches.Add(batch);
@@ -280,7 +280,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             stock.CurrentQuantity = after;
-            stock.UpdatedAt = DateTime.UtcNow;
+            stock.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var unitCost = adjustmentUnitCost ?? batch?.UnitCost ?? await EstimateUnitCostAsync(material.MaterialId);
 
             _context.InventoryTransactions.Add(new InventoryTransaction
@@ -340,7 +340,7 @@ namespace AutoWashPro.BLL.Services
             var expiryDate = NormalizeDate(dto.ExpiryDate);
             if (!material.IsActive) throw new BadRequestException("Cannot import inactive material.");
             if (material.RequiresExpiryTracking && expiryDate == null) throw new BadRequestException("Expiry date is required for this material.");
-            if (expiryDate.HasValue && expiryDate.Value <= DateTime.UtcNow.Date) throw new BadRequestException("Expiry date must be in the future.");
+            if (expiryDate.HasValue && expiryDate.Value <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date) throw new BadRequestException("Expiry date must be in the future.");
             if (manufactureDate.HasValue && expiryDate.HasValue && manufactureDate.Value > expiryDate.Value)
             {
                 throw new BadRequestException("Manufacture date cannot be after expiry date.");
@@ -373,7 +373,7 @@ namespace AutoWashPro.BLL.Services
         {
             var stock = await _context.WarehouseStocks.FirstOrDefaultAsync(s => s.WarehouseId == warehouseId && s.MaterialId == materialId);
             if (stock != null) return stock;
-            stock = new WarehouseStock { WarehouseId = warehouseId, MaterialId = materialId, CurrentQuantity = 0, MinStockLevel = minStockLevel, UpdatedAt = DateTime.UtcNow };
+            stock = new WarehouseStock { WarehouseId = warehouseId, MaterialId = materialId, CurrentQuantity = 0, MinStockLevel = minStockLevel, UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow };
             _context.WarehouseStocks.Add(stock);
             await _context.SaveChangesAsync();
             return stock;

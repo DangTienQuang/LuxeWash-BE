@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
@@ -24,6 +24,6 @@ namespace AutoWashPro.DAL.Entities
 
         [MaxLength(100)]
         public string DetectedBy { get; set; } = "AI Engine";
-        public DateTime DetectedOn { get; set; } = DateTime.UtcNow;
+        public DateTime DetectedOn { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
     }
 }

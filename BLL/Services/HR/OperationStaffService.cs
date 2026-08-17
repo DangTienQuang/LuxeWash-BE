@@ -33,7 +33,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<StaffLaneTaskDTO?> GetTodayLaneAssignmentAsync(int staffUserId, DateTime? date = null)
         {
-            var targetDate = date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
+            var targetDate = date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var assignment = await _context.StaffLaneAssignments
                 .Include(a => a.Lane)
                 .Where(a => a.StaffId == staffUserId && a.AssignedDate.Date == targetDate)
@@ -119,7 +119,7 @@ namespace AutoWashPro.BLL.Services
                         FleetVehicleId = booking.FleetVehicleId!.Value,
                         BranchId = booking.BranchId,
                         BookingId = booking.BookingId,
-                        CheckInTime = DateTime.UtcNow,
+                        CheckInTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                         Status = "CheckedIn",
                         WashCost = booking.FinalAmount,
                         CheckInImageUrl = booking.CheckInImageUrl
@@ -242,8 +242,8 @@ namespace AutoWashPro.BLL.Services
                     PaymentMethod = isBusinessBooking ? "Business account" : tx?.PaymentMethod,
                     OrderCode = tx?.OrderCode,
                     FinalAmount = b.FinalAmount,
-                    ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value.ToVnTime() : (DateTime?)null,
-                    CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value.ToVnTime() : (DateTime?)null,
+                    ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value : (DateTime?)null,
+                    CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value : (DateTime?)null,
                     ActualDurationMinutes = b.ActualDurationMinutes,
                     CustomerTierName = isBusinessBooking
                         ? "Business account"
@@ -283,7 +283,7 @@ namespace AutoWashPro.BLL.Services
                  {
                      throw new BadRequestException("Booking does not have an assigned lane; cannot start processing.");
                  }
-                 var startedAt = DateTime.UtcNow;
+                 var startedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                  booking.ProcessingStaffId = staffUserId;
                  booking.ProcessingStartTime = startedAt;
                  booking.CompletedTime = null;
@@ -328,7 +328,7 @@ namespace AutoWashPro.BLL.Services
             booking.Status = newStatus;
             if (isCompletingNow)
             {
-                booking.CompletedTime = DateTime.UtcNow;
+                booking.CompletedTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                 if (booking.ProcessingStartTime.HasValue)
                 {
                     var duration = (int)Math.Round((booking.CompletedTime.Value - booking.ProcessingStartTime.Value).TotalMinutes);
@@ -355,7 +355,7 @@ namespace AutoWashPro.BLL.Services
                  }
                  if (userProfile != null)
                  {
-                     userProfile.LastVisitDate = DateTime.UtcNow;
+                     userProfile.LastVisitDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                  }
             }
             if (isCompletingNow)
@@ -377,7 +377,7 @@ namespace AutoWashPro.BLL.Services
             {
                 throw new BadRequestException("Employee with this phone number not found or unavailable.");
             }
-            var targetDate = dto.Date?.Date ?? DateTime.UtcNow.ToVnTime().Date;
+            var targetDate = dto.Date?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var currentAssignment = await _context.StaffLaneAssignments
                 .FirstOrDefaultAsync(a => a.StaffId == currentStaffId && a.AssignedDate.Date == targetDate);
             var targetAssignment = await _context.StaffLaneAssignments
@@ -435,7 +435,7 @@ namespace AutoWashPro.BLL.Services
                     Status = fleetLog?.Status ?? fleetBooking?.Status ?? o.Booking?.Status ?? "CheckedIn",
                     // Database timestamps are UTC. Staff APIs expose wall-clock Vietnam time,
                     // so convert here as well to avoid a seven-hour live-duration offset.
-                    OccupiedAt = o.OccupiedAt.ToVnTime(),
+                    OccupiedAt = o.OccupiedAt,
                     LaneName = o.Lane?.Name ?? "",
                     CustomerName = fleetLog?.FleetVehicle?.BusinessProfile?.CompanyName,
                     DriverName = fleetLog?.FleetVehicle?.DriverName,

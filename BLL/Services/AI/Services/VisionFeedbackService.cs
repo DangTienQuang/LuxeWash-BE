@@ -31,7 +31,7 @@ namespace BLL.Services.AI.Services
                 ActualVehicleTypeId = actualVehicleTypeId,
                 ActualBrand = actualBrand,
                 ActualModel = actualModel,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
 
             _context.VehicleVisionFeedbacks.Add(feedback);

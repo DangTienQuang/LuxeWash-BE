@@ -24,7 +24,7 @@ namespace AutoWashPro.BLL.Services.Operations
             {
                 Type = "LaneDisplayEvent",
                 Payload = JsonSerializer.Serialize(eventDto, OperationsOutboxEnvelope.OutboxJsonOptions),
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
             _context.OutboxMessages.Add(msg);
         }
@@ -51,7 +51,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 LicensePlate = licensePlate,
                 ReasonCode = "NO_AVAILABLE_LANE",
                 Message = "Chưa có làn trống. Vui lòng giữ nguyên vị trí trước barie.",
-                DisplayUntil = DateTime.UtcNow.AddSeconds(20)
+                DisplayUntil = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddSeconds(20)
             });
             return Task.CompletedTask;
         }
@@ -66,7 +66,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 LicensePlate = licensePlate,
                 LaneId = laneId,
                 LaneName = laneName,
-                DisplayUntil = DateTime.UtcNow.AddSeconds(15)
+                DisplayUntil = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddSeconds(15)
             });
             return Task.CompletedTask;
         }

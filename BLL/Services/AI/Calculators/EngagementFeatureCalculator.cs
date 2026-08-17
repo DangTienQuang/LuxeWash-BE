@@ -89,7 +89,7 @@ namespace BLL.Services.AI.Calculators
             if (profile.ExpectedNextVisit.HasValue)
             {
                 var overdue =
-                    (DateTime.UtcNow -
+                    (AutoWashPro.DAL.Helpers.TimeHelper.VnNow -
                     profile.ExpectedNextVisit.Value).TotalDays;
 
                 if (overdue > 0)

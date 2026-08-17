@@ -28,7 +28,7 @@ namespace AutoWashPro.DAL.Entities
 
         public bool IsRead { get; set; } = false;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
         [ForeignKey("UserId")]
         public virtual User User { get; set; } = null!;

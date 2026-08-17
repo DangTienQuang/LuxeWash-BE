@@ -71,7 +71,7 @@ namespace AutoWashPro.BLL.BackgroundServices
             var context = scope.ServiceProvider.GetRequiredService<AutoWashDbContext>();
             var publisher = scope.ServiceProvider.GetRequiredService<ILaneDisplayPublisherService>();
 
-            var now = DateTime.UtcNow;
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var messages = await context.OutboxMessages
                 .Where(m => m.ProcessedAt == null && (m.NextRetryAt == null || m.NextRetryAt <= now) && (m.ErrorMessage == null || m.RetryCount < 3))
                 .OrderBy(m => m.CreatedAt)
@@ -134,7 +134,7 @@ namespace AutoWashPro.BLL.BackgroundServices
                                     await publisher.PublishEventAsync(eventDto);
                                 }
                             }
-                            message.ProcessedAt = DateTime.UtcNow;
+                            message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             break;
 
                         case "barrier_command":
@@ -152,14 +152,14 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 var bCmd = await context.BarrierCommands.FirstOrDefaultAsync(c => c.CommandId == cmdIdStr);
                                 if (bCmd != null)
                                 {
-                                    if (bCmd.Status != "Pending" || bCmd.ExpiresAt <= DateTime.UtcNow)
+                                    if (bCmd.Status != "Pending" || bCmd.ExpiresAt <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                                     {
-                                        if (bCmd.Status == "Pending" && bCmd.ExpiresAt <= DateTime.UtcNow)
+                                        if (bCmd.Status == "Pending" && bCmd.ExpiresAt <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                                         {
                                             bCmd.Status = "Expired";
                                         }
                                         
-                                        message.ProcessedAt = DateTime.UtcNow;
+                                        message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                                         message.NextRetryAt = null;
                                         message.ErrorMessage = null;
                                         break; // Do not send to Firebase
@@ -174,7 +174,7 @@ namespace AutoWashPro.BLL.BackgroundServices
                             if (publishResult == BarrierPublishResult.SkippedNoFirebase)
                             {
                                 message.ProcessedAt = null;
-                                message.NextRetryAt = DateTime.UtcNow.AddSeconds(30);
+                                message.NextRetryAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddSeconds(30);
                                 message.ErrorMessage = "Firebase is not available.";
                                 break;
                             }
@@ -193,7 +193,7 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 }
                             }
                             
-                            message.ProcessedAt = DateTime.UtcNow;
+                            message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             message.RetryCount = 0;
                             message.NextRetryAt = null;
                             message.ErrorMessage = null;
@@ -226,7 +226,7 @@ namespace AutoWashPro.BLL.BackgroundServices
                                     await publisher.PublishEventAsync(legacyDto);
                                 }
                             }
-                            message.ProcessedAt = DateTime.UtcNow;
+                            message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             break;
 
                         default:
@@ -260,7 +260,7 @@ namespace AutoWashPro.BLL.BackgroundServices
                             2 => 3,
                             _ => 10
                         };
-                        message.NextRetryAt = DateTime.UtcNow.AddSeconds(delaySeconds);
+                        message.NextRetryAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddSeconds(delaySeconds);
                     }
                 }
             }
