@@ -52,7 +52,7 @@ namespace AutoWashPro.BLL.Services
                 plannedUsages.AddRange(usages.Select(usage => (
                     detail.DetailId,
                     usage.MaterialId,
-                    decimal.Round(usage.BaseQuantity * multiplier * weightMultiplier, 4),
+                    decimal.Round(usage.BaseQuantity * multiplier * (usage.VehicleTypeId == null ? weightMultiplier : 1m), 4),
                     detail.ServiceId)));
             }
             if (plannedUsages.Count == 0)

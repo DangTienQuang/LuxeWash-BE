@@ -100,5 +100,8 @@ namespace AutoWashPro.DAL.Entities
 
         public string? CheckInImageUrl { get; set; }
         public string? CheckOutImageUrl { get; set; }
+
+        [InverseProperty("Booking")]
+        public ICollection<BookingMaterialUsage> BookingMaterialUsages { get; set; } = new List<BookingMaterialUsage>();
     }
 }

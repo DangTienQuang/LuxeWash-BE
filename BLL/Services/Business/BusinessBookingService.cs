@@ -196,6 +196,8 @@ namespace BLL.Services
             if (slot == null)
                 throw new NotFoundException("Time slot not found.");
             DateTime scheduledTime = dto.ScheduledTime.Date.Add(slot.StartTime);
+            if (scheduledTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
+                throw new BadRequestException("Cannot book a time slot in the past or that has already started.");
             var scheduleRequests = new List<VehicleScheduleRequest>();
             var capacityWeights = new Dictionary<int, int>();
             foreach (var item in dto.Vehicles)
@@ -240,23 +242,7 @@ namespace BLL.Services
                 .ToDictionaryAsync(x => x.LaneId, x => x.Name);
             var vehicleSummaries = new List<VehicleBookingSummaryDTO>();
             decimal totalAmount = scheduleRequests.Sum(request => request.ServicePrices.Sum(price => price.Price));
-            var billingPeriodStart = new DateTime(scheduledTime.Year, scheduledTime.Month, 1);
-            var billingPeriodEnd = billingPeriodStart.AddMonths(1);
-            var committedAmount = await _context.Bookings
-                .Where(booking =>
-                    booking.BusinessProfileId == business.BusinessProfileId &&
-                    booking.ScheduledTime >= billingPeriodStart &&
-                    booking.ScheduledTime < billingPeriodEnd &&
-                    booking.Status != "Cancelled" &&
-                    booking.Status != "NoShow")
-                .SumAsync(booking => (decimal?)booking.FinalAmount) ?? 0;
-            if (business.MonthlyCreditLimit > 0 &&
-                committedAmount + totalAmount > business.MonthlyCreditLimit)
-            {
-                throw new BadRequestException(
-                    "Doanh nghiệp không còn đủ hạn mức tín dụng để tạo đặt lịch này.",
-                    "BUSINESS_CREDIT_LIMIT_EXCEEDED");
-            }
+
 
             var assignedSlotIds = scheduleResult.Assignments
                 .Select(x => x.AssignedSlotId)
@@ -274,6 +260,24 @@ namespace BLL.Services
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             try
             {
+                var billingPeriodStart = new DateTime(scheduledTime.Year, scheduledTime.Month, 1);
+                var billingPeriodEnd = billingPeriodStart.AddMonths(1);
+                var committedAmount = await _context.Bookings
+                    .Where(booking =>
+                        booking.BusinessProfileId == business.BusinessProfileId &&
+                        booking.ScheduledTime >= billingPeriodStart &&
+                        booking.ScheduledTime < billingPeriodEnd &&
+                        booking.Status != "Cancelled" &&
+                        booking.Status != "NoShow")
+                    .SumAsync(booking => (decimal?)booking.FinalAmount) ?? 0;
+                if (business.MonthlyCreditLimit > 0 &&
+                    committedAmount + totalAmount > business.MonthlyCreditLimit)
+                {
+                    throw new BadRequestException(
+                        "Doanh nghiệp không còn đủ hạn mức tín dụng để tạo đặt lịch này.",
+                        "BUSINESS_CREDIT_LIMIT_EXCEEDED");
+                }
+
                 foreach (var (assignedSlotId, requiredWeight) in requiredWeightBySlot)
                 {
                     var dailyCapacity = await _context.DailySlotCapacities

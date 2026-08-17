@@ -165,6 +165,16 @@ namespace AutoWashPro.BLL.DTOs
         public string? BookingType { get; set; }
         public int? BusinessProfileId { get; set; }
         public int? FleetVehicleId { get; set; }
+        public List<BookingMaterialUsageDTO>? MaterialUsages { get; set; }
+    }
+    public class BookingMaterialUsageDTO
+    {
+        public int MaterialId { get; set; }
+        public string MaterialName { get; set; } = string.Empty;
+        public decimal QuantityUsed { get; set; }
+        public string Unit { get; set; } = string.Empty;
+        public decimal CostAmount { get; set; }
+        public string UsageType { get; set; } = string.Empty;
     }
     public class BookingPaymentStatusDTO
     {

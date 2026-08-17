@@ -292,6 +292,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<List<AdminBookingResponseDTO>> GetAllBookingsByDateAsync(DateTime targetDate)
         {
             var bookings = await _context.Bookings.Include(b => b.AppliedVoucher)
+                .Include(b => b.BookingMaterialUsages).ThenInclude(u => u.Material)
                 .Where(b => b.ScheduledTime.Date == targetDate.Date)
                 .OrderBy(b => b.ScheduledTime)
                 .Select(b => new AdminBookingResponseDTO
@@ -324,7 +325,16 @@ namespace AutoWashPro.BLL.Services
                     ProcessingLaneId = b.ProcessingLaneId,
                     ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null,
                     CheckInImageUrl = b.CheckInImageUrl,
-                    CheckOutImageUrl = b.CheckOutImageUrl
+                    CheckOutImageUrl = b.CheckOutImageUrl,
+                    MaterialUsages = b.BookingMaterialUsages.Select(u => new BookingMaterialUsageDTO
+                    {
+                        MaterialId = u.MaterialId,
+                        MaterialName = u.Material.Name,
+                        QuantityUsed = u.QuantityUsed,
+                        Unit = u.Material.Unit,
+                        CostAmount = u.CostAmount,
+                        UsageType = u.UsageType
+                    }).ToList()
                 })
                 .ToListAsync();
             var adminBookingIds = bookings.Select(b => b.BookingId).ToList();
@@ -467,6 +477,7 @@ namespace AutoWashPro.BLL.Services
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
             var todayInVN = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var activeBookings = await _context.Bookings.Include(b => b.AppliedVoucher)
+                .Include(b => b.BookingMaterialUsages).ThenInclude(u => u.Material)
                 .Where(b => b.LicensePlate == normalizedPlate
                          && b.BranchId == branchId
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
@@ -498,7 +509,16 @@ namespace AutoWashPro.BLL.Services
                     CompletedTime = b.CompletedTime,
                     ActualDurationMinutes = b.ActualDurationMinutes,
                     ProcessingLaneId = b.ProcessingLaneId,
-                    ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null
+                    ProcessingLaneName = b.ProcessingLane != null ? b.ProcessingLane.Name : null,
+                    MaterialUsages = b.BookingMaterialUsages.Select(u => new BookingMaterialUsageDTO
+                    {
+                        MaterialId = u.MaterialId,
+                        MaterialName = u.Material.Name,
+                        QuantityUsed = u.QuantityUsed,
+                        Unit = u.Material.Unit,
+                        CostAmount = u.CostAmount,
+                        UsageType = u.UsageType
+                    }).ToList()
                 })
                 .AsNoTracking()
                 .ToListAsync();
@@ -1281,6 +1301,7 @@ namespace AutoWashPro.BLL.Services
         {
             if (serviceIds == null || serviceIds.Count == 0)
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Please select at least 1 service.");
+            serviceIds = serviceIds.Distinct().ToList();
             var slot = await _context.TimeSlots.FirstOrDefaultAsync(ts => ts.SlotId == slotId && ts.BranchId == branchId);
             if (slot == null)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException("Invalid time slot.");
@@ -1298,9 +1319,8 @@ namespace AutoWashPro.BLL.Services
                 }
             }
             var targetDateTime = targetDate.Date.Add(slot.StartTime);
-            var slotEndDateTime = GetSlotEndDateTime(targetDate, slot.StartTime, slot.EndTime);
-            if (slotEndDateTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
-                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot book a time slot in the past.");
+            if (targetDateTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot book a time slot in the past or that has already started.");
             int totalCapacityWeight = 0;
             var vehicle = await _context.Vehicles.Include(v => v.VehicleType).FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
             if (vehicle == null)
@@ -1382,6 +1402,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<BookingResponseDTO> CreateBookingAsync(int userId, CreateBookingDTO request)
         {
+            if (request.ServiceIds != null) request.ServiceIds = request.ServiceIds.Distinct().ToList();
             var compatibility = await ValidateBookingCompatibilityAsync(userId, request.BranchId, request.SlotId, request.ScheduledDate, request.VehicleId, request.LicensePlate, request.ServiceIds);
             if (!compatibility.IsCompatible)
             {
@@ -1434,15 +1455,11 @@ namespace AutoWashPro.BLL.Services
                 {
                     await _context.SaveChangesAsync();
                 }
-                catch (DbUpdateException ex)
+                catch (DbUpdateException)
                 {
                     _context.Entry(dailyCapacity).State = EntityState.Detached;
                     dailyCapacity = await _context.DailySlotCapacities.FirstAsync(dc => dc.SlotId == slot.SlotId && dc.BranchId == request.BranchId && dc.Date == targetDateTime.Date);
                 }
-            }
-            else
-            {
-               dailyCapacity = await _context.DailySlotCapacities.FirstAsync(dc => dc.SlotId == slot.SlotId && dc.Date == targetDateTime.Date);
             }
             if (dailyCapacity.BookedWeight + maxCapacityWeight > slot.MaxCapacity)
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Insufficient shop capacity for this vehicle. Please choose another time slot.");
@@ -2079,6 +2096,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<WalkInBookingResponseDTO> CreateWalkInBookingAsync(int staffId, CreateWalkInBookingDTO request)
         {
+            if (request.ServiceIds != null) request.ServiceIds = request.ServiceIds.Distinct().ToList();
             if (request.ServiceIds == null || request.ServiceIds.Count == 0)
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Please select at least 1 service.");
             int? customerUserId = request.UserId == 0 ? (int?)null : request.UserId;
