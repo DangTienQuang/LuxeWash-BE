@@ -291,7 +291,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<List<AdminBookingResponseDTO>> GetAllBookingsByDateAsync(DateTime targetDate)
         {
-            var bookings = await _context.Bookings
+            var bookings = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Where(b => b.ScheduledTime.Date == targetDate.Date)
                 .OrderBy(b => b.ScheduledTime)
                 .Select(b => new AdminBookingResponseDTO
@@ -312,7 +312,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = b.ScheduledTime,
                     Status = b.Status ?? "",
                     OriginalPrice = b.OriginalPrice,
+                    PointsUsed = b.PointsUsed,
                     PointDiscountAmount = b.PointDiscountAmount,
+                    AppliedVoucherId = b.AppliedVoucherId,
+                    AppliedVoucherCode = b.AppliedVoucher != null ? b.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = b.VoucherDiscountAmount,
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime,
@@ -396,7 +399,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<BookingResponseDTO> GetBookingByIdAsync(int userId, int bookingId)
         {
-            var booking = await _context.Bookings
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails)
                 .ThenInclude(bd => bd.Service)
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
@@ -437,8 +440,11 @@ namespace AutoWashPro.BLL.Services
                 ScheduledTime = booking.ScheduledTime,
                 Status = booking.Status,
                 OriginalPrice = booking.OriginalPrice,
-                PointDiscountAmount = booking.PointDiscountAmount,
-                VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                PointsUsed = booking.PointsUsed,
+                    PointDiscountAmount = booking.PointDiscountAmount,
+                AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
+                    VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount,
                 ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value : (DateTime?)null,
                 CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value : (DateTime?)null,
@@ -460,7 +466,7 @@ namespace AutoWashPro.BLL.Services
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
             var todayInVN = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
-            var activeBookings = await _context.Bookings
+            var activeBookings = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Where(b => b.LicensePlate == normalizedPlate
                          && b.BranchId == branchId
                          && (b.Status == "CheckedIn" || b.Status == "Processing"))
@@ -482,7 +488,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = b.ScheduledTime,
                     Status = b.Status ?? "",
                     OriginalPrice = b.OriginalPrice,
+                    PointsUsed = b.PointsUsed,
                     PointDiscountAmount = b.PointDiscountAmount,
+                    AppliedVoucherId = b.AppliedVoucherId,
+                    AppliedVoucherCode = b.AppliedVoucher != null ? b.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = b.VoucherDiscountAmount,
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime,
@@ -524,7 +533,7 @@ namespace AutoWashPro.BLL.Services
                     IsVip = !isBusinessBooking && vipInfo.IsVip
                 };
             }
-            var preBookedCandidates = await _context.Bookings
+            var preBookedCandidates = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Where(b => b.LicensePlate == normalizedPlate
                          && b.BranchId == branchId
                          && (b.Status == "Pending" || b.Status == "Confirmed"))
@@ -547,7 +556,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = b.ScheduledTime,
                     Status = b.Status ?? "",
                     OriginalPrice = b.OriginalPrice,
+                    PointsUsed = b.PointsUsed,
                     PointDiscountAmount = b.PointDiscountAmount,
+                    AppliedVoucherId = b.AppliedVoucherId,
+                    AppliedVoucherCode = b.AppliedVoucher != null ? b.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = b.VoucherDiscountAmount,
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime,
@@ -665,7 +677,7 @@ namespace AutoWashPro.BLL.Services
         }
         private async Task<(string? TierName, int TotalPoint, bool IsVip)> GetVipInfoByBookingIdAsync(int bookingId)
         {
-            var booking = await _context.Bookings
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Where(b => b.BookingId == bookingId)
                 .Select(b => new { b.UserId })
                 .FirstOrDefaultAsync();
@@ -737,7 +749,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<BookingPaymentStatusDTO> GetBookingPaymentStatusAsync(int bookingId)
         {
-            var booking = await _context.Bookings
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.ProcessingLane)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
@@ -796,7 +808,7 @@ namespace AutoWashPro.BLL.Services
                         await _walletService.ConfirmTransactionPaymentAsync(tx.TransactionId, verified.Amount, tx.OrderCode!);
                         paymentStatus = "Completed";
                         paidAt = verified.PaidAt ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-                        booking = await _context.Bookings
+                        booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                             .Include(b => b.ProcessingLane)
                             .AsNoTracking()
                             .FirstOrDefaultAsync(b => b.BookingId == bookingId);
@@ -839,7 +851,7 @@ namespace AutoWashPro.BLL.Services
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
 
-            var matches = await _context.Bookings
+            var matches = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
@@ -906,8 +918,11 @@ namespace AutoWashPro.BLL.Services
                 ScheduledTime = booking.ScheduledTime,
                 Status = newStatus,
                 OriginalPrice = booking.OriginalPrice,
-                PointDiscountAmount = booking.PointDiscountAmount,
-                VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                PointsUsed = booking.PointsUsed,
+                    PointDiscountAmount = booking.PointDiscountAmount,
+                AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
+                    VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount,
                 ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value : (DateTime?)null,
                 CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value : (DateTime?)null,
@@ -929,7 +944,7 @@ namespace AutoWashPro.BLL.Services
             var normalizedPlate = NormalizeLicensePlate(licensePlate);
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
-            var activeBooking = await _context.Bookings
+            var activeBooking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails).ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
                 .Where(b => b.LicensePlate == normalizedPlate
@@ -977,7 +992,7 @@ namespace AutoWashPro.BLL.Services
                         await _laneCoordinator.CheckOutAtExitGateAsync(normalizedPlate, activeFleetLog.BranchId);
                     }
                 }
-                var updatedBooking = await _context.Bookings
+                var updatedBooking = await _context.Bookings.Include(b => b.AppliedVoucher)
                     .Include(b => b.BookingDetails).ThenInclude(bd => bd.Service)
                     .Include(b => b.ProcessingLane)
                     .FirstOrDefaultAsync(b => b.BookingId == targetBooking.BookingId) ?? targetBooking;
@@ -989,7 +1004,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = updatedBooking.ScheduledTime,
                     Status = BookingStatuses.Completed,
                     OriginalPrice = updatedBooking.OriginalPrice,
+                    PointsUsed = updatedBooking.PointsUsed,
                     PointDiscountAmount = updatedBooking.PointDiscountAmount,
+                    AppliedVoucherId = updatedBooking.AppliedVoucherId,
+                    AppliedVoucherCode = updatedBooking.AppliedVoucher != null ? updatedBooking.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = updatedBooking.VoucherDiscountAmount,
                     FinalAmount = updatedBooking.FinalAmount,
                     ProcessingStartTime = updatedBooking.ProcessingStartTime.HasValue ? updatedBooking.ProcessingStartTime.Value : (DateTime?)null,
@@ -1046,7 +1064,7 @@ namespace AutoWashPro.BLL.Services
         private async Task<BookingResponseDTO?> GetRecentCameraCheckOutAsync(string normalizedPlate)
         {
             var cutoff = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddMinutes(-5);
-            var recentBooking = await _context.Bookings
+            var recentBooking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .AsNoTracking()
                 .Include(b => b.BookingDetails)
                     .ThenInclude(detail => detail.Service)
@@ -1081,7 +1099,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = recentBooking.ScheduledTime,
                     Status = recentBooking.Status,
                     OriginalPrice = recentBooking.OriginalPrice,
+                    PointsUsed = recentBooking.PointsUsed,
                     PointDiscountAmount = recentBooking.PointDiscountAmount,
+                    AppliedVoucherId = recentBooking.AppliedVoucherId,
+                    AppliedVoucherCode = recentBooking.AppliedVoucher != null ? recentBooking.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = recentBooking.VoucherDiscountAmount,
                     FinalAmount = recentBooking.FinalAmount,
                     ProcessingStartTime = recentBooking.ProcessingStartTime,
@@ -1152,7 +1173,7 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<(bool Success, AutoWashPro.BLL.Services.Operations.GateCheckInResult? CheckInResult, AutoWashPro.BLL.Services.Operations.CheckOutResult? CheckOutResult)> UpdateBookingStatusAsync(int bookingId, string newStatus, bool allowOutsideScheduledTime = false)
         {
-            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.BookingId == bookingId);
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher).FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
             var allowedStatuses = new[] { "Pending", "CheckedIn", "Processing", "Completed", "Cancelled", "Delayed", "CancelledBySystem" };
             if (!allowedStatuses.Contains(newStatus)) throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid status.");
@@ -1284,7 +1305,7 @@ namespace AutoWashPro.BLL.Services
             var vehicle = await _context.Vehicles.Include(v => v.VehicleType).FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
             if (vehicle == null)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Vehicle with license plate {licensePlate} does not exist in your profile.");
-            bool hasActiveBooking = await _context.Bookings.AnyAsync(b => b.LicensePlate == licensePlate && (b.Status == "Pending" || b.Status == "CheckedIn"));
+            bool hasActiveBooking = await _context.Bookings.Include(b => b.AppliedVoucher).AnyAsync(b => b.LicensePlate == licensePlate && (b.Status == "Pending" || b.Status == "CheckedIn"));
             if (hasActiveBooking)
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Vehicle with license plate {licensePlate} has an unfinished booking. Cannot create a new booking.");
             foreach (var serviceId in serviceIds)
@@ -1325,7 +1346,7 @@ namespace AutoWashPro.BLL.Services
         {
             try
             {
-                var booking = await _context.Bookings
+                var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                     .Include(b => b.BookingDetails)
                         .ThenInclude(bd => bd.Service)
                     .Include(b => b.User)
@@ -1543,7 +1564,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = booking.ScheduledTime,
                     Status = booking.Status,
                     OriginalPrice = booking.OriginalPrice,
+                    PointsUsed = booking.PointsUsed,
                     PointDiscountAmount = booking.PointDiscountAmount,
+                    AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
                     FinalAmount = booking.FinalAmount,
                     ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value : (DateTime?)null,
@@ -1579,7 +1603,7 @@ namespace AutoWashPro.BLL.Services
             if (page < 1) page = 1;
             if (pageSize < 1 || pageSize > 200) pageSize = 50;
             var nowUtc = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var bookings = await _context.Bookings
+            var bookings = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.Branch)
                 .Where(b => b.UserId == userId)
                 .OrderByDescending(b => b.ScheduledTime)
@@ -1597,7 +1621,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = b.ScheduledTime,
                     Status = b.Status ?? "",
                     OriginalPrice = b.OriginalPrice,
+                    PointsUsed = b.PointsUsed,
                     PointDiscountAmount = b.PointDiscountAmount,
+                    AppliedVoucherId = b.AppliedVoucherId,
+                    AppliedVoucherCode = b.AppliedVoucher != null ? b.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = b.VoucherDiscountAmount,
                     FinalAmount = b.FinalAmount,
                     ProcessingStartTime = b.ProcessingStartTime,
@@ -1688,7 +1715,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<List<RelocationProposalCustomerDTO>> GetRelocationProposalsAsync(int userId)
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var pendingBookings = await _context.Bookings
+            var pendingBookings = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.Branch)
                 .Include(b => b.BookingDetails).ThenInclude(d => d.Service)
                 .Where(b => b.UserId == userId && b.Status == "Pending" && b.ScheduledTime >= now)
@@ -1738,7 +1765,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<bool> CancelBookingAsync(int userId, int bookingId)
         {
-            var booking = await _context.Bookings
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails)
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
@@ -1935,7 +1962,7 @@ namespace AutoWashPro.BLL.Services
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var booking = await _context.Bookings
+                var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                     .Include(b => b.BookingDetails)
                     .FirstOrDefaultAsync(b => b.BookingId == bookingId);
                 if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
@@ -2018,7 +2045,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task ReportMismatchAsync(int bookingId, AutoWashPro.BLL.Enums.VehicleConditionEnum condition, int actualTypeId)
         {
-            var booking = await _context.Bookings
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails)
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId);
             if (booking == null) throw new AutoWashPro.BLL.Exceptions.NotFoundException("Booking not found.");
@@ -2057,7 +2084,7 @@ namespace AutoWashPro.BLL.Services
             int? customerUserId = request.UserId == 0 ? (int?)null : request.UserId;
             var targetDateTime = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var normalizedPlate = request.LicensePlate.Replace("-", "").Replace(".", "").Trim().ToUpper();
-            bool hasActiveBooking = await _context.Bookings.AnyAsync(b => b.LicensePlate == normalizedPlate && (b.Status == "Pending" || b.Status == "CheckedIn"));
+            bool hasActiveBooking = await _context.Bookings.Include(b => b.AppliedVoucher).AnyAsync(b => b.LicensePlate == normalizedPlate && (b.Status == "Pending" || b.Status == "CheckedIn"));
             if (hasActiveBooking)
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Vehicle with license plate {normalizedPlate} has an unfinished booking.");
             var existingVehicle = await _context.Vehicles
@@ -2453,7 +2480,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = booking.ScheduledTime,
                     Status = booking.Status,
                     OriginalPrice = booking.OriginalPrice,
+                    PointsUsed = booking.PointsUsed,
                     PointDiscountAmount = booking.PointDiscountAmount,
+                    AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
                     FinalAmount = booking.FinalAmount,
                     PaymentUrl = paymentUrl,
@@ -2484,7 +2514,7 @@ namespace AutoWashPro.BLL.Services
                 slot = await _context.TimeSlots.FindAsync(request.TimeSlotId.Value);
             }
 
-            var query = _context.Bookings
+            var query = _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.User)
                 .Where(b => b.Status == BookingStatuses.Pending && b.BranchId == request.BranchId);
             if (request.AffectedDate.HasValue)
@@ -2575,7 +2605,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<BookingResponseDTO> RescheduleBookingAsync(int userId, int bookingId, RescheduleBookingDTO request)
         {
-            var booking = await _context.Bookings
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.User)
                 .Include(b => b.BookingDetails)
                 .ThenInclude(bd => bd.Service)
@@ -2665,7 +2695,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = booking.ScheduledTime,
                     Status = booking.Status,
                     OriginalPrice = booking.OriginalPrice,
+                    PointsUsed = booking.PointsUsed,
                     PointDiscountAmount = booking.PointDiscountAmount,
+                    AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
                     FinalAmount = booking.FinalAmount,
                     ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value : (DateTime?)null,
@@ -2684,7 +2717,7 @@ namespace AutoWashPro.BLL.Services
             var normalizedPlate = NormalizeLicensePlate(licensePlate);
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
-            var matches = await _context.Bookings
+            var matches = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
                 .Where(b => b.BranchId == branchId
@@ -2755,8 +2788,11 @@ namespace AutoWashPro.BLL.Services
                 ScheduledTime = booking.ScheduledTime,
                 Status = booking.Status,
                 OriginalPrice = booking.OriginalPrice,
-                PointDiscountAmount = booking.PointDiscountAmount,
-                VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                PointsUsed = booking.PointsUsed,
+                    PointDiscountAmount = booking.PointDiscountAmount,
+                AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
+                    VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount,
                 ProcessingStartTime = booking.ProcessingStartTime.HasValue ? booking.ProcessingStartTime.Value : (DateTime?)null,
                 CompletedTime = booking.CompletedTime.HasValue ? booking.CompletedTime.Value : (DateTime?)null,
@@ -2766,7 +2802,7 @@ namespace AutoWashPro.BLL.Services
         public async Task<int> ProcessOverdueAutomatedWashesAsync()
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var processingBookings = await _context.Bookings
+            var processingBookings = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails)
                 .Include(b => b.Vehicle)
                 .Where(b => b.Status == "Processing" && b.ProcessingStartTime.HasValue)
@@ -2818,7 +2854,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<BookingResponseDTO> AcceptRelocationAsync(int userId, int bookingId, AcceptRelocationRequestDTO request)
         {
-            var booking = await _context.Bookings
+            var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails)
                     .ThenInclude(d => d.Service)
                 .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
@@ -2897,8 +2933,11 @@ namespace AutoWashPro.BLL.Services
                 ScheduledTime = booking.ScheduledTime,
                 Status = booking.Status,
                 OriginalPrice = booking.OriginalPrice,
-                PointDiscountAmount = booking.PointDiscountAmount,
-                VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                PointsUsed = booking.PointsUsed,
+                    PointDiscountAmount = booking.PointDiscountAmount,
+                AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
+                    VoucherDiscountAmount = booking.VoucherDiscountAmount,
                 FinalAmount = booking.FinalAmount
             };
         }
@@ -2959,7 +2998,7 @@ namespace AutoWashPro.BLL.Services
             string? switchNotificationBody = null;
             try
             {
-                var booking = await _context.Bookings
+                var booking = await _context.Bookings.Include(b => b.AppliedVoucher)
                     .Include(b => b.Branch)
                     .Include(b => b.BookingDetails)
                     .ThenInclude(bd => bd.Service)
@@ -3170,7 +3209,10 @@ namespace AutoWashPro.BLL.Services
                     ScheduledTime = booking.ScheduledTime,
                     Status = booking.Status,
                     OriginalPrice = booking.OriginalPrice,
+                    AppliedVoucherId = booking.AppliedVoucherId,
+                    AppliedVoucherCode = booking.AppliedVoucher != null ? booking.AppliedVoucher.Code : string.Empty,
                     VoucherDiscountAmount = booking.VoucherDiscountAmount,
+                    PointsUsed = booking.PointsUsed,
                     PointDiscountAmount = booking.PointDiscountAmount,
                     FinalAmount = booking.FinalAmount
                 };

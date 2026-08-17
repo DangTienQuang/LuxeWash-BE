@@ -12,6 +12,11 @@ namespace BLL.DTOs.Business
         public DateTime ScheduledTime { get; set; }
         public string Status { get; set; } = null!;
         public decimal FinalAmount { get; set; }
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = string.Empty;
+        public DateTime? ProcessingStartTime { get; set; }
+        public DateTime? CompletedTime { get; set; }
+        public int? ActualDurationMinutes { get; set; }
     }
     public class BusinessVehicleStatusDTO
     {

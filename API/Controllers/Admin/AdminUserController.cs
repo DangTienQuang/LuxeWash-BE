@@ -13,10 +13,12 @@ namespace API.Controllers.Admin
     public class AdminUserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IWalletService _walletService;
 
-        public AdminUserController(IUserService userService)
+        public AdminUserController(IUserService userService, IWalletService walletService)
         {
             _userService = userService;
+            _walletService = walletService;
         }
 
         [HttpGet]
@@ -50,6 +52,13 @@ namespace API.Controllers.Admin
         {
             await _userService.SyncCustomerProfilePointsAsync();
             return Ok(new { statusCode = 200, message = "Customer points synced successfully." });
+        }
+
+        [HttpGet("{id}/points-history")]
+        public async Task<IActionResult> GetCustomerPointsHistory(int id)
+        {
+            var result = await _walletService.GetPointsHistoryAsync(id);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
         }
     }
 }

@@ -130,7 +130,10 @@ namespace AutoWashPro.BLL.DTOs
         public DateTime ScheduledTime { get; set; }
         public required string Status { get; set; }
         public decimal OriginalPrice { get; set; }
+        public int PointsUsed { get; set; } = 0;
         public decimal PointDiscountAmount { get; set; }
+        public int? AppliedVoucherId { get; set; }
+        public string AppliedVoucherCode { get; set; } = string.Empty;
         public decimal VoucherDiscountAmount { get; set; }
         public decimal FinalAmount { get; set; }
         public DateTime? ProcessingStartTime { get; set; }

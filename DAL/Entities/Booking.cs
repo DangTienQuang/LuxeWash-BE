@@ -72,6 +72,8 @@ namespace AutoWashPro.DAL.Entities
         public decimal PointDiscountAmount { get; set; } = 0;
 
         public int? AppliedVoucherId { get; set; }
+        [ForeignKey("AppliedVoucherId")]
+        public Voucher? AppliedVoucher { get; set; }
 
         public decimal VoucherDiscountAmount { get; set; } = 0;
 

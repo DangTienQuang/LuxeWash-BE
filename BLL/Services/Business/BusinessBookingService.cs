@@ -524,6 +524,7 @@ namespace BLL.Services
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
             if (business == null) throw new NotFoundException("Business profile not found.");
             return await _context.Bookings
+                .Include(x => x.Branch)
                 .Where(x =>
                     x.BusinessProfileId ==
                     business.BusinessProfileId)
@@ -534,7 +535,12 @@ namespace BLL.Services
                     LicensePlate = x.LicensePlate,
                     ScheduledTime = x.ScheduledTime,
                     Status = x.Status,
-                    FinalAmount = x.FinalAmount
+                    FinalAmount = x.FinalAmount,
+                    BranchId = x.BranchId,
+                    BranchName = x.Branch != null ? x.Branch.Name : string.Empty,
+                    ProcessingStartTime = x.ProcessingStartTime,
+                    CompletedTime = x.CompletedTime,
+                    ActualDurationMinutes = x.ActualDurationMinutes
                 })
                 .ToListAsync();
         }
