@@ -53,20 +53,16 @@ namespace BLL.Helpers
             var title = voucher.CampaignType switch
             {
                 VoucherCampaignType.Birthday => "Happy Birthday from LuxeWash",
-                VoucherCampaignType.Age => "LuxeWash sent you a special voucher",
                 VoucherCampaignType.Winback => "Long time no see, LuxeWash misses you",
                 VoucherCampaignType.Vip => "Exclusive gift for VIP members",
-                VoucherCampaignType.Milestone => "Thank you for accompanying LuxeWash",
                 _ => "LuxeWash sent you a new voucher"
             };
 
             var reason = voucher.CampaignType switch
             {
                 VoucherCampaignType.Birthday => "on the occasion of your birthday",
-                VoucherCampaignType.Age => voucher.TargetAge.HasValue ? $"on the occasion of your {voucher.TargetAge.Value}th birthday" : "exclusively for you",
                 VoucherCampaignType.Winback => "to welcome you back to our services",
                 VoucherCampaignType.Vip => "exclusively for your membership tier",
-                VoucherCampaignType.Milestone => voucher.MilestoneUsageCount.HasValue ? $"because you reached the milestone of {voucher.MilestoneUsageCount.Value} service usages" : "because you have been with us",
                 _ => "exclusively for you"
             };
 

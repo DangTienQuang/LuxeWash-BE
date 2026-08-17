@@ -1291,10 +1291,7 @@ namespace AutoWashPro.BLL.Services
             }
 
             await _context.SaveChangesAsync();
-            if (isCompletingNow && booking.UserId.HasValue)
-            {
-                await _voucherCampaignService.ProcessMilestoneCampaignsAsync(booking.UserId.Value);
-            }
+
             return (true, checkInResult, checkOutResult);
         }
         public async Task<CompatibilityDTO> ValidateBookingCompatibilityAsync(int userId, int branchId, int slotId, DateTime targetDate, int? vehicleId, string licensePlate, List<int> serviceIds)

@@ -48,11 +48,10 @@ namespace AutoWashPro.DAL.Entities
 
         public TimeSpan? ValidStartTime { get; set; }
         public TimeSpan? ValidEndTime { get; set; }
-        public int? TargetAge { get; set; }
+        
         public int? InactiveDays { get; set; }
         public int? ResendAfterDays { get; set; }
-        public int? MilestoneUsageCount { get; set; }
-
+        
         public int? BranchId { get; set; }
         [ForeignKey("BranchId")]
         public Branch? Branch { get; set; }

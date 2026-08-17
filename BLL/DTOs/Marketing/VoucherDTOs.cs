@@ -135,25 +135,11 @@ namespace AutoWashPro.BLL.DTOs
     public class CreateBirthdayVouchersDTO : CreateAutomatedVoucherBaseDTO
     {
     }
-    public class CreateAgeVouchersDTO : CreateAutomatedVoucherBaseDTO
-    {
-        [Range(1, 150)]
-        public int TargetAge { get; set; }
-    }
     public class CreateWinbackVouchersDTO : CreateAutomatedVoucherBaseDTO
     {
-        [Range(1, 3650)]
-        public int InactiveDays { get; set; } = 60;
-        [Range(1, 3650)]
-        public int ResendAfterDays { get; set; } = 30;
     }
     public class CreateVipVouchersDTO : CreateAutomatedVoucherBaseDTO
     {
-    }
-    public class CreateMilestoneVouchersDTO : CreateAutomatedVoucherBaseDTO
-    {
-        [Range(1, int.MaxValue)]
-        public int MilestoneUsageCount { get; set; }
     }
     public class CampaignVoucherResponseDTO
     {
@@ -176,13 +162,9 @@ namespace AutoWashPro.BLL.DTOs
         public TimeSpan? ValidEndTime { get; set; }
         public bool IsActive { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public int? TargetAge { get; set; }
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? InactiveDays { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? ResendAfterDays { get; set; }
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public int? MilestoneUsageCount { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? ScannedUsers { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

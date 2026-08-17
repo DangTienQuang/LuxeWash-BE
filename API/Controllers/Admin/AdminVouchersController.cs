@@ -66,13 +66,6 @@ namespace API.Controllers.Admin
             return Created("", new { statusCode = 201, message = "Birthday voucher rule created successfully.", data = result });
         }
 
-        [HttpPost("age")]
-        public async Task<IActionResult> CreateAgeVouchers([FromBody] CreateAgeVouchersDTO request)
-        {
-            var result = await _voucherCampaignService.CreateAgeVouchersAsync(request);
-            return Created("", new { statusCode = 201, message = "Age-based voucher rule created successfully.", data = result });
-        }
-
         [HttpPost("winback")]
         public async Task<IActionResult> CreateWinbackVouchers([FromBody] CreateWinbackVouchersDTO request)
         {
@@ -87,12 +80,7 @@ namespace API.Controllers.Admin
             return Created("", new { statusCode = 201, message = "VIP voucher rule created successfully.", data = result });
         }
 
-        [HttpPost("milestone")]
-        public async Task<IActionResult> CreateMilestoneVouchers([FromBody] CreateMilestoneVouchersDTO request)
-        {
-            var result = await _voucherCampaignService.CreateMilestoneVouchersAsync(request);
-            return Created("", new { statusCode = 201, message = "Usage milestone voucher rule created successfully.", data = result });
-        }
+
         [HttpPost("process-campaigns")]
         public async Task<IActionResult> ProcessCampaignsNow()
         {

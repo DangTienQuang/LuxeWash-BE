@@ -27,23 +27,9 @@ namespace AutoWashPro.BLL.Services
             return MapCampaignDto(voucher);
         }
 
-        public async Task<CampaignVoucherResponseDTO> CreateAgeVouchersAsync(CreateAgeVouchersDTO request)
-        {
-            if (request.TargetAge <= 0) throw new BadRequestException("Invalid target age.");
-            var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Age, v => v.TargetAge = request.TargetAge);
-            return MapCampaignDto(voucher);
-        }
-
         public async Task<CampaignVoucherResponseDTO> CreateWinbackVouchersAsync(CreateWinbackVouchersDTO request)
         {
-            if (request.ResendAfterDays > request.InactiveDays)
-                throw new BadRequestException("Resend days should not be greater than the days of inactivity.");
-
-            var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Winback, v =>
-            {
-                v.InactiveDays = request.InactiveDays;
-                v.ResendAfterDays = request.ResendAfterDays;
-            });
+            var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Winback);
             return MapCampaignDto(voucher);
         }
 
@@ -64,21 +50,12 @@ namespace AutoWashPro.BLL.Services
             return response;
         }
 
-        public async Task<CampaignVoucherResponseDTO> CreateMilestoneVouchersAsync(CreateMilestoneVouchersDTO request)
-        {
-            if (request.MilestoneUsageCount <= 0) throw new BadRequestException("Invalid usage milestone.");
-            var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Milestone, v => v.MilestoneUsageCount = request.MilestoneUsageCount);
-            return MapCampaignDto(voucher);
-        }
-
         public async Task<List<VoucherCampaignProcessResultDTO>> ProcessDailyCampaignsAsync(DateTime? targetDate = null)
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var date = (targetDate ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow).Date;
             var activeCampaigns = await GetActiveCampaignsQuery(now)
                 .Where(v => v.CampaignType == VoucherCampaignType.Birthday
-                         || v.CampaignType == VoucherCampaignType.Age
-                         || v.CampaignType == VoucherCampaignType.Winback
                          || v.CampaignType == VoucherCampaignType.Vip)
                 .ToListAsync();
 
@@ -89,25 +66,6 @@ namespace AutoWashPro.BLL.Services
             }
 
             return results;
-        }
-
-        public async Task<VoucherCampaignProcessResultDTO?> ProcessMilestoneCampaignsAsync(int userId)
-        {
-            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var date = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
-            var campaigns = await GetActiveCampaignsQuery(now)
-                .Where(v => v.CampaignType == VoucherCampaignType.Milestone)
-                .OrderBy(v => v.MilestoneUsageCount)
-                .ToListAsync();
-
-            VoucherCampaignProcessResultDTO? lastResult = null;
-            foreach (var campaign in campaigns)
-            {
-                var result = await ProcessCampaignAsync(campaign, date, userId);
-                if (result.GrantedCount > 0) lastResult = result;
-            }
-
-            return lastResult;
         }
 
         private IQueryable<Voucher> GetActiveCampaignsQuery(DateTime now)
@@ -249,12 +207,6 @@ namespace AutoWashPro.BLL.Services
                              && (u.CustomerProfile.LastBirthdayGiftYear == null || u.CustomerProfile.LastBirthdayGiftYear < targetDate.Year))
                     .ToList(),
 
-                VoucherCampaignType.Age => users
-                    .Where(u => u.CustomerProfile!.DateOfBirth.HasValue
-                             && campaign.TargetAge.HasValue
-                             && CalculateAge(u.CustomerProfile.DateOfBirth.Value, targetDate) == campaign.TargetAge.Value)
-                    .ToList(),
-
                 VoucherCampaignType.Winback => users
                     .Where(u => u.CustomerProfile!.LastVisitDate.HasValue
                              && campaign.InactiveDays.HasValue
@@ -268,29 +220,8 @@ namespace AutoWashPro.BLL.Services
                     .Where(u => IsUserTierEligible(u.CustomerProfile!, campaign.RequiredTier))
                     .ToList(),
 
-                VoucherCampaignType.Milestone => await GetMilestoneUsersAsync(users, campaign),
-
                 _ => new List<User>()
             };
-        }
-
-        private async Task<List<User>> GetMilestoneUsersAsync(List<User> users, Voucher campaign)
-        {
-            if (!campaign.MilestoneUsageCount.HasValue) return new List<User>();
-
-            var userIds = users.Select(u => u.UserId).ToList();
-            var bookingCounts = await _context.Bookings
-                .Where(b => b.UserId.HasValue
-                         && userIds.Contains(b.UserId.Value)
-                         && b.Status == "Completed")
-                .GroupBy(b => b.UserId!.Value)
-                .Select(g => new { UserId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UserId, x => x.Count);
-
-            return users
-                .Where(u => bookingCounts.TryGetValue(u.UserId, out var count)
-                         && count >= campaign.MilestoneUsageCount.Value)
-                .ToList();
         }
 
         private async Task<Voucher> CreateCampaignVoucherAsync(CreateAutomatedVoucherBaseDTO request, VoucherCampaignType campaignType, Action<Voucher>? configure = null)
@@ -349,10 +280,8 @@ namespace AutoWashPro.BLL.Services
             return campaign.CampaignType switch
             {
                 VoucherCampaignType.Birthday => $"BIRTHDAY-{targetDate:yyyy}",
-                VoucherCampaignType.Age => $"AGE-{campaign.TargetAge}",
                 VoucherCampaignType.Winback => $"WINBACK-{targetDate:yyyyMMdd}",
                 VoucherCampaignType.Vip => $"VIP-{targetDate:yyyyMM}",
-                VoucherCampaignType.Milestone => $"MILESTONE-{campaign.MilestoneUsageCount}",
                 _ => $"MANUAL-{targetDate:yyyyMMdd}"
             };
         }
@@ -396,10 +325,8 @@ namespace AutoWashPro.BLL.Services
             ValidStartTime = v.ValidStartTime,
             ValidEndTime = v.ValidEndTime,
             IsActive = v.IsActive,
-            TargetAge = v.TargetAge,
             InactiveDays = v.InactiveDays,
-            ResendAfterDays = v.ResendAfterDays,
-            MilestoneUsageCount = v.MilestoneUsageCount
+            ResendAfterDays = v.ResendAfterDays
         };
 
         private static DateTime CalculateUserVoucherExpiry(Voucher voucher, DateTime receivedDate)
