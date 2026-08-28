@@ -409,7 +409,7 @@ namespace AutoWashPro.DAL.Data
 
             modelBuilder.Entity<BookingMaterialUsage>()
                 .HasOne(u => u.Booking)
-                .WithMany()
+                .WithMany(b => b.BookingMaterialUsages)
                 .HasForeignKey(u => u.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
 

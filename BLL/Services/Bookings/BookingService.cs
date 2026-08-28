@@ -69,7 +69,7 @@ namespace AutoWashPro.BLL.Services
             TimeZoneInfo vnTimeZone;
             try { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
             catch (TimeZoneNotFoundException) { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
-            DateTime currentDateTimeInVN = TimeZoneInfo.ConvertTimeFromUtc(AutoWashPro.DAL.Helpers.TimeHelper.VnNow, vnTimeZone);
+            DateTime currentDateTimeInVN = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             DateTime todayInVN = currentDateTimeInVN.Date;
             var maxDate = todayInVN.AddDays(userProfile.Tier.BookingWindowDays);
             if (request.TargetDate.Date < todayInVN || request.TargetDate.Date > maxDate)

@@ -66,6 +66,12 @@ namespace AutoWashPro.BLL.Services
                 return false;
             }
 
+            if (messaging == null)
+            {
+                _logger.LogWarning("Firebase is not initialized (messaging is null). Push notification for User {UserId} was not sent.", request.UserId);
+                return false;
+            }
+
             var successCount = 0;
             var failureCount = 0;
             var tokensToRemove = new List<UserFcmToken>();

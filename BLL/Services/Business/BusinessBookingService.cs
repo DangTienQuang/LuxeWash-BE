@@ -68,8 +68,8 @@ namespace BLL.Services
             TimeZoneInfo vnTimeZone;
             try { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
             catch { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
-            DateTime todayInVN = TimeZoneInfo.ConvertTimeFromUtc(AutoWashPro.DAL.Helpers.TimeHelper.VnNow, vnTimeZone).Date;
-            TimeSpan currentTimeInVN = TimeZoneInfo.ConvertTimeFromUtc(AutoWashPro.DAL.Helpers.TimeHelper.VnNow, vnTimeZone).TimeOfDay;
+            DateTime todayInVN = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
+            TimeSpan currentTimeInVN = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.TimeOfDay;
             if (request.TargetDate.Date < todayInVN)
                 throw new BadRequestException("Cannot book for a date in the past.");
             var simRequests = new List<VehicleScheduleRequest>();
