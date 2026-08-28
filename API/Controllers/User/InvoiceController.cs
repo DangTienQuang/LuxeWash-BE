@@ -58,7 +58,8 @@ namespace API.Controllers.User
         [Authorize(Roles = "Business,Manager,Staff")]
         public async Task<IActionResult> DownloadInvoicePdf(int invoiceId)
         {
-            var invoice = await _businessService.GetInvoiceExportAsync(invoiceId);
+            int? requestingBusinessUserId = User.IsInRole("Business") ? ClaimHelper.GetUserId(User) : null;
+            var invoice = await _businessService.GetInvoiceExportAsync(invoiceId, requestingBusinessUserId);
             var pdfBytes = await _invoicePdfService.GenerateInvoiceAsync(invoiceId);
             var fileName = InvoiceFileNameHelper.BuildInvoiceFileName(invoice);
 

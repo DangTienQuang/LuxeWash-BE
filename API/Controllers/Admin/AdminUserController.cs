@@ -22,12 +22,19 @@ namespace API.Controllers.Admin
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAllCustomers([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? keyword = null, [FromQuery] string? status = null)
+        public async Task<IActionResult> GetAllCustomers([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? keyword = null, [FromQuery] string? status = null, [FromQuery] string? role = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 1 || pageSize > 100) pageSize = 10;
 
-            var result = await _userService.GetAllCustomersAsync(page, pageSize, keyword, status);
+            var result = await _userService.GetAllCustomersAsync(page, pageSize, keyword, status, role);
+            return Ok(new { statusCode = 200, message = "Success", data = result });
+        }
+
+        [HttpGet("stats")]
+        public async Task<IActionResult> GetUserRoleStats()
+        {
+            var result = await _userService.GetUserRoleStatsAsync();
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 

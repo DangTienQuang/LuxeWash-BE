@@ -162,8 +162,9 @@ namespace API.Controllers
         [HttpPost("check-in")]
         public async Task<IActionResult> CheckIn(FleetCheckInDTO dto)
         {
+            int userId = ClaimHelper.GetUserId(User);
             var result =
-                await _businessBookingService.CheckInAsync(dto.BookingId);
+                await _businessBookingService.CheckInAsync(userId, dto.BookingId);
 
             return Ok(new
             {
@@ -191,7 +192,8 @@ namespace API.Controllers
         [HttpPost("walk-out/{washLogId}")]
         public async Task<IActionResult> WalkOut(int washLogId)
         {
-            await _businessBookingService.WalkOutAsync(washLogId);
+            int userId = ClaimHelper.GetUserId(User);
+            await _businessBookingService.WalkOutAsync(userId, washLogId);
 
             return Ok(new
             {
@@ -219,8 +221,9 @@ namespace API.Controllers
         [HttpGet("current")]
         public async Task<IActionResult> GetCurrentVehicles()
         {
+            int userId = ClaimHelper.GetUserId(User);
             var result =
-                await _businessBookingService.GetCurrentVehiclesAsync();
+                await _businessBookingService.GetCurrentVehiclesAsync(userId);
 
             return Ok(new
             {
@@ -282,7 +285,8 @@ namespace API.Controllers
         [HttpPost("checkout/{washLogId}")]
         public async Task<IActionResult> CheckOut(int washLogId)
         {
-            var result = await _businessBookingService.CheckOutAsync(washLogId);
+            int userId = ClaimHelper.GetUserId(User);
+            var result = await _businessBookingService.CheckOutAsync(userId, washLogId);
 
             return Ok(new
             {

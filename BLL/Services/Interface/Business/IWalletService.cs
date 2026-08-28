@@ -10,8 +10,8 @@ namespace AutoWashPro.BLL.Services
         Task<PaymentQrResponseDTO> CreatePaymentQrAsync(int userId, PaymentQrRequestDTO request);
         Task<TopUpResponseDTO> CreateTopUpLinkAsync(int userId, TopUpRequestDTO request);
         Task ProcessPayOsWebhookAsync(WebhookTopUpDTO webhookData);
-        Task<List<TransactionResponseDTO>> GetTransactionsAsync(int userId);
-        Task<List<PointHistoryResponseDTO>> GetPointsHistoryAsync(int userId);
+        Task<List<TransactionResponseDTO>> GetTransactionsAsync(int userId, int page = 1, int pageSize = 50);
+        Task<List<PointHistoryResponseDTO>> GetPointsHistoryAsync(int userId, int page = 1, int pageSize = 50);
         Task DeductSpendablePointsAsync(int userId, int pointsToDeduct, string reason);
         Task RefundSpendablePointsAsync(int userId, int pointsToRefund, string reason, int? referenceBookingId = null);
         Task RefundBalanceAsync(int userId, decimal amount, string reason);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoWashPro.BLL.Exceptions;
+using AutoWashPro.BLL.Services;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using AutoWashPro.DAL.Enums;
@@ -97,7 +98,8 @@ namespace BLL.Services
                 voucher = new Voucher
                 {
                     Code = voucherCode,
-                    DiscountAmount = eval.CalculatedVoucherDiscountPercent,
+                    DiscountAmount = 0,
+                    DiscountPercent = eval.CalculatedVoucherDiscountPercent,
                     VoucherType = VoucherType.Discount,
                     CampaignType = VoucherCampaignType.Winback,
                     BranchId = branchId,
@@ -146,7 +148,7 @@ namespace BLL.Services
                     ? $"Doanh thu giảm {eval.RevenueDropPercentage}%. Hệ thống đã tạo ĐỀ XUẤT Voucher ({voucherCode}) chờ Manager xét duyệt (Số khách quen mục tiêu: ~{branchCustomerIds.Count} người)."
                     : $"Doanh thu giảm {eval.RevenueDropPercentage}%. Voucher ({voucherCode}) đã được xét duyệt (Trạng thái: {voucher.ApprovalStatus}).",
                 GeneratedVoucherCode = voucher.Code,
-                DiscountPercentage = (int)voucher.DiscountAmount,
+                DiscountPercentage = (int)(voucher.DiscountPercent ?? 0),
                 GrantedUsersCount = grantedCount
             };
         }
@@ -176,6 +178,8 @@ namespace BLL.Services
                     VoucherId = v.VoucherId,
                     Code = v.Code,
                     DiscountAmount = v.DiscountAmount,
+                    DiscountPercent = v.DiscountPercent,
+                    MaxDiscountAmount = v.MaxDiscountAmount,
                     MaxUsages = v.MaxUsages,
                     ExpiryDays = v.ExpiryDays,
                     ApprovalStatus = v.ApprovalStatus,
@@ -208,6 +212,13 @@ namespace BLL.Services
             {
                 voucher.DiscountAmount = dto.DiscountAmount.Value;
             }
+            if (dto.DiscountPercent.HasValue && dto.DiscountPercent.Value > 0)
+            {
+                var effectiveMaxDiscountAmount = dto.MaxDiscountAmount ?? voucher.MaxDiscountAmount;
+                VoucherService.ValidatePercentDiscount(dto.DiscountPercent.Value, effectiveMaxDiscountAmount);
+                voucher.DiscountPercent = dto.DiscountPercent.Value;
+                voucher.MaxDiscountAmount = effectiveMaxDiscountAmount;
+            }
             if (dto.MaxUsages.HasValue && dto.MaxUsages.Value > 0)
             {
                 voucher.MaxUsages = dto.MaxUsages.Value;
@@ -230,6 +241,8 @@ namespace BLL.Services
                 VoucherId = voucher.VoucherId,
                 Code = voucher.Code,
                 DiscountAmount = voucher.DiscountAmount,
+                DiscountPercent = voucher.DiscountPercent,
+                MaxDiscountAmount = voucher.MaxDiscountAmount,
                 MaxUsages = voucher.MaxUsages,
                 ExpiryDays = voucher.ExpiryDays,
                 ApprovalStatus = voucher.ApprovalStatus,
@@ -305,7 +318,7 @@ namespace BLL.Services
                 ApprovalStatus = "Approved",
                 Message = $"Đã PHÊ DUYỆT thành công đề xuất Voucher '{voucher.Code}'. Đã phát hành và gửi vào ví của {grantedCount} khách hàng quen thuộc!",
                 GeneratedVoucherCode = voucher.Code,
-                DiscountPercentage = (int)voucher.DiscountAmount,
+                DiscountPercentage = (int)(voucher.DiscountPercent ?? 0),
                 GrantedUsersCount = grantedCount
             };
         }
@@ -417,7 +430,8 @@ namespace BLL.Services
                 existingWeekdayVoucher = new Voucher
                 {
                     Code = weekdayCode,
-                    DiscountAmount = weekdayDiscount,
+                    DiscountAmount = 0,
+                    DiscountPercent = weekdayDiscount,
                     MaxUsages = 100,
                     CurrentUsageCount = 0,
                     MaxUsagePerUser = 2,
@@ -439,6 +453,8 @@ namespace BLL.Services
                 VoucherId = existingWeekdayVoucher.VoucherId,
                 Code = existingWeekdayVoucher.Code,
                 DiscountAmount = existingWeekdayVoucher.DiscountAmount,
+                DiscountPercent = existingWeekdayVoucher.DiscountPercent,
+                MaxDiscountAmount = existingWeekdayVoucher.MaxDiscountAmount,
                 MaxUsages = existingWeekdayVoucher.MaxUsages,
                 ExpiryDays = existingWeekdayVoucher.ExpiryDays,
                 ApprovalStatus = existingWeekdayVoucher.ApprovalStatus,
@@ -462,7 +478,8 @@ namespace BLL.Services
                 existingWinbackVoucher = new Voucher
                 {
                     Code = winbackCode,
-                    DiscountAmount = winbackDiscount,
+                    DiscountAmount = 0,
+                    DiscountPercent = winbackDiscount,
                     MaxUsages = targetWinbackUsers * 2,
                     CurrentUsageCount = 0,
                     MaxUsagePerUser = 1,
@@ -484,6 +501,8 @@ namespace BLL.Services
                 VoucherId = existingWinbackVoucher.VoucherId,
                 Code = existingWinbackVoucher.Code,
                 DiscountAmount = existingWinbackVoucher.DiscountAmount,
+                DiscountPercent = existingWinbackVoucher.DiscountPercent,
+                MaxDiscountAmount = existingWinbackVoucher.MaxDiscountAmount,
                 MaxUsages = existingWinbackVoucher.MaxUsages,
                 ExpiryDays = existingWinbackVoucher.ExpiryDays,
                 ApprovalStatus = existingWinbackVoucher.ApprovalStatus,

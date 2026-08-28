@@ -34,7 +34,9 @@ namespace AutoWashPro.DAL.Entities
         [MaxLength(128)]
         public string? EmailVerificationOtpHash { get; set; }
         public DateTime? EmailVerificationOtpExpiresAt { get; set; }
-        
+        public int OtpFailedAttempts { get; set; } = 0;
+        public DateTime? OtpLockedUntil { get; set; }
+
         public ICollection<UserFcmToken> FcmTokens { get; set; } = new List<UserFcmToken>();
 
         public CustomerProfile CustomerProfile { get; set; } = null!;

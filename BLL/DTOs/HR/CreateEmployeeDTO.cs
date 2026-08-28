@@ -5,8 +5,10 @@ namespace AutoWashPro.BLL.DTOs
     {
         [Required]
         [MaxLength(20)]
+        [RegularExpression(@"^0[35789][0-9]{8}$", ErrorMessage = "Phone number is invalid.")]
         public string PhoneNumber { get; set; } = null!;
         [Required]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Password must have at least 8 characters, including 1 uppercase letter and 1 digit.")]
         public string Password { get; set; } = null!;
         [Required]
         [MaxLength(100)]

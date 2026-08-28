@@ -20,7 +20,7 @@ namespace BLL.Services.Interface
         Task<List<FleetHistoryDTO>> GetHistoryAsync(int businessUserId, FleetHistoryFilterDTO filter);
         Task<List<FleetQueueDTO>> GetBusinessQueueAsync(int branchId);
         Task<FleetDashboardDTO> GetDashboardAsync(int businessUserId);
-        Task<List<FleetWashHistoryDTO>> GetWashHistoryAsync(int businessUserId);
+        Task<List<FleetWashHistoryDTO>> GetWashHistoryAsync(int businessUserId, int page = 1, int pageSize = 50);
         Task<byte[]> GenerateFleetTemplateAsync();
         Task<FleetTemplateDTO> GetFleetTemplateInfoAsync(string baseUrl);
         Task<List<StaffPendingVehicleDTO>> GetAllPendingVehiclesAsync(int? businessProfileId = null);

@@ -22,13 +22,13 @@ namespace AutoWashPro.BLL.Services
         Task<ShiftAssignmentResponseDTO> CreateShiftAssignmentAsync(CreateShiftAssignmentDTO request);
         Task<ShiftAssignmentResponseDTO> UpdateShiftAssignmentAsync(int assignmentId, UpdateShiftAssignmentDTO request);
         Task<bool> DeleteShiftAssignmentAsync(int assignmentId);
-        Task<List<OvertimeRequestResponseDTO>> GetOvertimeRequestsAsync(string? status);
+        Task<List<OvertimeRequestResponseDTO>> GetOvertimeRequestsAsync(int managerUserId, bool isAdmin, string? status);
         Task<List<OvertimeRequestResponseDTO>> GetMyOvertimeRequestsAsync(int staffUserId);
         Task<OvertimeRequestResponseDTO> CreateOvertimeRequestAsync(int staffUserId, CreateOvertimeRequestDTO request);
-        Task<OvertimeRequestResponseDTO> ReviewOvertimeRequestAsync(int requestId, int managerUserId, ReviewRequestDTO request);
-        Task<List<ShiftSwapRequestResponseDTO>> GetShiftSwapRequestsAsync(string? status);
+        Task<OvertimeRequestResponseDTO> ReviewOvertimeRequestAsync(int requestId, int managerUserId, bool isAdmin, ReviewRequestDTO request);
+        Task<List<ShiftSwapRequestResponseDTO>> GetShiftSwapRequestsAsync(int managerUserId, bool isAdmin, string? status);
         Task<List<ShiftSwapRequestResponseDTO>> GetMyShiftSwapRequestsAsync(int staffUserId);
         Task<ShiftSwapRequestResponseDTO> CreateShiftSwapRequestAsync(int staffUserId, CreateShiftSwapRequestDTO request);
-        Task<ShiftSwapRequestResponseDTO> ReviewShiftSwapRequestAsync(int requestId, int managerUserId, ReviewRequestDTO request);
+        Task<ShiftSwapRequestResponseDTO> ReviewShiftSwapRequestAsync(int requestId, int managerUserId, bool isAdmin, ReviewRequestDTO request);
     }
 }

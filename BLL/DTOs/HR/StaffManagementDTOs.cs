@@ -19,7 +19,7 @@ namespace AutoWashPro.BLL.DTOs
     public class CreateStaffDTO
     {
         [Required]
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
+        [RegularExpression(@"^0[35789][0-9]{8}$", ErrorMessage = "Phone number is invalid.")]
         public string PhoneNumber { get; set; } = string.Empty;
         [EmailAddress]
         public string? Email { get; set; }
@@ -36,7 +36,7 @@ namespace AutoWashPro.BLL.DTOs
     {
         [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Full name cannot consist of only whitespace.")]
         public string? FullName { get; set; }
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
+        [RegularExpression(@"^0[35789][0-9]{8}$", ErrorMessage = "Phone number is invalid.")]
         public string? PhoneNumber { get; set; }
         [EmailAddress]
         public string? Email { get; set; }

@@ -3,12 +3,14 @@ using AutoWashPro.BLL.Services;
 using BLL.Services;
 using BLL.Services.AI.Interfaces;
 using BLL.Services.Interface;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers.Ai
 {
     [ApiController]
     [Route("api/lpr")]
+    [Authorize(Roles = "Staff,Manager")]
     public class VehicleDetectionController : ControllerBase
     {
         private readonly ILicensePlateService _plateService;

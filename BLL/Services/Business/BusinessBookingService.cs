@@ -87,8 +87,17 @@ namespace BLL.Services
                         distinctServiceIds.Contains(x.ServiceId))
                     .ToListAsync();
                 if (servicePrices.Count != distinctServiceIds.Count)
+                {
+                    var pricedServiceIds = servicePrices.Select(x => x.ServiceId).ToHashSet();
+                    var missingServiceNames = await _context.Services
+                        .Where(s => distinctServiceIds.Contains(s.ServiceId) && !pricedServiceIds.Contains(s.ServiceId))
+                        .Select(s => s.ServiceName)
+                        .ToListAsync();
                     throw new BadRequestException(
-                        $"One or more services have not been priced for vehicle {vehicle.LicensePlate}.");
+                        $"Xe {vehicle.LicensePlate} ({vehicle.VehicleType.Name}) chưa được thiết lập giá cho (các) dịch vụ: " +
+                        $"{string.Join(", ", missingServiceNames)}.",
+                        "SERVICE_NOT_PRICED_FOR_VEHICLE");
+                }
 
                 var capacityWeight = servicePrices
                     .Select(x => x.CapacityWeight > 0 ? x.CapacityWeight : vehicle.VehicleType.BaseWeight)
@@ -214,9 +223,17 @@ namespace BLL.Services
                         distinctServiceIds.Contains(sp.ServiceId))
                     .ToListAsync();
                 if (vehicleServicePrices.Count != distinctServiceIds.Count)
+                {
+                    var pricedServiceIds = vehicleServicePrices.Select(x => x.ServiceId).ToHashSet();
+                    var missingServiceNames = await _context.Services
+                        .Where(s => distinctServiceIds.Contains(s.ServiceId) && !pricedServiceIds.Contains(s.ServiceId))
+                        .Select(s => s.ServiceName)
+                        .ToListAsync();
                     throw new BadRequestException(
-                        $"One or more services have not been priced for the vehicle " +
-                        $"{vehicle.LicensePlate} ({vehicle.VehicleType.Name}).");
+                        $"Xe {vehicle.LicensePlate} ({vehicle.VehicleType.Name}) chưa được thiết lập giá cho (các) dịch vụ: " +
+                        $"{string.Join(", ", missingServiceNames)}.",
+                        "SERVICE_NOT_PRICED_FOR_VEHICLE");
+                }
                 capacityWeights[vehicle.FleetVehicleId] = vehicleServicePrices
                     .Select(x => x.CapacityWeight > 0 ? x.CapacityWeight : vehicle.VehicleType.BaseWeight)
                     .DefaultIfEmpty(vehicle.VehicleType.BaseWeight)
@@ -278,14 +295,17 @@ namespace BLL.Services
                         "BUSINESS_CREDIT_LIMIT_EXCEEDED");
                 }
 
+                var requiredSlotIds = requiredWeightBySlot.Keys.ToList();
+                var dailyCapacitiesBySlot = await _context.DailySlotCapacities
+                    .Where(x =>
+                        x.BranchId == dto.BranchId &&
+                        x.Date == scheduledTime.Date &&
+                        requiredSlotIds.Contains(x.SlotId))
+                    .ToDictionaryAsync(x => x.SlotId);
+
                 foreach (var (assignedSlotId, requiredWeight) in requiredWeightBySlot)
                 {
-                    var dailyCapacity = await _context.DailySlotCapacities
-                        .FirstOrDefaultAsync(x =>
-                            x.BranchId == dto.BranchId &&
-                            x.SlotId == assignedSlotId &&
-                            x.Date == scheduledTime.Date);
-                    if (dailyCapacity == null)
+                    if (!dailyCapacitiesBySlot.TryGetValue(assignedSlotId, out var dailyCapacity))
                     {
                         dailyCapacity = new DailySlotCapacity
                         {
@@ -295,6 +315,7 @@ namespace BLL.Services
                             BookedWeight = 0
                         };
                         _context.DailySlotCapacities.Add(dailyCapacity);
+                        dailyCapacitiesBySlot[assignedSlotId] = dailyCapacity;
                     }
                     if (dailyCapacity.BookedWeight + requiredWeight > assignedSlots[assignedSlotId].MaxCapacity)
                         throw new BadRequestException("BUSINESS_SLOT_CAPACITY_EXCEEDED");
@@ -522,8 +543,10 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-        public async Task<List<BusinessBookingListDTO>> GetBookingsAsync(int businessUserId)
+        public async Task<List<BusinessBookingListDTO>> GetBookingsAsync(int businessUserId, int page = 1, int pageSize = 50)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 200) pageSize = 50;
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
             if (business == null) throw new NotFoundException("Business profile not found.");
@@ -533,6 +556,8 @@ namespace BLL.Services
                     x.BusinessProfileId ==
                     business.BusinessProfileId)
                 .OrderByDescending(x => x.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(x => new BusinessBookingListDTO
                 {
                     BookingId = x.BookingId,
@@ -624,8 +649,9 @@ namespace BLL.Services
             booking.UpdatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             await _context.SaveChangesAsync();
         }
-        public async Task<FleetWashLogDTO> CheckInAsync(int bookingId)
+        public async Task<FleetWashLogDTO> CheckInAsync(int staffUserId, int bookingId)
         {
+            var staffBranchId = await GetStaffBranchIdAsync(staffUserId);
             var booking = await _context.Bookings
                 .Include(x => x.FleetVehicle)
                 .Include(x => x.BookingDetails)
@@ -633,6 +659,7 @@ namespace BLL.Services
                     x.BookingId == bookingId);
             if (booking == null) throw new NotFoundException("Booking not found.");
             if (booking.BookingType != "Business") throw new BadRequestException("This is not a business booking.");
+            if (booking.BranchId != staffBranchId) throw new ForbiddenException("This booking does not belong to your branch.");
             if (booking.Status != "Pending") throw new BadRequestException("This booking cannot be checked in yet.");
             var detail = booking.BookingDetails.First();
             var washLog = new FleetWashLog
@@ -738,13 +765,18 @@ namespace BLL.Services
                 LaneName = admission.LaneName
             };
         }
-        public async Task WalkOutAsync(int washLogId)
+        public async Task WalkOutAsync(int staffUserId, int washLogId)
         {
+            var staffBranchId = await GetStaffBranchIdAsync(staffUserId);
             var washLog = await _context.FleetWashLogs
                 .FirstOrDefaultAsync(x => x.FleetWashLogId == washLogId);
             if (washLog == null)
             {
                 throw new NotFoundException("Car wash log not found.");
+            }
+            if (washLog.BranchId != staffBranchId)
+            {
+                throw new ForbiddenException("This vehicle does not belong to your branch.");
             }
             if (washLog.Status != "Processing")
             {
@@ -800,13 +832,15 @@ namespace BLL.Services
             }
             await _context.SaveChangesAsync();
         }
-        public async Task<List<CurrentFleetVehicleDTO>> GetCurrentVehiclesAsync()
+        public async Task<List<CurrentFleetVehicleDTO>> GetCurrentVehiclesAsync(int staffUserId)
         {
+            var staffBranchId = await GetStaffBranchIdAsync(staffUserId);
             return await _context.FleetWashLogs
                 .Include(x => x.FleetVehicle)
                 .Where(x =>
-                    x.Status == "CheckedIn" ||
-                    x.Status == "Processing")
+                    x.BranchId == staffBranchId &&
+                    (x.Status == "CheckedIn" ||
+                    x.Status == "Processing"))
                 .OrderBy(x => x.CheckInTime)
                 .Select(x => new CurrentFleetVehicleDTO
                 {
@@ -818,8 +852,9 @@ namespace BLL.Services
                 })
                 .ToListAsync();
         }
-        public async Task<FleetCheckoutResponseDTO> CheckOutAsync(int washLogId)
+        public async Task<FleetCheckoutResponseDTO> CheckOutAsync(int staffUserId, int washLogId)
         {
+            var staffBranchId = await GetStaffBranchIdAsync(staffUserId);
             var washLog = await _context.FleetWashLogs
                 .Include(x => x.FleetVehicle)
                 .Include(x => x.Booking)
@@ -830,6 +865,10 @@ namespace BLL.Services
             if (washLog == null)
             {
                 throw new NotFoundException("Car wash log not found.");
+            }
+            if (washLog.BranchId != staffBranchId)
+            {
+                throw new ForbiddenException("This vehicle does not belong to your branch.");
             }
             var hasActiveOccupancy = await _context.LaneOccupancies
                 .AnyAsync(x => x.FleetWashLogId == washLogId);
@@ -874,11 +913,16 @@ namespace BLL.Services
                 CompletedTime = washLog.CompletedTime.Value
             };
         }
-        public async Task<InvoiceDTO> GetInvoiceByBookingAsync(int bookingId)
+        public async Task<InvoiceDTO> GetInvoiceByBookingAsync(int businessUserId, int bookingId)
         {
+            var business = await _context.BusinessProfiles
+                .FirstOrDefaultAsync(x => x.UserId == businessUserId);
+            if (business == null) throw new NotFoundException("Business profile not found.");
+
             var invoice = await _context.Invoices
                 .Include(x => x.InvoiceItems)
-                .FirstOrDefaultAsync(x => x.BookingId == bookingId);
+                .Include(x => x.Booking)
+                .FirstOrDefaultAsync(x => x.BookingId == bookingId && x.Booking != null && x.Booking.BusinessProfileId == business.BusinessProfileId);
             if (invoice == null)
                 throw new NotFoundException("Invoice not found.");
             return new InvoiceDTO
@@ -1251,6 +1295,18 @@ namespace BLL.Services
             }
             return result.OrderByDescending(x => x.CheckInTime ?? x.ScheduledTime).ToList();
         }
-    }        
+        private async Task<int> GetStaffBranchIdAsync(int staffUserId)
+        {
+            var branchId = await _context.EmployeeProfiles
+                .Where(e => e.EmployeeId == staffUserId)
+                .Select(e => e.BranchId)
+                .FirstOrDefaultAsync();
+            if (!branchId.HasValue)
+            {
+                throw new BadRequestException("Staff is not assigned to a branch.");
+            }
+            return branchId.Value;
+        }
+    }
 }
 #pragma warning restore CS8600, CS8601, CS8602, CS8604, CS8625, CS8629, CS0168, CS0618

@@ -227,11 +227,11 @@ namespace API.Controllers
 
         [Authorize(Roles = "Business")]
         [HttpGet]
-        public async Task<IActionResult> GetBookings()
+        public async Task<IActionResult> GetBookings([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
         {
             int userId = ClaimHelper.GetUserId(User);
 
-            var result = await _businessBookingService.GetBookingsAsync(userId);
+            var result = await _businessBookingService.GetBookingsAsync(userId, page, pageSize);
 
             return Ok(new
             {
@@ -272,10 +272,13 @@ namespace API.Controllers
             });
         }
 
+        [Authorize(Roles = "Business")]
         [HttpGet("invoice/{bookingId}")]
         public async Task<IActionResult> GetInvoice(int bookingId)
         {
-            var result = await _businessBookingService.GetInvoiceByBookingAsync(bookingId);
+            int userId = ClaimHelper.GetUserId(User);
+
+            var result = await _businessBookingService.GetInvoiceByBookingAsync(userId, bookingId);
 
             return Ok(new
             {
@@ -321,6 +324,11 @@ namespace API.Controllers
         [HttpGet("statements/monthly")]
         public async Task<IActionResult> GetMonthlyStatement([FromQuery] int year, [FromQuery] int month)
         {
+            if (month < 1 || month > 12)
+                throw new BadRequestException("Billing month is invalid.");
+            if (year < 2000 || year > 9999)
+                throw new BadRequestException("Billing year is invalid.");
+
             int userId = ClaimHelper.GetUserId(User);
 
             var result = await _businessBookingService
@@ -354,8 +362,9 @@ namespace API.Controllers
         [Authorize(Roles = "Business,Manager,Staff")]
         public async Task<IActionResult> ExportInvoice(int invoiceId)
         {
+            int? requestingBusinessUserId = User.IsInRole("Business") ? ClaimHelper.GetUserId(User) : null;
             var result =
-                await _businessService.GetInvoiceExportAsync(invoiceId);
+                await _businessService.GetInvoiceExportAsync(invoiceId, requestingBusinessUserId);
 
             return Ok(new
             {

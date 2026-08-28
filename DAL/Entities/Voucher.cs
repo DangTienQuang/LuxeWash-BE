@@ -19,6 +19,8 @@ namespace AutoWashPro.DAL.Entities
         public string Code { get; set; } = null!;
 
         public decimal DiscountAmount { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
         public int MaxUsages { get; set; }
         public int CurrentUsageCount { get; set; } = 0;
         public int MaxUsagePerUser { get; set; } = 1;

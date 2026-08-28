@@ -4,6 +4,7 @@ using AutoWashPro.BLL.Services.Interface;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,15 +17,18 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashDbContext _context;
         private readonly IPushNotificationService _pushNotificationService;
         private readonly Microsoft.AspNetCore.SignalR.IHubContext<AutoWashPro.BLL.Hubs.NotificationHub> _hubContext;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public UserNotificationService(
-            AutoWashDbContext context, 
+            AutoWashDbContext context,
             IPushNotificationService pushNotificationService,
-            Microsoft.AspNetCore.SignalR.IHubContext<AutoWashPro.BLL.Hubs.NotificationHub> hubContext)
+            Microsoft.AspNetCore.SignalR.IHubContext<AutoWashPro.BLL.Hubs.NotificationHub> hubContext,
+            IServiceScopeFactory scopeFactory)
         {
             _context = context;
             _pushNotificationService = pushNotificationService;
             _hubContext = hubContext;
+            _scopeFactory = scopeFactory;
         }
 
         public async Task<List<UserNotificationDTO>> GetMyNotificationsAsync(int userId)
@@ -199,7 +203,12 @@ namespace AutoWashPro.BLL.Services
 
                     try
                     {
-                        await _pushNotificationService.SendPushNotificationAsync(new PushNotificationRequest
+                        // The request's DI scope (and its scoped DbContext) may already be disposed by
+                        // the time this background task runs, so resolve a fresh scope per notification
+                        // instead of reusing the injected (request-scoped) _pushNotificationService.
+                        using var scope = _scopeFactory.CreateScope();
+                        var scopedPushService = scope.ServiceProvider.GetRequiredService<IPushNotificationService>();
+                        await scopedPushService.SendPushNotificationAsync(new PushNotificationRequest
                         {
                             UserId = notification.UserId,
                             Title = notification.Title,

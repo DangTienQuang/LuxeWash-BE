@@ -200,7 +200,7 @@ namespace BLL.Services
                 CreatedAt = profile.CreatedAt
             };
         }
-        public async Task<InvoiceExportDTO> GetInvoiceExportAsync(int invoiceId)
+        public async Task<InvoiceExportDTO> GetInvoiceExportAsync(int invoiceId, int? requestingBusinessUserId = null)
         {
             var invoice = await _context.Invoices
                 .Include(i => i.BusinessProfile)
@@ -214,6 +214,14 @@ namespace BLL.Services
             if (invoice == null)
             {
                 throw new NotFoundException("Invoice not found.");
+            }
+            if (requestingBusinessUserId.HasValue)
+            {
+                var ownsInvoice = invoice.BusinessProfile != null && invoice.BusinessProfile.UserId == requestingBusinessUserId.Value;
+                if (!ownsInvoice)
+                {
+                    throw new NotFoundException("Invoice not found.");
+                }
             }
             return new InvoiceExportDTO
             {

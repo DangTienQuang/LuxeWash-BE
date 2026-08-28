@@ -128,6 +128,13 @@ namespace AutoWashPro.DAL.Data
             modelBuilder.Entity<OutboxMessage>()
                 .HasIndex(m => new { m.ProcessedAt, m.NextRetryAt });
 
+            modelBuilder.Entity<Transaction>()
+                .HasIndex(t => t.OrderCode)
+                .IsUnique();
+
+            modelBuilder.Entity<Transaction>()
+                .HasIndex(t => t.ReferenceBookingId);
+
             modelBuilder.Entity<UserFcmToken>()
                 .HasIndex(t => t.Token)
                 .IsUnique();

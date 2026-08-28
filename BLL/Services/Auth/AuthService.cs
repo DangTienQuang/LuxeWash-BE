@@ -24,6 +24,9 @@ namespace AutoWashPro.BLL.Services
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
 
+        private const int MaxOtpAttempts = 5;
+        private const int OtpLockMinutes = 15;
+
         public AuthService(AutoWashDbContext context, IConfiguration configuration, IEmailService emailService)
         {
             _context = context;
@@ -207,8 +210,7 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Account does not have a verification OTP code. Please register again.");
             if (user.EmailVerificationOtpExpiresAt <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("OTP code has expired. Please register again to receive a new code.");
-            if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(request.Otp), StringComparison.Ordinal))
-                throw new BadRequestException("Incorrect OTP code.");
+            await VerifyOtpAttemptOrThrowAsync(user, request.Otp);
 
             user.Status = UserStatuses.Active;
             user.EmailVerificationOtpHash = null;
@@ -270,6 +272,9 @@ namespace AutoWashPro.BLL.Services
 
             if (user == null || user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiryTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new UnauthorizedException("Refresh token is invalid or expired. Please log in again.");
+
+            if (user.Status != UserStatuses.Active)
+                throw new UnauthorizedException("Account is locked or inactive.");
 
             var newAccessToken = CreateJwtToken(user);
             var newRefreshToken = GenerateRefreshToken();
@@ -366,6 +371,31 @@ namespace AutoWashPro.BLL.Services
         {
             var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(otp));
             return Convert.ToHexString(bytes);
+        }
+
+        private async Task VerifyOtpAttemptOrThrowAsync(User user, string otp)
+        {
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            if (user.OtpLockedUntil.HasValue && user.OtpLockedUntil > now)
+            {
+                var minutesLeft = (int)Math.Ceiling((user.OtpLockedUntil.Value - now).TotalMinutes);
+                throw new BadRequestException($"Too many incorrect OTP attempts. Please try again in {minutesLeft} minute(s).");
+            }
+
+            if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(otp), StringComparison.Ordinal))
+            {
+                user.OtpFailedAttempts++;
+                if (user.OtpFailedAttempts >= MaxOtpAttempts)
+                {
+                    user.OtpLockedUntil = now.AddMinutes(OtpLockMinutes);
+                    user.OtpFailedAttempts = 0;
+                }
+                await _context.SaveChangesAsync();
+                throw new BadRequestException("Incorrect OTP code.");
+            }
+
+            user.OtpFailedAttempts = 0;
+            user.OtpLockedUntil = null;
         }
 
         private Task SendRegistrationOtpEmailAsync(string email, string fullName, string otp, DateTime otpExpiresAt)
@@ -513,8 +543,7 @@ namespace AutoWashPro.BLL.Services
             if (user.EmailVerificationOtpExpiresAt <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("OTP code has expired. Please submit another forgot password request.");
 
-            if (!string.Equals(user.EmailVerificationOtpHash, HashOtp(request.Otp), StringComparison.Ordinal))
-                throw new BadRequestException("Incorrect OTP code.");
+            await VerifyOtpAttemptOrThrowAsync(user, request.Otp);
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             user.EmailVerificationOtpHash = null;

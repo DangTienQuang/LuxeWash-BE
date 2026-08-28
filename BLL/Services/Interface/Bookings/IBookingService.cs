@@ -29,10 +29,9 @@ namespace AutoWashPro.BLL.Services
         Task ForceCancelBookingsAsync(ForceCancelRequestDTO request);
         Task<bool> SendBookingConfirmationEmailAsync(int userId, int bookingId);
         Task<BookingResponseDTO> RescheduleBookingAsync(int userId, int bookingId, RescheduleBookingDTO request);
-        Task<BookingPaymentStatusDTO> GetBookingPaymentStatusAsync(int bookingId);
+        Task<BookingPaymentStatusDTO> GetBookingPaymentStatusAsync(int userId, int bookingId, bool isPrivilegedCaller = false);
         Task<BookingResponseDTO> AutoCheckInAndStartProcessingAsync(string licensePlate, int branchId, bool autoStart);
         Task<int> ProcessOverdueAutomatedWashesAsync();
-        Task<BookingResponseDTO> AcceptRelocationAsync(int userId, int bookingId, AcceptRelocationRequestDTO request);
         Task<OverloadSuggestionResponseDTO?> GetPendingOverloadSuggestionAsync(int userId, int bookingId);
         Task<HandleOverloadDecisionResponseDTO> HandleOverloadDecisionAsync(int userId, int bookingId, HandleOverloadDecisionDTO request);
     }

@@ -6,12 +6,12 @@ using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using System.Linq;
 
+#if DEBUG
 namespace API.Controllers.Admin
 {
     [Route("api/v1/admin/seeding")]
     [ApiController]
-    // Uncomment the line below to secure this endpoint in production
-    // [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     public class AdminSeedingController : ControllerBase
     {
         private readonly AutoWashDbContext _context;
@@ -205,3 +205,4 @@ namespace API.Controllers.Admin
         }
     }
 }
+#endif

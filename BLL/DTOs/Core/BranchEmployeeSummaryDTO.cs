@@ -9,4 +9,13 @@ namespace AutoWashPro.BLL.DTOs
         public List<EmployeeProfileDTO> Managers { get; set; } = new List<EmployeeProfileDTO>();
         public List<EmployeeProfileDTO> Staff { get; set; } = new List<EmployeeProfileDTO>();
     }
+
+    public class BranchEmployeesSummaryItemDTO
+    {
+        public int BranchId { get; set; }
+        public int TotalManagers { get; set; }
+        public int TotalStaff { get; set; }
+        public List<EmployeeProfileDTO> Managers { get; set; } = new List<EmployeeProfileDTO>();
+        public List<EmployeeProfileDTO> Staff { get; set; } = new List<EmployeeProfileDTO>();
+    }
 }

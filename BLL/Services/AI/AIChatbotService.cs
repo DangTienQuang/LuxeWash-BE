@@ -1,3 +1,4 @@
+using AutoWashPro.BLL.Exceptions;
 using AutoWashPro.BLL.Services;
 using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
@@ -34,7 +35,7 @@ namespace BLL.Services
             if (request == null
                 || string.IsNullOrWhiteSpace(request.Message))
             {
-                throw new Exception(
+                throw new BadRequestException(
                     "Tin nhắn không được để trống.");
             }
 
@@ -54,7 +55,7 @@ namespace BLL.Services
                     reason ?? "Blocked",
                     true);
 
-                throw new Exception(
+                throw new BadRequestException(
                     reason ?? "Tin nhắn không hợp lệ.");
             }
 

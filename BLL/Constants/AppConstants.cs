@@ -20,6 +20,7 @@ namespace AutoWashPro.BLL.Constants
         public const string Manager = "Manager";
         public const string Staff = "Staff";
         public const string Customer = "Customer";
+        public const string Business = "Business";
     }
 
     public static class PointConstants
@@ -28,6 +29,12 @@ namespace AutoWashPro.BLL.Constants
         public const int VndPerEarnedPoint = 1000;
         public const string CompletionReasonPrefix = "Service completion";
         public const string RefundPointsReasonPrefix = "Refund points due to booking cancellation";
+    }
+
+    public static class WalletConstants
+    {
+        // Kept in sync with the Mobile/Web FE top-up minimum (see wallet/top-up.tsx).
+        public const decimal MinTopUpAmount = 10000;
     }
 
     public static class BookingStatuses

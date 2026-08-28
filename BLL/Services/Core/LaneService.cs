@@ -80,6 +80,13 @@ namespace AutoWashPro.BLL.Services
                 var branch = await _context.Branches.FindAsync(updateDto.BranchId);
                 if (branch == null) throw new NotFoundException("Branch not found.");
             }
+            var deactivatingOrRebranching = !updateDto.IsActive || lane.BranchId != updateDto.BranchId;
+            if (deactivatingOrRebranching)
+            {
+                var hasActiveOccupancy = await _context.LaneOccupancies.AnyAsync(o => o.LaneId == laneId);
+                if (hasActiveOccupancy)
+                    throw new BadRequestException("Cannot deactivate or change branch for this lane because a vehicle is currently occupying it. Please check out the vehicle first.");
+            }
             lane.Name = updateDto.Name;
             lane.BranchId = updateDto.BranchId;
             lane.IsActive = updateDto.IsActive;

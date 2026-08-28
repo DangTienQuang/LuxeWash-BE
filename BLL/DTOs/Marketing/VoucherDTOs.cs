@@ -7,6 +7,8 @@ namespace AutoWashPro.BLL.DTOs
         public int VoucherId { get; set; }
         public required string Code { get; set; }
         public decimal DiscountAmount { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
         public int PointsRequired { get; set; }
         public DateTime ExpiryDate { get; set; }
         public DateTime CampaignExpiryDate { get; set; }
@@ -37,6 +39,8 @@ namespace AutoWashPro.BLL.DTOs
         public int VoucherId { get; set; }
         public required string Code { get; set; }
         public decimal DiscountAmount { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
         public int PointsRequired { get; set; }
         public DateTime ExpiryDate { get; set; }
         public decimal MinOrderAmount { get; set; }
@@ -62,6 +66,8 @@ namespace AutoWashPro.BLL.DTOs
         public int VoucherId { get; set; }
         public required string Code { get; set; }
         public decimal DiscountAmount { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
         public int MaxUsages { get; set; }
         public DateTime ExpiryDate { get; set; }
         public int PointsRequired { get; set; }
@@ -89,6 +95,10 @@ namespace AutoWashPro.BLL.DTOs
         public required string Code { get; set; }
         [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Discount amount is invalid.")]
         public decimal DiscountAmount { get; set; }
+        [Range(typeof(decimal), "0", "100", ErrorMessage = "Discount percent must be between 0 and 100.")]
+        public decimal? DiscountPercent { get; set; }
+        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Max discount amount is invalid.")]
+        public decimal? MaxDiscountAmount { get; set; }
         [Range(0, int.MaxValue)]
         public int MaxUsages { get; set; } = 0;
         [Range(1, int.MaxValue)]
@@ -116,6 +126,10 @@ namespace AutoWashPro.BLL.DTOs
         public required string Code { get; set; }
         [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Discount amount is invalid.")]
         public decimal DiscountAmount { get; set; }
+        [Range(typeof(decimal), "0", "100", ErrorMessage = "Discount percent must be between 0 and 100.")]
+        public decimal? DiscountPercent { get; set; }
+        [Range(typeof(decimal), "0", "1000000000", ErrorMessage = "Max discount amount is invalid.")]
+        public decimal? MaxDiscountAmount { get; set; }
         [Range(0, int.MaxValue)]
         public int MaxUsages { get; set; } = 0;
         [Range(1, int.MaxValue)]
@@ -149,6 +163,8 @@ namespace AutoWashPro.BLL.DTOs
         public int VoucherId { get; set; }
         public required string Code { get; set; }
         public decimal DiscountAmount { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
         public int MaxUsages { get; set; }
         public int MaxUsagePerUser { get; set; }
         public int? ExpiryDays { get; set; }

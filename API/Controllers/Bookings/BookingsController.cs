@@ -168,7 +168,9 @@ namespace AutoWashPro.API.Controllers
         [HttpGet("{id}/payment-status")]
         public async Task<IActionResult> GetBookingPaymentStatus(int id)
         {
-            var result = await _bookingService.GetBookingPaymentStatusAsync(id);
+            int userId = GetUserId();
+            bool isPrivilegedCaller = User.IsInRole("Staff") || User.IsInRole("Manager") || User.IsInRole("Admin");
+            var result = await _bookingService.GetBookingPaymentStatusAsync(userId, id, isPrivilegedCaller);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 

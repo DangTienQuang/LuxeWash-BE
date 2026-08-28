@@ -30,6 +30,8 @@ namespace AutoWashPro.BLL.Services
                     VoucherId = uv.VoucherId,
                     Code = uv.Voucher.Code,
                     DiscountAmount = uv.Voucher.DiscountAmount,
+                    DiscountPercent = uv.Voucher.DiscountPercent,
+                    MaxDiscountAmount = uv.Voucher.MaxDiscountAmount,
                     PointsRequired = uv.Voucher.PointsRequired,
                     ExpiryDate = uv.ExpiryDate,
                     CampaignExpiryDate = uv.Voucher.ExpiryDate,
@@ -89,6 +91,8 @@ namespace AutoWashPro.BLL.Services
                     VoucherId = v.VoucherId,
                     Code = v.Code,
                     DiscountAmount = v.DiscountAmount,
+                    DiscountPercent = v.DiscountPercent,
+                    MaxDiscountAmount = v.MaxDiscountAmount,
                     PointsRequired = v.PointsRequired,
                     ExpiryDate = v.ExpiryDate,
                     MinOrderAmount = v.MinOrderAmount,
@@ -154,8 +158,8 @@ namespace AutoWashPro.BLL.Services
 
                 await _userNotificationService.CreateNotificationAsync(
                     userId,
-                    "Äá»•i voucher thÃ nh cÃ´ng",
-                    $"Báº¡n Ä‘Ã£ Ä‘á»•i thÃ nh cÃ´ng voucher {voucher.Code} báº±ng Ä‘iá»ƒm.",
+                    "Đổi voucher thành công",
+                    $"Bạn đã đổi thành công voucher {voucher.Code} bằng điểm.",
                     "Voucher",
                     voucher.VoucherId.ToString()
                 );
@@ -228,6 +232,7 @@ namespace AutoWashPro.BLL.Services
 
             if (AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.ExpiryDate) <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("Expiration date must be in the future.");
+            ValidateVoucherDateRange(request.StartDate, request.ExpiryDate);
 
             var code = request.Code.Trim().ToUpperInvariant();
             if (await _context.Vouchers.AnyAsync(v => v.Code == code))
@@ -235,11 +240,14 @@ namespace AutoWashPro.BLL.Services
 
             await ValidateTierAsync(request.RequiredTierId);
             await ValidateVehicleTypeAsync(request.VehicleTypeId);
+            ValidatePercentDiscount(request.DiscountPercent, request.MaxDiscountAmount);
 
             var voucher = new Voucher
             {
                 Code = code,
                 DiscountAmount = request.DiscountAmount,
+                DiscountPercent = request.DiscountPercent > 0 ? request.DiscountPercent : null,
+                MaxDiscountAmount = request.DiscountPercent > 0 ? request.MaxDiscountAmount : null,
                 MaxUsages = request.MaxUsages,
                 CurrentUsageCount = 0,
                 MaxUsagePerUser = request.MaxUsagePerUser,
@@ -271,6 +279,7 @@ namespace AutoWashPro.BLL.Services
 
             if (AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.ExpiryDate) <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
                 throw new BadRequestException("Expiration date must be in the future.");
+            ValidateVoucherDateRange(request.StartDate, request.ExpiryDate);
 
             var voucher = await _context.Vouchers.Include(v => v.RequiredTier).FirstOrDefaultAsync(v => v.VoucherId == id);
             if (voucher == null) throw new NotFoundException("Voucher not found.");
@@ -281,9 +290,12 @@ namespace AutoWashPro.BLL.Services
 
             await ValidateTierAsync(request.RequiredTierId);
             await ValidateVehicleTypeAsync(request.VehicleTypeId);
+            ValidatePercentDiscount(request.DiscountPercent, request.MaxDiscountAmount);
 
             voucher.Code = code;
             voucher.DiscountAmount = request.DiscountAmount;
+            voucher.DiscountPercent = request.DiscountPercent > 0 ? request.DiscountPercent : null;
+            voucher.MaxDiscountAmount = request.DiscountPercent > 0 ? request.MaxDiscountAmount : null;
             voucher.MaxUsages = request.MaxUsages;
             voucher.MaxUsagePerUser = request.MaxUsagePerUser;
             voucher.ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.ExpiryDate);
@@ -360,19 +372,32 @@ namespace AutoWashPro.BLL.Services
             if (userVoucher.Voucher.VoucherType != VoucherType.PhysicalGift)
                 throw new BadRequestException("This voucher is not a physical gift voucher.");
 
-            ValidateVoucherAvailability(userVoucher.Voucher);
-            if (userVoucher.ExpiryDate < AutoWashPro.DAL.Helpers.TimeHelper.VnNow) throw new BadRequestException("This voucher has expired.");
-            if (userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser)
-                throw new BadRequestException("This voucher code has run out of usage limit.");
+            using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
+            {
+                await _context.Entry(userVoucher).ReloadAsync();
+                await _context.Entry(userVoucher.Voucher).ReloadAsync();
 
-            userVoucher.UsageCount += 1;
-            userVoucher.IsUsed = userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser;
-            userVoucher.UsedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            userVoucher.LastUsedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            userVoucher.Voucher.CurrentUsageCount += 1;
+                ValidateVoucherAvailability(userVoucher.Voucher);
+                if (userVoucher.ExpiryDate < AutoWashPro.DAL.Helpers.TimeHelper.VnNow) throw new BadRequestException("This voucher has expired.");
+                if (userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser)
+                    throw new BadRequestException("This voucher code has run out of usage limit.");
 
-            await _context.SaveChangesAsync();
-            return true;
+                userVoucher.UsageCount += 1;
+                userVoucher.IsUsed = userVoucher.UsageCount >= userVoucher.Voucher.MaxUsagePerUser;
+                userVoucher.UsedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+                userVoucher.LastUsedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+                userVoucher.Voucher.CurrentUsageCount += 1;
+
+                await _context.SaveChangesAsync();
+                await dbTransaction.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
         }
 
         private static void ValidateVoucherAvailability(Voucher voucher)
@@ -390,6 +415,22 @@ namespace AutoWashPro.BLL.Services
                 : voucher.ExpiryDate;
 
             return userExpiry <= voucher.ExpiryDate ? userExpiry : voucher.ExpiryDate;
+        }
+
+        internal static void ValidatePercentDiscount(decimal? discountPercent, decimal? maxDiscountAmount)
+        {
+            if (!discountPercent.HasValue || discountPercent.Value <= 0) return;
+            if (!maxDiscountAmount.HasValue || maxDiscountAmount.Value <= 0)
+                throw new BadRequestException("Max discount amount is required when using a percent-based discount.");
+        }
+
+        private static void ValidateVoucherDateRange(DateTime? startDate, DateTime expiryDate)
+        {
+            if (!startDate.HasValue) return;
+            var vnStartDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(startDate.Value);
+            var vnExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(expiryDate);
+            if (vnStartDate >= vnExpiryDate)
+                throw new BadRequestException("Start date must be before the expiration date.");
         }
 
         private async Task ValidateTierAsync(int? tierId)
@@ -419,6 +460,8 @@ namespace AutoWashPro.BLL.Services
             VoucherId = v.VoucherId,
             Code = v.Code,
             DiscountAmount = v.DiscountAmount,
+            DiscountPercent = v.DiscountPercent,
+            MaxDiscountAmount = v.MaxDiscountAmount,
             MaxUsages = v.MaxUsages,
             CurrentUsageCount = v.CurrentUsageCount,
             MaxUsagePerUser = v.MaxUsagePerUser,

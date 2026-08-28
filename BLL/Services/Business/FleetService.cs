@@ -480,8 +480,10 @@ namespace BLL.Services
                 VehiclesCurrentlyInStation = vehiclesCurrentlyInStation
             };
         }
-        public async Task<List<FleetWashHistoryDTO>> GetWashHistoryAsync(int businessUserId)
+        public async Task<List<FleetWashHistoryDTO>> GetWashHistoryAsync(int businessUserId, int page = 1, int pageSize = 50)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 200) pageSize = 50;
             var business = await _context.BusinessProfiles
                 .FirstOrDefaultAsync(x => x.UserId == businessUserId);
             if (business == null)
@@ -493,6 +495,8 @@ namespace BLL.Services
                     x.Booking != null &&
                     x.Booking.BusinessProfileId == business.BusinessProfileId)
                 .OrderByDescending(x => x.CheckInTime)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(x => new FleetWashHistoryDTO
                 {
                     FleetWashLogId = x.FleetWashLogId,

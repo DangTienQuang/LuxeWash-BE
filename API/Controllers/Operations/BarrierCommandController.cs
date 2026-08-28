@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using AutoWashPro.BLL.Services.Operations;
 using BLL.Helpers;
@@ -174,21 +172,12 @@ namespace API.Controllers.Operations
 
             var deviceId = Request.Headers["X-Device-Id"].ToString();
             var deviceKey = Request.Headers["X-Device-Key"].ToString();
-            if (!FixedTimeEquals(deviceId, _deviceOptions.DeviceId)
-                || !FixedTimeEquals(deviceKey, _deviceOptions.DeviceKey))
+            if (!DeviceAuthHelper.IsValidDevice(deviceId, deviceKey, _deviceOptions.DeviceId, _deviceOptions.DeviceKey))
             {
                 error = Unauthorized(new { message = "Invalid barrier device credentials." });
                 return false;
             }
             return true;
-        }
-
-        private static bool FixedTimeEquals(string supplied, string expected)
-        {
-            var suppliedBytes = Encoding.UTF8.GetBytes(supplied ?? string.Empty);
-            var expectedBytes = Encoding.UTF8.GetBytes(expected ?? string.Empty);
-            return suppliedBytes.Length == expectedBytes.Length
-                && CryptographicOperations.FixedTimeEquals(suppliedBytes, expectedBytes);
         }
     }
 

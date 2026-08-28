@@ -39,6 +39,12 @@ namespace API.Controllers.Admin
             return Ok(await _materialService.GetBatchesAsync(branchId, expiringOnly));
         }
 
+        [HttpGet("service-materials")]
+        public async Task<IActionResult> GetAllServiceMaterials()
+        {
+            return Ok(await _usageService.GetAllAsync());
+        }
+
         [HttpGet("condition-multipliers")]
         public async Task<IActionResult> GetConditionMultipliers()
         {

@@ -27,14 +27,14 @@ namespace API.Controllers.Manager
         [HttpGet]
         public async Task<IActionResult> GetShiftSwapRequests([FromQuery] string? status = null)
         {
-            var result = await _staffService.GetShiftSwapRequestsAsync(status);
+            var result = await _staffService.GetShiftSwapRequestsAsync(GetUserId(), User.IsInRole("Admin"), status);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
         [HttpPut("{id}/review")]
         public async Task<IActionResult> ReviewShiftSwapRequest(int id, [FromBody] ReviewRequestDTO request)
         {
-            var result = await _staffService.ReviewShiftSwapRequestAsync(id, GetUserId(), request);
+            var result = await _staffService.ReviewShiftSwapRequestAsync(id, GetUserId(), User.IsInRole("Admin"), request);
             return Ok(new { statusCode = 200, message = "Shift swap request reviewed successfully.", data = result });
         }
     }

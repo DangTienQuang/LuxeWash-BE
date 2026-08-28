@@ -31,6 +31,20 @@ namespace AutoWashPro.BLL.Services
             return usages.Select(MapUsage).ToList();
         }
 
+        public async Task<List<ServiceMaterialUsageDTO>> GetAllAsync()
+        {
+            var usages = await _context.ServiceMaterialUsages
+                .Include(u => u.Service)
+                .Include(u => u.VehicleType)
+                .Include(u => u.Material)
+                .OrderBy(u => u.ServiceId)
+                .ThenBy(u => u.VehicleTypeId)
+                .ThenBy(u => u.Material.Name)
+                .ToListAsync();
+
+            return usages.Select(MapUsage).ToList();
+        }
+
         public async Task<List<ServiceMaterialUsageDTO>> UpsertAsync(int serviceId, UpsertServiceMaterialUsageDTO dto)
         {
             await EnsureServiceExistsAsync(serviceId);

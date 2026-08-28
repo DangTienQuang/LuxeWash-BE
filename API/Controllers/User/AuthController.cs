@@ -2,6 +2,7 @@ using AutoWashPro.BLL.DTOs;
 using AutoWashPro.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -19,6 +20,7 @@ namespace API.Controllers.User
             _authService = authService;
         }
 
+        [EnableRateLimiting("OtpPolicy")]
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDTO request)
         {
@@ -26,6 +28,7 @@ namespace API.Controllers.User
             return Created("", new { statusCode = 201, message = "Success", data = result });
         }
 
+        [EnableRateLimiting("OtpPolicy")]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO request)
         {
@@ -33,12 +36,14 @@ namespace API.Controllers.User
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
+        [EnableRateLimiting("OtpPolicy")]
         [HttpPost("verify-otp")]
         public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDTO request)
         {
             var result = await _authService.VerifyOtpAsync(request);
             return Ok(new { statusCode = 200, message = "Email verified successfully.", data = result });
         }
+        [EnableRateLimiting("OtpPolicy")]
         [HttpPost("resend-otp")]
         public async Task<IActionResult> ResendOtp([FromBody] ResendOtpDTO request)
         {
@@ -78,6 +83,7 @@ namespace API.Controllers.User
             return Ok(new { statusCode = 200, message = "Logged out successfully." });
         }
 
+        [EnableRateLimiting("OtpPolicy")]
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO request)
         {
@@ -85,6 +91,7 @@ namespace API.Controllers.User
             return Ok(new { statusCode = 200, message = "Password reset OTP has been sent to your email." });
         }
 
+        [EnableRateLimiting("OtpPolicy")]
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO request)
         {

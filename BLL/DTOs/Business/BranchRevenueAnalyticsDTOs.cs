@@ -36,6 +36,8 @@ namespace BLL.DTOs.Business
         public int VoucherId { get; set; }
         public string Code { get; set; } = string.Empty;
         public decimal DiscountAmount { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
         public int MaxUsages { get; set; }
         public int? ExpiryDays { get; set; }
         public string ApprovalStatus { get; set; } = "Proposed";
@@ -54,6 +56,8 @@ namespace BLL.DTOs.Business
     {
         public string? Code { get; set; }
         public decimal? DiscountAmount { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
         public int? MaxUsages { get; set; }
         public int? ExpiryDays { get; set; }
         public string? ProposalNote { get; set; }

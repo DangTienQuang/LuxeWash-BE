@@ -53,7 +53,7 @@ namespace AutoWashPro.BLL.DTOs
     {
         [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Full name cannot consist of only whitespace.")]
         public string? FullName { get; set; }
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
+        [RegularExpression(@"^0[35789][0-9]{8}$", ErrorMessage = "Phone number is invalid.")]
         public string? PhoneNumber { get; set; }
         [EmailAddress(ErrorMessage = "Email format is invalid.")]
         public string? Email { get; set; }
@@ -77,10 +77,21 @@ namespace AutoWashPro.BLL.DTOs
         public int UserId { get; set; }
         public string FullName { get; set; } = null!;
         public string PhoneNumber { get; set; } = null!;
+        public string Role { get; set; } = null!;
         public string TierName { get; set; } = null!;
         public string Status { get; set; } = null!;
         public DateTime? LastVisitDate { get; set; }
         public string? Email { get; internal set; }
+    }
+
+    public class UserRoleStatsDTO
+    {
+        public int Total { get; set; }
+        public int Customer { get; set; }
+        public int Staff { get; set; }
+        public int Manager { get; set; }
+        public int Business { get; set; }
+        public int Blocked { get; set; }
     }
     public class VehicleRecognitionDTO
     {

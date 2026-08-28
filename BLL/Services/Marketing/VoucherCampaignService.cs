@@ -97,15 +97,19 @@ namespace AutoWashPro.BLL.Services
             };
             var emailItems = new List<(User User, DateTime ExpiryDate)>();
 
+            var triggerKey = BuildTriggerKey(campaign, targetDate);
+            var eligibleUserIds = eligibleUsers.Select(u => u.UserId).ToList();
+            var alreadyGrantedUserIds = (await _context.UserVouchers
+                .Where(uv => uv.VoucherId == campaign.VoucherId
+                    && uv.TriggerKey == triggerKey
+                    && eligibleUserIds.Contains(uv.UserId))
+                .Select(uv => uv.UserId)
+                .ToListAsync())
+                .ToHashSet();
+
             foreach (var user in eligibleUsers)
             {
-                var triggerKey = BuildTriggerKey(campaign, targetDate);
-                var alreadyGranted = await _context.UserVouchers.AnyAsync(uv =>
-                    uv.UserId == user.UserId
-                    && uv.VoucherId == campaign.VoucherId
-                    && uv.TriggerKey == triggerKey);
-
-                if (alreadyGranted)
+                if (alreadyGrantedUserIds.Contains(user.UserId))
                 {
                     result.SkippedCount++;
                     continue;
@@ -242,6 +246,12 @@ namespace AutoWashPro.BLL.Services
                 if (!tierExists) throw new BadRequestException("Required tier does not exist.");
             }
 
+            if (request.DiscountPercent.HasValue && request.DiscountPercent.Value > 0
+                && (!request.MaxDiscountAmount.HasValue || request.MaxDiscountAmount.Value <= 0))
+            {
+                throw new BadRequestException("Max discount amount is required when using a percent-based discount.");
+            }
+
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var startDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.StartDate) ?? now;
             var endDate = AutoWashPro.DAL.Helpers.TimeHelper.ConvertToVnTime(request.EndDate) ?? startDate.AddDays(request.ExpiryDays);
@@ -251,6 +261,8 @@ namespace AutoWashPro.BLL.Services
             {
                 Code = code,
                 DiscountAmount = request.DiscountAmount,
+                DiscountPercent = request.DiscountPercent > 0 ? request.DiscountPercent : null,
+                MaxDiscountAmount = request.DiscountPercent > 0 ? request.MaxDiscountAmount : null,
                 MaxUsages = request.MaxUsages,
                 CurrentUsageCount = 0,
                 MaxUsagePerUser = request.MaxUsagePerUser,
@@ -320,6 +332,8 @@ namespace AutoWashPro.BLL.Services
             VoucherId = v.VoucherId,
             Code = v.Code,
             DiscountAmount = v.DiscountAmount,
+            DiscountPercent = v.DiscountPercent,
+            MaxDiscountAmount = v.MaxDiscountAmount,
             MaxUsages = v.MaxUsages,
             MaxUsagePerUser = v.MaxUsagePerUser,
             ExpiryDays = v.ExpiryDays,

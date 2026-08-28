@@ -46,7 +46,7 @@ namespace API.Controllers.Staff
             var branchIdClaim = User.FindFirst("BranchId")?.Value;
             if (string.IsNullOrEmpty(branchIdClaim) || !int.TryParse(branchIdClaim, out int branchId))
             {
-                throw new AutoWashPro.BLL.Exceptions.UnauthorizedException("Branch information (BranchId) not found in token.");
+                throw new AutoWashPro.BLL.Exceptions.UnauthorizedException("Branch information (BranchId) not found in token.", "BRANCH_REQUIRED");
             }
 
             var result = await _bookingService.LookupLicensePlateAsync(licensePlate, branchId);

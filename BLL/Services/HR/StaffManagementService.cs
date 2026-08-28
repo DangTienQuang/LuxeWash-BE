@@ -292,9 +292,14 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
             return true;
         }
-        public async Task<List<OvertimeRequestResponseDTO>> GetOvertimeRequestsAsync(string? status)
+        public async Task<List<OvertimeRequestResponseDTO>> GetOvertimeRequestsAsync(int managerUserId, bool isAdmin, string? status)
         {
             var query = BaseOvertimeQuery();
+            if (!isAdmin)
+            {
+                var branchId = await GetManagerBranchIdAsync(managerUserId);
+                query = query.Where(o => o.StaffUser.EmployeeProfile != null && o.StaffUser.EmployeeProfile.BranchId == branchId);
+            }
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(o => o.Status == status.Trim());
             var requests = await query.OrderByDescending(o => o.CreatedAt).ToListAsync();
             return requests.Select(MapOvertime).ToList();
@@ -310,6 +315,8 @@ namespace AutoWashPro.BLL.Services
         public async Task<OvertimeRequestResponseDTO> CreateOvertimeRequestAsync(int staffUserId, CreateOvertimeRequestDTO request)
         {
             ValidateTimeRange(request.StartTime, request.EndTime);
+            if (request.WorkDate.Date < AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date)
+                throw new BadRequestException("Cannot create an overtime request for a past date.");
             await GetStaffUserAsync(staffUserId);
             var overtime = new OvertimeRequest
             {
@@ -324,10 +331,18 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
             return await GetOvertimeDtoAsync(overtime.OvertimeRequestId);
         }
-        public async Task<OvertimeRequestResponseDTO> ReviewOvertimeRequestAsync(int requestId, int managerUserId, ReviewRequestDTO request)
+        public async Task<OvertimeRequestResponseDTO> ReviewOvertimeRequestAsync(int requestId, int managerUserId, bool isAdmin, ReviewRequestDTO request)
         {
-            var overtime = await _context.OvertimeRequests.FindAsync(requestId);
+            var overtime = await _context.OvertimeRequests
+                .Include(o => o.StaffUser).ThenInclude(u => u.EmployeeProfile)
+                .FirstOrDefaultAsync(o => o.OvertimeRequestId == requestId);
             if (overtime == null) throw new NotFoundException("Overtime request not found.");
+            if (!isAdmin)
+            {
+                var branchId = await GetManagerBranchIdAsync(managerUserId);
+                if (overtime.StaffUser.EmployeeProfile?.BranchId != branchId)
+                    throw new ForbiddenException("You do not have permission to review requests from another branch.");
+            }
             if (overtime.Status != "Pending") throw new BadRequestException("This request has already been processed.");
             overtime.Status = request.IsApproved ? "Approved" : "Rejected";
             overtime.ReviewedByUserId = managerUserId;
@@ -336,9 +351,14 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
             return await GetOvertimeDtoAsync(overtime.OvertimeRequestId);
         }
-        public async Task<List<ShiftSwapRequestResponseDTO>> GetShiftSwapRequestsAsync(string? status)
+        public async Task<List<ShiftSwapRequestResponseDTO>> GetShiftSwapRequestsAsync(int managerUserId, bool isAdmin, string? status)
         {
             var query = BaseSwapQuery();
+            if (!isAdmin)
+            {
+                var branchId = await GetManagerBranchIdAsync(managerUserId);
+                query = query.Where(s => s.FromAssignment.StaffUser.EmployeeProfile != null && s.FromAssignment.StaffUser.EmployeeProfile.BranchId == branchId);
+            }
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(s => s.Status == status.Trim());
             var requests = await query.OrderByDescending(s => s.CreatedAt).ToListAsync();
             return requests.Select(MapSwap).ToList();
@@ -409,13 +429,19 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
             return await GetSwapDtoAsync(swap.ShiftSwapRequestId);
         }
-        public async Task<ShiftSwapRequestResponseDTO> ReviewShiftSwapRequestAsync(int requestId, int managerUserId, ReviewRequestDTO request)
+        public async Task<ShiftSwapRequestResponseDTO> ReviewShiftSwapRequestAsync(int requestId, int managerUserId, bool isAdmin, ReviewRequestDTO request)
         {
             var swap = await _context.ShiftSwapRequests
-                .Include(s => s.FromAssignment)
+                .Include(s => s.FromAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.EmployeeProfile)
                 .Include(s => s.ToAssignment)
                 .FirstOrDefaultAsync(s => s.ShiftSwapRequestId == requestId);
             if (swap == null) throw new NotFoundException("Shift swap request not found.");
+            if (!isAdmin)
+            {
+                var branchId = await GetManagerBranchIdAsync(managerUserId);
+                if (swap.FromAssignment.StaffUser.EmployeeProfile?.BranchId != branchId)
+                    throw new ForbiddenException("You do not have permission to review requests from another branch.");
+            }
             if (swap.Status != "Pending") throw new BadRequestException("This request has already been processed.");
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -454,6 +480,18 @@ namespace AutoWashPro.BLL.Services
                 await transaction.RollbackAsync();
                 throw;
             }
+        }
+        private async Task<int> GetManagerBranchIdAsync(int managerUserId)
+        {
+            var branchId = await _context.EmployeeProfiles
+                .Where(e => e.EmployeeId == managerUserId)
+                .Select(e => e.BranchId)
+                .FirstOrDefaultAsync();
+            if (!branchId.HasValue)
+            {
+                throw new BadRequestException("Manager is not assigned to a branch.");
+            }
+            return branchId.Value;
         }
         private async Task<User> GetStaffUserAsync(int userId)
         {

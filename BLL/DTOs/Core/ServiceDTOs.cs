@@ -17,6 +17,7 @@ namespace AutoWashPro.BLL.DTOs
         public int BranchId { get; set; }
         public decimal Price { get; set; }
         public int EstimatedDurationMinutes { get; set; }
+        public int CapacityWeight { get; set; }
     }
     public class CreateOrUpdateServiceDTO
     {
@@ -39,5 +40,8 @@ namespace AutoWashPro.BLL.DTOs
         [Required]
         [Range(5, 600, ErrorMessage = "Estimated duration (minutes) must be between 5 and 600.")]
         public int EstimatedDurationMinutes { get; set; }
+        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "Capacity weight must be at least 1.")]
+        public int CapacityWeight { get; set; } = 1;
     }
 }

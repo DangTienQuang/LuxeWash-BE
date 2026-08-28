@@ -115,5 +115,55 @@ namespace AutoWashPro.BLL.Services
                 Staff = staff
             };
         }
+        public async Task<List<BranchEmployeesSummaryItemDTO>> GetAllBranchEmployeesSummaryAsync()
+        {
+            var employees = await _context.EmployeeProfiles
+                .Include(e => e.User)
+                .Where(e => e.BranchId.HasValue)
+                .Select(e => new
+                {
+                    BranchId = e.BranchId!.Value,
+                    e.EmployeeId,
+                    e.FullName,
+                    e.User.PhoneNumber,
+                    e.User.Role,
+                    e.User.Status
+                })
+                .ToListAsync();
+
+            return employees
+                .GroupBy(e => e.BranchId)
+                .Select(group => new BranchEmployeesSummaryItemDTO
+                {
+                    BranchId = group.Key,
+                    TotalManagers = group.Count(e => e.Role == "Manager"),
+                    TotalStaff = group.Count(e => e.Role == "Staff"),
+                    Managers = group
+                        .Where(e => e.Role == "Manager")
+                        .Select(e => new EmployeeProfileDTO
+                        {
+                            UserId = e.EmployeeId,
+                            PhoneNumber = e.PhoneNumber,
+                            FullName = e.FullName,
+                            Role = e.Role,
+                            Status = e.Status,
+                            BranchId = e.BranchId
+                        })
+                        .ToList(),
+                    Staff = group
+                        .Where(e => e.Role == "Staff")
+                        .Select(e => new EmployeeProfileDTO
+                        {
+                            UserId = e.EmployeeId,
+                            PhoneNumber = e.PhoneNumber,
+                            FullName = e.FullName,
+                            Role = e.Role,
+                            Status = e.Status,
+                            BranchId = e.BranchId
+                        })
+                        .ToList()
+                })
+                .ToList();
+        }
     }
 }

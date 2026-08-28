@@ -26,16 +26,16 @@ namespace AutoWashPro.API.Controllers
         }
 
         [HttpGet("transactions")]
-        public async Task<IActionResult> GetTransactions()
+        public async Task<IActionResult> GetTransactions([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
         {
-            var result = await _walletService.GetTransactionsAsync(GetCurrentUserId());
+            var result = await _walletService.GetTransactionsAsync(GetCurrentUserId(), page, pageSize);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
         [HttpGet("points/history")]
-        public async Task<IActionResult> GetPointsHistory()
+        public async Task<IActionResult> GetPointsHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
         {
-            var result = await _walletService.GetPointsHistoryAsync(GetCurrentUserId());
+            var result = await _walletService.GetPointsHistoryAsync(GetCurrentUserId(), page, pageSize);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
     }

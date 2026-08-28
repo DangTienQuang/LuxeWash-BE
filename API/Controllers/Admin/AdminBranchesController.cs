@@ -52,5 +52,12 @@ namespace API.Controllers.Admin
             var summary = await _branchService.GetBranchEmployeeSummaryAsync(id);
             return Ok(summary);
         }
+
+        [HttpGet("employees-summary")]
+        public async Task<IActionResult> GetAllBranchesEmployeesSummary()
+        {
+            var summary = await _branchService.GetAllBranchEmployeesSummaryAsync();
+            return Ok(summary);
+        }
     }
 }

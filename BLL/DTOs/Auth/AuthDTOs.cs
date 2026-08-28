@@ -4,7 +4,7 @@ namespace AutoWashPro.BLL.DTOs
     public class RegisterDTO
     {
         [Required(ErrorMessage = "Phone number is required.")]
-        [RegularExpression(@"^(0[3|5|7|8|9])+([0-9]{8})$", ErrorMessage = "Phone number is invalid.")]
+        [RegularExpression(@"^0[35789][0-9]{8}$", ErrorMessage = "Phone number is invalid.")]
         public string PhoneNumber { get; set; } = null!;
         [Required(ErrorMessage = "Email is required.")]
         [EmailAddress(ErrorMessage = "Email format is invalid.")]

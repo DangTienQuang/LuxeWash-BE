@@ -13,16 +13,16 @@ namespace BLL.Services.Interface
     {
         Task<MultiVehicleBookingResponseDTO> CreateBusinessBookingAsync(int businessUserId, CreateBusinessBookingDTO dto);
         Task<List<FleetVehicleDTO>> GetActiveFleetVehiclesAsync(int businessUserId);
-        Task<List<BusinessBookingListDTO>> GetBookingsAsync(int businessUserId);
+        Task<List<BusinessBookingListDTO>> GetBookingsAsync(int businessUserId, int page = 1, int pageSize = 50);
         Task<BusinessBookingDetailDTO> GetBookingDetailAsync(int businessUserId, int bookingId);
         Task CancelBookingAsync(int businessUserId, int bookingId);
-        Task<FleetWashLogDTO> CheckInAsync(int bookingId);
+        Task<FleetWashLogDTO> CheckInAsync(int staffUserId, int bookingId);
         Task<FleetCheckInResponseDTO> WalkInAsync(FleetWalkInDTO dto);
-        Task WalkOutAsync(int washLogId);
+        Task WalkOutAsync(int staffUserId, int washLogId);
         Task StartProcessingAsync(int washLogId, int staffUserId, StartFleetWashDTO dto);
-        Task<List<CurrentFleetVehicleDTO>> GetCurrentVehiclesAsync();
-        Task<FleetCheckoutResponseDTO> CheckOutAsync(int washLogId);
-        Task<InvoiceDTO> GetInvoiceByBookingAsync(int bookingId);
+        Task<List<CurrentFleetVehicleDTO>> GetCurrentVehiclesAsync(int staffUserId);
+        Task<FleetCheckoutResponseDTO> CheckOutAsync(int staffUserId, int washLogId);
+        Task<InvoiceDTO> GetInvoiceByBookingAsync(int businessUserId, int bookingId);
         Task<List<FleetWashHistoryDTO>> GetFleetWashHistoryAsync(int businessUserId, FleetHistoryFilterDTO filter);
         Task<FleetDashboardDTO> GetDashboardAsync(int businessUserId);
         Task<List<InvoiceListDTO>> GetInvoicesAsync(int businessUserId);

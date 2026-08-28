@@ -211,13 +211,6 @@ namespace AutoWashPro.BLL.DTOs
         public decimal VoucherDiscountAmount { get; set; }
         public DateTime ProposalExpiresAt { get; set; }
     }
-    public class AcceptRelocationRequestDTO
-    {
-        [Required]
-        public int AlternativeBranchId { get; set; }
-        [Required]
-        public string VoucherCode { get; set; } = string.Empty;
-    }
 }
 namespace AutoWashPro.BLL.DTOs
 {

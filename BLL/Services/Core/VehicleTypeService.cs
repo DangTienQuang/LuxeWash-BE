@@ -60,6 +60,8 @@ namespace AutoWashPro.BLL.Services
             var type = await _context.VehicleTypes.Include(t => t.Vehicles).FirstOrDefaultAsync(t => t.Id == id);
             if (type == null) throw new NotFoundException("Vehicle type not found.");
             if (type.Vehicles.Any()) throw new BadRequestException("Cannot delete this vehicle type because there are customer vehicles currently using it.");
+            if (await _context.ServicePrices.AnyAsync(sp => sp.VehicleTypeId == id))
+                throw new BadRequestException("Cannot delete this vehicle type because there are service prices configured for it.");
             _context.VehicleTypes.Remove(type);
             await _context.SaveChangesAsync();
             return true;

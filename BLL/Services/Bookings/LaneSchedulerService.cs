@@ -34,6 +34,20 @@ namespace BLL.Services
                     .ThenInclude(f => f!.FleetVehicle)
                 .Where(o => o.BranchId == branchId)
                 .ToListAsync();
+
+            var occupiedVehicleTypeIds = occupancies
+                .Where(o => o.Booking != null && o.Booking.BookingDetails.Any())
+                .Select(o => o.Booking!.FleetVehicle?.VehicleTypeId ?? o.Booking!.Vehicle?.VehicleTypeId)
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+            var servicePricesByVehicleType = (await _context.ServicePrices
+                .Where(x => x.BranchId == branchId && occupiedVehicleTypeIds.Contains(x.VehicleTypeId))
+                .ToListAsync())
+                .GroupBy(x => x.VehicleTypeId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
             var result = new Dictionary<int, DateTime>();
             foreach (var lane in lanes)
             {
@@ -51,9 +65,9 @@ namespace BLL.Services
                         if (vehicleTypeId != null)
                         {
                             var serviceIds = occupancy.Booking.BookingDetails.Select(x => x.ServiceId).ToList();
-                            var prices = await _context.ServicePrices
-                                .Where(x => x.BranchId == branchId && x.VehicleTypeId == vehicleTypeId && serviceIds.Contains(x.ServiceId))
-                                .ToListAsync();
+                            var prices = servicePricesByVehicleType.TryGetValue(vehicleTypeId.Value, out var priceList)
+                                ? priceList.Where(x => serviceIds.Contains(x.ServiceId)).ToList()
+                                : new List<AutoWashPro.DAL.Entities.ServicePrice>();
                             duration = WashTimeEstimator.EstimateMinutes(prices);
                         }
                     }
@@ -162,6 +176,20 @@ namespace BLL.Services
                 .OrderBy(x => x.ScheduledTime)
                 .ThenBy(x => x.BookingId)
                 .ToListAsync();
+
+            var existingBookingVehicleTypeIds = existingBookings
+                .Where(b => b.BookingDetails.Count > 0)
+                .Select(b => b.FleetVehicle?.VehicleTypeId ?? b.Vehicle?.VehicleTypeId)
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+            var existingBookingPricesByVehicleType = (await _context.ServicePrices
+                .Where(x => x.BranchId == branchId && existingBookingVehicleTypeIds.Contains(x.VehicleTypeId))
+                .ToListAsync())
+                .GroupBy(x => x.VehicleTypeId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
             foreach (var booking in existingBookings)
             {
                 if (booking.BookingDetails.Count == 0)
@@ -169,14 +197,11 @@ namespace BLL.Services
                 var vehicleTypeId = booking.FleetVehicle?.VehicleTypeId ?? booking.Vehicle?.VehicleTypeId;
                 if (vehicleTypeId == null)
                     continue;
-                    
+
                 var serviceIds = booking.BookingDetails.Select(x => x.ServiceId).ToList();
-                var prices = await _context.ServicePrices
-                    .Where(x =>
-                        x.BranchId == branchId &&
-                        x.VehicleTypeId == vehicleTypeId &&
-                        serviceIds.Contains(x.ServiceId))
-                    .ToListAsync();
+                var prices = existingBookingPricesByVehicleType.TryGetValue(vehicleTypeId.Value, out var priceList)
+                    ? priceList.Where(x => serviceIds.Contains(x.ServiceId)).ToList()
+                    : new List<AutoWashPro.DAL.Entities.ServicePrice>();
                 var duration = WashTimeEstimator.EstimateMinutes(prices);
                 var existingChoice = lanes
                     .Select(lane => new

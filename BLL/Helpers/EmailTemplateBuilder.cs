@@ -78,7 +78,7 @@ namespace BLL.Helpers
                     </tr>
                     <tr>
                         <td style='padding: 8px; border-bottom: 1px solid #eee;'><b>Giá trị giảm:</b></td>
-                        <td style='padding: 8px; border-bottom: 1px solid #eee;'>{voucher.DiscountAmount:N0} đ</td>
+                        <td style='padding: 8px; border-bottom: 1px solid #eee;'>{FormatDiscountValue(voucher)}</td>
                     </tr>
                     <tr>
                         <td style='padding: 8px; border-bottom: 1px solid #eee;'><b>Số lượt dùng mỗi khách:</b></td>
@@ -92,6 +92,18 @@ namespace BLL.Helpers
                 <p style='margin-top: 20px;'>Voucher đã được tự động thêm vào ví voucher của bạn. Hãy đặt lịch và chọn voucher khi thanh toán để sử dụng.</p>
                 <p>Trân trọng,<br><b>Đội ngũ LuxeWash</b></p>
             </div>";
+        }
+
+        private static string FormatDiscountValue(Voucher voucher)
+        {
+            if (voucher.DiscountPercent.HasValue && voucher.DiscountPercent.Value > 0)
+            {
+                var capText = voucher.MaxDiscountAmount.HasValue && voucher.MaxDiscountAmount.Value > 0
+                    ? $" (tối đa {voucher.MaxDiscountAmount.Value:N0} đ)"
+                    : string.Empty;
+                return $"{voucher.DiscountPercent.Value:0.##}%{capText}";
+            }
+            return $"{voucher.DiscountAmount:N0} đ";
         }
     }
 }

@@ -190,20 +190,32 @@ namespace AutoWashPro.BLL.Services
             return true;
         }
 
-        public async Task<PagedResultDTO<UserAdminSummaryDTO>> GetAllCustomersAsync(int page, int pageSize, string? searchKeyword, string? statusFilter)
+        public async Task<PagedResultDTO<UserAdminSummaryDTO>> GetAllCustomersAsync(int page, int pageSize, string? searchKeyword, string? statusFilter, string? roleFilter)
         {
             var query = _context.Users
                 .Include(u => u.CustomerProfile)
                     .ThenInclude(cp => cp.Tier)
-                .Where(u => u.Role == UserRoles.Customer)
+                .Include(u => u.StaffProfile)
+                .Include(u => u.ManagerProfile)
+                .Include(u => u.EmployeeProfile)
+                .Include(u => u.BusinessProfile)
+                .Where(u => u.Role != UserRoles.Admin)
                 .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(roleFilter))
+            {
+                query = query.Where(u => u.Role == roleFilter.Trim());
+            }
 
             if (!string.IsNullOrWhiteSpace(searchKeyword))
             {
                 var keyword = searchKeyword.Trim().ToLower();
                 query = query.Where(u => u.PhoneNumber.Contains(keyword)
                                       || (u.Email != null && u.Email.ToLower().Contains(keyword))
-                                      || (u.CustomerProfile != null && u.CustomerProfile.FullName.ToLower().Contains(keyword)));
+                                      || (u.CustomerProfile != null && u.CustomerProfile.FullName.ToLower().Contains(keyword))
+                                      || (u.StaffProfile != null && u.StaffProfile.FullName.ToLower().Contains(keyword))
+                                      || (u.ManagerProfile != null && u.ManagerProfile.FullName.ToLower().Contains(keyword))
+                                      || (u.BusinessProfile != null && u.BusinessProfile.CompanyName.ToLower().Contains(keyword)));
             }
 
             if (!string.IsNullOrWhiteSpace(statusFilter))
@@ -222,8 +234,14 @@ namespace AutoWashPro.BLL.Services
                 {
                     UserId = u.UserId,
                     Email = u.Email,
-                    FullName = u.CustomerProfile != null ? u.CustomerProfile.FullName : "N/A",
+                    FullName = u.CustomerProfile != null ? u.CustomerProfile.FullName
+                        : u.StaffProfile != null ? u.StaffProfile.FullName
+                        : u.ManagerProfile != null ? u.ManagerProfile.FullName
+                        : u.EmployeeProfile != null ? u.EmployeeProfile.FullName
+                        : u.BusinessProfile != null ? u.BusinessProfile.CompanyName
+                        : "N/A",
                     PhoneNumber = u.PhoneNumber,
+                    Role = u.Role,
                     TierName = u.CustomerProfile != null && u.CustomerProfile.Tier != null ? u.CustomerProfile.Tier.TierName : "N/A",
                     Status = u.Status,
                     LastVisitDate = u.CustomerProfile != null ? u.CustomerProfile.LastVisitDate : null
@@ -239,10 +257,33 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
+        public async Task<UserRoleStatsDTO> GetUserRoleStatsAsync()
+        {
+            var counts = await _context.Users
+                .Where(u => u.Role != UserRoles.Admin)
+                .GroupBy(u => u.Role)
+                .Select(g => new { Role = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            int blocked = await _context.Users.CountAsync(u => u.Role != UserRoles.Admin && u.Status == "Blocked");
+
+            int RoleCount(string role) => counts.FirstOrDefault(c => c.Role == role)?.Count ?? 0;
+
+            return new UserRoleStatsDTO
+            {
+                Total = counts.Sum(c => c.Count),
+                Customer = RoleCount(UserRoles.Customer),
+                Staff = RoleCount(UserRoles.Staff),
+                Manager = RoleCount(UserRoles.Manager),
+                Business = RoleCount(UserRoles.Business),
+                Blocked = blocked
+            };
+        }
+
         public async Task<UserProfileDTO> GetCustomerDetailByAdminAsync(int customerId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == customerId);
-            if (user == null || user.Role != UserRoles.Customer) throw new NotFoundException("Customer not found.");
+            if (user == null || user.Role == UserRoles.Admin) throw new NotFoundException("Customer not found.");
 
             return await GetProfileAsync(customerId);
         }

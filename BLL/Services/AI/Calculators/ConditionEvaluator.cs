@@ -4,6 +4,7 @@ using AutoWashPro.DAL.Entities;
 using DAL.Entities;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Text;
@@ -80,17 +81,17 @@ namespace BLL.Services.AI.Calculators
         private int CompareValues(object actual, string expected)
         {
             if (actual is int i)
-                return i.CompareTo(int.Parse(expected));
+                return i.CompareTo(int.Parse(expected, CultureInfo.InvariantCulture));
             if (actual is long l)
-                return l.CompareTo(long.Parse(expected));
+                return l.CompareTo(long.Parse(expected, CultureInfo.InvariantCulture));
             if (actual is decimal dec)
-                return dec.CompareTo(decimal.Parse(expected));
+                return dec.CompareTo(decimal.Parse(expected, CultureInfo.InvariantCulture));
             if (actual is double dbl)
-                return dbl.CompareTo(double.Parse(expected));
+                return dbl.CompareTo(double.Parse(expected, CultureInfo.InvariantCulture));
             if (actual is float fl)
-                return fl.CompareTo(float.Parse(expected));
+                return fl.CompareTo(float.Parse(expected, CultureInfo.InvariantCulture));
             if (actual is DateTime dt)
-                return dt.CompareTo(DateTime.Parse(expected));
+                return dt.CompareTo(DateTime.Parse(expected, CultureInfo.InvariantCulture));
             return string.Compare(actual.ToString(), expected, StringComparison.OrdinalIgnoreCase);
         }
     }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace BLL.Services
@@ -9,7 +10,7 @@ namespace BLL.Services
     public class AIModerationService
         : IAIModerationService
     {
-        private readonly List<string> _blockedWords =
+        private static readonly string[] _blockedWords =
         [
             "fuck",
             "bitch",
@@ -28,28 +29,23 @@ namespace BLL.Services
             "jailbreak"
         ];
 
+        // Word-boundary matching (Unicode-aware, so it respects Vietnamese diacritics) avoids the
+        // Scunthorpe problem: a Contains() check on "ngu" would also flag "nguyên", "người", "nguồn", etc.
+        private static readonly Regex _blockedWordsRegex = new(
+            string.Join("|", _blockedWords.Select(w => $@"\b{Regex.Escape(w)}\b")),
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
         public bool IsBlocked(string message)
         {
-            var lower = message.ToLower();
-
-            return _blockedWords.Any(
-                x => lower.Contains(x));
+            return _blockedWordsRegex.IsMatch(message);
         }
 
         public string? GetBlockedReason(
             string message)
         {
-            var lower = message.ToLower();
-
-            var matched = _blockedWords
-                .FirstOrDefault(
-                    x => lower.Contains(x));
-
-            if (matched == null)
-                return null;
-
-            return
-                "Nội dung không phù hợp.";
+            return _blockedWordsRegex.IsMatch(message)
+                ? "Nội dung không phù hợp."
+                : null;
         }
     }
 }

@@ -1,5 +1,7 @@
 ﻿using AutoWashPro.BLL.Services;
 using Microsoft.Extensions.Configuration;
+using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 
@@ -63,16 +65,33 @@ namespace BLL.Services
                 await response.Content
                     .ReadAsStringAsync();
 
-            using var doc =
-                JsonDocument.Parse(responseJson);
+            try
+            {
+                using var doc =
+                    JsonDocument.Parse(responseJson);
 
-            return doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString()
-                ?? "AI không phản hồi.";
+                if (!doc.RootElement.TryGetProperty("candidates", out var candidates)
+                    || candidates.ValueKind != JsonValueKind.Array
+                    || candidates.GetArrayLength() == 0)
+                {
+                    return "AI không phản hồi.";
+                }
+
+                var text = candidates[0]
+                    .GetProperty("content")
+                    .GetProperty("parts")[0]
+                    .GetProperty("text")
+                    .GetString();
+
+                return text ?? "AI không phản hồi.";
+            }
+            catch (Exception ex) when (
+                ex is JsonException
+                || ex is KeyNotFoundException
+                || ex is IndexOutOfRangeException)
+            {
+                return "AI không phản hồi.";
+            }
         }
     }
 }

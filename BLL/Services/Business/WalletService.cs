@@ -174,6 +174,8 @@ namespace AutoWashPro.BLL.Services
             {
                 if (!request.Amount.HasValue || request.Amount.Value <= 0)
                     throw new BadRequestException("Please enter a valid wallet deposit amount.");
+                if (request.Amount.Value < WalletConstants.MinTopUpAmount)
+                    throw new BadRequestException($"Minimum top-up amount is {WalletConstants.MinTopUpAmount:N0} VND.");
                 amount = request.Amount.Value;
                 transactionType = "Topup";
                 transactionDescription = "Yeu cau nap tien";
@@ -209,7 +211,6 @@ namespace AutoWashPro.BLL.Services
                 paymentDescription = $"Booking #{booking.BookingId}";
             }
             var payOsAmount = ToPayOsAmount(amount);
-            var orderCode = GenerateOrderCode();
             var transaction = new Transaction
             {
                 WalletId = wallet.WalletId,
@@ -218,14 +219,13 @@ namespace AutoWashPro.BLL.Services
                 Description = transactionDescription,
                 PaymentMethod = "PayOS",
                 ReferenceBookingId = referenceBookingId,
-                OrderCode = orderCode.ToString(),
                 Status = "Pending",
                 CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
-            _context.Transactions.Add(transaction);
+            long orderCode;
             try
             {
-                await _context.SaveChangesAsync();
+                orderCode = await AddTransactionWithUniqueOrderCodeAsync(transaction);
             }
             catch (DbUpdateException ex)
             {
@@ -287,13 +287,17 @@ namespace AutoWashPro.BLL.Services
             }
             await ConfirmTransactionPaymentAsync(transaction.TransactionId, data.Amount, orderCodeStr);
         }
-        public async Task<List<TransactionResponseDTO>> GetTransactionsAsync(int userId)
+        public async Task<List<TransactionResponseDTO>> GetTransactionsAsync(int userId, int page = 1, int pageSize = 50)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 200) pageSize = 50;
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
             if (wallet == null) return new List<TransactionResponseDTO>();
             return await _context.Transactions
                 .Where(t => t.WalletId == wallet.WalletId)
                 .OrderByDescending(t => t.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(t => new TransactionResponseDTO
                 {
                     TransactionId = t.TransactionId,
@@ -365,7 +369,7 @@ namespace AutoWashPro.BLL.Services
                     }
                     if (currentWallet.Balance < currentInvoice.TotalAmount)
                         throw new BadRequestException(
-                            "Sá»‘ dÆ° vÃ­ khÃ´ng Ä‘á»§ Ä‘á»ƒ thanh toÃ¡n hÃ³a Ä‘Æ¡n.",
+                            "Số dư ví không đủ để thanh toán hóa đơn.",
                             "INSUFFICIENT_WALLET_BALANCE");
 
                     currentWallet.Balance -= currentInvoice.TotalAmount;
@@ -414,7 +418,6 @@ namespace AutoWashPro.BLL.Services
                 pending.Status = "Expired";
 
             var amount = ToPayOsAmount(invoice.TotalAmount);
-            var orderCode = GenerateOrderCode();
             var transaction = new Transaction
             {
                 WalletId = wallet.WalletId,
@@ -423,12 +426,10 @@ namespace AutoWashPro.BLL.Services
                 TransactionType = "InvoicePayment",
                 Description = $"Invoice payment {invoice.InvoiceCode}",
                 PaymentMethod = "PayOS",
-                OrderCode = orderCode.ToString(),
                 Status = "Pending",
                 CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
             };
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
+            var orderCode = await AddTransactionWithUniqueOrderCodeAsync(transaction);
 
             var paymentRequest = new CreatePaymentLinkRequest
             {
@@ -551,11 +552,15 @@ namespace AutoWashPro.BLL.Services
                 _logger.LogWarning(ex, "Failed to send confirmation email for booking #{BookingId} after QR payment.", bookingId);
             }
         }
-        public async Task<List<PointHistoryResponseDTO>> GetPointsHistoryAsync(int userId)
+        public async Task<List<PointHistoryResponseDTO>> GetPointsHistoryAsync(int userId, int page = 1, int pageSize = 50)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 200) pageSize = 50;
             return await _context.PointLedgers
                 .Where(p => p.UserId == userId)
                 .OrderByDescending(p => p.TransactionDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(p => new PointHistoryResponseDTO
                 {
                     LedgerId = p.LedgerId,
@@ -739,26 +744,60 @@ namespace AutoWashPro.BLL.Services
         public async Task RefundBalanceAsync(int userId, decimal amount, string reason)
         {
             if (amount <= 0) throw new BadRequestException("Refund amount must be greater than 0.");
-            var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
-            if (wallet == null) throw new NotFoundException("User wallet not found.");
-            wallet.Balance += amount;
-            var transaction = new Transaction
+            using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
             {
-                WalletId = wallet.WalletId,
-                Amount = amount,
-                TransactionType = "Refund",
-                Description = reason,
-                Status = "Completed",
-                CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
-            };
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
+                var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
+                if (wallet == null) throw new NotFoundException("User wallet not found.");
+                wallet.Balance += amount;
+                var transaction = new Transaction
+                {
+                    WalletId = wallet.WalletId,
+                    Amount = amount,
+                    TransactionType = "Refund",
+                    Description = reason,
+                    Status = "Completed",
+                    CreatedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
+                };
+                _context.Transactions.Add(transaction);
+                await _context.SaveChangesAsync();
+                await dbTransaction.CommitAsync();
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
         }
         private static long GenerateOrderCode()
         {
             var timestampPart = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1_000_000_000_000;
-            var randomPart = Random.Shared.Next(10, 99);
-            return timestampPart * 100 + randomPart;
+            var randomPart = Random.Shared.Next(0, 1_000_000);
+            return timestampPart * 1_000_000 + randomPart;
+        }
+
+        // OrderCode is enforced unique at the DB level. A collision (two requests generating the
+        // same timestamp+random combination) is extremely rare but not impossible under high load,
+        // so retry once with a freshly generated code before giving up.
+        private async Task<long> AddTransactionWithUniqueOrderCodeAsync(Transaction transaction)
+        {
+            var orderCode = GenerateOrderCode();
+            transaction.OrderCode = orderCode.ToString();
+            _context.Transactions.Add(transaction);
+            try
+            {
+                await _context.SaveChangesAsync();
+                return orderCode;
+            }
+            catch (DbUpdateException)
+            {
+                _context.Entry(transaction).State = EntityState.Detached;
+                orderCode = GenerateOrderCode();
+                transaction.OrderCode = orderCode.ToString();
+                _context.Transactions.Add(transaction);
+                await _context.SaveChangesAsync();
+                return orderCode;
+            }
         }
         private static int ToPayOsAmount(decimal amount)
         {

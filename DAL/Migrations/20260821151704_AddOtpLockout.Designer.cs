@@ -3,16 +3,19 @@ using System;
 using AutoWashPro.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace DAL.Migrations
+namespace AutoWashPro.DAL.Migrations
 {
     [DbContext(typeof(AutoWashDbContext))]
-    partial class AutoWashDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821151704_AddOtpLockout")]
+    partial class AddOtpLockout
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2138,11 +2141,6 @@ namespace DAL.Migrations
 
                     b.HasKey("TransactionId");
 
-                    b.HasIndex("OrderCode")
-                        .IsUnique();
-
-                    b.HasIndex("ReferenceBookingId");
-
                     b.HasIndex("ReferenceInvoiceId");
 
                     b.HasIndex("WalletId");
@@ -2484,9 +2482,6 @@ namespace DAL.Migrations
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("decimal(65,30)");
 
-                    b.Property<decimal?>("DiscountPercent")
-                        .HasColumnType("decimal(65,30)");
-
                     b.Property<DateTime>("ExpiryDate")
                         .HasColumnType("datetime(6)");
 
@@ -2501,9 +2496,6 @@ namespace DAL.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
-
-                    b.Property<decimal?>("MaxDiscountAmount")
-                        .HasColumnType("decimal(65,30)");
 
                     b.Property<int>("MaxUsagePerUser")
                         .HasColumnType("int");

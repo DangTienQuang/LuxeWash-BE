@@ -27,14 +27,14 @@ namespace API.Controllers.Manager
         [HttpGet]
         public async Task<IActionResult> GetOvertimeRequests([FromQuery] string? status = null)
         {
-            var result = await _staffService.GetOvertimeRequestsAsync(status);
+            var result = await _staffService.GetOvertimeRequestsAsync(GetUserId(), User.IsInRole("Admin"), status);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
 
         [HttpPut("{id}/review")]
         public async Task<IActionResult> ReviewOvertimeRequest(int id, [FromBody] ReviewRequestDTO request)
         {
-            var result = await _staffService.ReviewOvertimeRequestAsync(id, GetUserId(), request);
+            var result = await _staffService.ReviewOvertimeRequestAsync(id, GetUserId(), User.IsInRole("Admin"), request);
             return Ok(new { statusCode = 200, message = "Overtime request reviewed successfully.", data = result });
         }
     }
