@@ -19,9 +19,9 @@ namespace AutoWashPro.API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetActiveCarModels()
+        public async Task<IActionResult> GetActiveCarModels([FromQuery] bool includeInactive = false)
         {
-            var models = await _carModelService.GetActiveCarModelsAsync();
+            var models = await _carModelService.GetActiveCarModelsAsync(includeInactive);
             return Ok(new { statusCode = 200, data = models });
         }
 

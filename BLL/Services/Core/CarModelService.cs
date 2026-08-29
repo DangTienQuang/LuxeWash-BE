@@ -18,10 +18,10 @@ namespace AutoWashPro.BLL.Services
             _context = context;
             _logger = logger;
         }
-        public async Task<List<CarModelDTO>> GetActiveCarModelsAsync()
+        public async Task<List<CarModelDTO>> GetActiveCarModelsAsync(bool includeInactive = false)
         {
             return await _context.CarModels
-                .Where(c => c.IsActive && c.Status == "Approved")
+                .Where(c => (includeInactive || c.IsActive) && c.Status == "Approved")
                 .OrderBy(c => c.Brand).ThenBy(c => c.Name)
                 .Select(c => new CarModelDTO
                 {
@@ -29,6 +29,7 @@ namespace AutoWashPro.BLL.Services
                     Brand = c.Brand,
                     Name = c.Name,
                     Status = c.Status,
+                    IsActive = c.IsActive,
                     RequestedByUserId = c.RequestedByUserId,
                     VehicleTypeId = c.VehicleTypeId
                 })
@@ -72,32 +73,14 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<int> RequestNewCarModelAsync(int userId, RequestCarModelDTO request)
         {
+            // Leave VehicleTypeId null when the requester didn't classify the model — the admin
+            // must pick a real type at approval time (see ApproveCarModelAsync). Don't silently
+            // bucket it into an "Other" type, which made the approval "pick a type" guard a no-op.
             int? finalVehicleTypeId = request.VehicleTypeId;
             if (finalVehicleTypeId.HasValue)
             {
                 var vehicleTypeExists = await _context.VehicleTypes.AnyAsync(vt => vt.Id == finalVehicleTypeId.Value);
                 if (!vehicleTypeExists) throw new BadRequestException("Invalid vehicle type.");
-            }
-            else
-            {
-                var otherVehicleType = await _context.VehicleTypes
-                    .FirstOrDefaultAsync(vt => vt.Name.Contains("Other") || vt.Name.Contains("Other"));
-                if (otherVehicleType != null)
-                {
-                    finalVehicleTypeId = otherVehicleType.Id;
-                }
-                else
-                {
-                    var newOtherType = new AutoWashPro.DAL.Entities.VehicleType
-                    {
-                        Name = "Other",
-                        Description = "Unclassified vehicle types",
-                        BaseWeight = 1
-                    };
-                    _context.VehicleTypes.Add(newOtherType);
-                    await _context.SaveChangesAsync();
-                    finalVehicleTypeId = newOtherType.Id;
-                }
             }
             string combinedName = request.Name.Trim();
             if (!string.IsNullOrWhiteSpace(request.Version))
@@ -133,6 +116,7 @@ namespace AutoWashPro.BLL.Services
                     Brand = c.Brand,
                     Name = c.Name,
                     Status = c.Status,
+                    IsActive = c.IsActive,
                     RequestedByUserId = c.RequestedByUserId,
                     VehicleTypeId = c.VehicleTypeId
                 })
@@ -143,6 +127,7 @@ namespace AutoWashPro.BLL.Services
             var model = await _context.CarModels.FindAsync(id);
             if (model == null) throw new NotFoundException("Car model not found.");
             if (model.Status != "Pending") throw new BadRequestException("Can only approve car models in pending status.");
+            if (request.VehicleTypeId <= 0) throw new BadRequestException("Please select a vehicle type to approve.");
             var vehicleTypeExists = await _context.VehicleTypes.AnyAsync(vt => vt.Id == request.VehicleTypeId);
             if (!vehicleTypeExists) throw new BadRequestException("Invalid vehicle type.");
             model.Status = "Approved";

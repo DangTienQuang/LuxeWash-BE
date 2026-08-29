@@ -14,6 +14,8 @@ namespace BLL.Services.Interface
         Task<FleetImportResultDTO> ImportFleetAsync(int userId, IFormFile file);
         Task<List<FleetImportBatch>> GetImportBatchesAsync();
         Task<FleetImportDetailDTO> GetImportBatchDetailAsync(int batchId);
+        Task<List<FleetImportBatch>> GetMyImportBatchesAsync(int businessUserId);
+        Task<FleetImportDetailDTO> GetMyImportBatchDetailAsync(int businessUserId, int batchId);
         Task<List<FleetVehicleDTO>> GetPendingVehiclesAsync(int businessUserId);
         Task ApproveFleetVehicleAsync(int fleetVehicleId);
         Task RejectFleetVehicleAsync(int fleetVehicleId, string reason);

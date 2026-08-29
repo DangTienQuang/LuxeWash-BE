@@ -158,6 +158,36 @@ namespace API.Controllers
             });
         }
 
+        [Authorize(Roles = "Business")]
+        [HttpGet("my-imports")]
+        public async Task<IActionResult> GetMyImports()
+        {
+            int userId = ClaimHelper.GetUserId(User);
+            var result = await _fleetService.GetMyImportBatchesAsync(userId);
+
+            return Ok(new
+            {
+                statusCode = 200,
+                message = "Success",
+                data = result
+            });
+        }
+
+        [Authorize(Roles = "Business")]
+        [HttpGet("my-imports/{batchId}")]
+        public async Task<IActionResult> GetMyImportDetail(int batchId)
+        {
+            int userId = ClaimHelper.GetUserId(User);
+            var result = await _fleetService.GetMyImportBatchDetailAsync(userId, batchId);
+
+            return Ok(new
+            {
+                statusCode = 200,
+                message = "Success",
+                data = result
+            });
+        }
+
         [Authorize(Roles = "Staff,Manager")]
         [HttpPost("check-in")]
         public async Task<IActionResult> CheckIn(FleetCheckInDTO dto)

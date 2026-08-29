@@ -12,6 +12,7 @@ namespace AutoWashPro.BLL.DTOs
     {
         [Required(ErrorMessage = "Vehicle type name is required.")]
         [RegularExpression(@"^(?!\s*$).+", ErrorMessage = "Vehicle type name cannot consist of only whitespace.")]
+        [StringLength(50, ErrorMessage = "Vehicle type name must not exceed 50 characters.")]
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
         [Range(0, 100)]

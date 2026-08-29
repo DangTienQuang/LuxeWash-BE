@@ -20,7 +20,7 @@ namespace BLL.Services
             _cloudinary = cloudinary;
         }
 
-        public async Task<string> UploadFileAsync(IFormFile file, string folder)
+        public async Task<string> UploadFileAsync(IFormFile file, string folder, bool imageOnly = true)
         {
             if (file == null || file.Length == 0)
             {
@@ -32,15 +32,19 @@ namespace BLL.Services
                 throw new BadRequestException($"File size too large. Got {file.Length}. Maximum is 10485760.");
             }
 
-            var extension = Path.GetExtension(file.FileName);
-            if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension.ToLowerInvariant()))
+            // imageOnly = false: callers uploading already-validated documents (e.g. fleet import .xlsx).
+            if (imageOnly)
             {
-                throw new BadRequestException("Invalid file type. Only jpg, jpeg, png, and webp images are allowed.");
-            }
+                var extension = Path.GetExtension(file.FileName);
+                if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension.ToLowerInvariant()))
+                {
+                    throw new BadRequestException("Invalid file type. Only jpg, jpeg, png, and webp images are allowed.");
+                }
 
-            if (string.IsNullOrWhiteSpace(file.ContentType) || !AllowedContentTypes.Contains(file.ContentType.ToLowerInvariant()))
-            {
-                throw new BadRequestException("Invalid file type. Only jpg, jpeg, png, and webp images are allowed.");
+                if (string.IsNullOrWhiteSpace(file.ContentType) || !AllowedContentTypes.Contains(file.ContentType.ToLowerInvariant()))
+                {
+                    throw new BadRequestException("Invalid file type. Only jpg, jpeg, png, and webp images are allowed.");
+                }
             }
 
             using var stream = file.OpenReadStream();

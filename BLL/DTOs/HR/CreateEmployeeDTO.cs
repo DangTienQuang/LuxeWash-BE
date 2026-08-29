@@ -16,6 +16,8 @@ namespace AutoWashPro.BLL.DTOs
         [Required]
         [RegularExpression("^(Manager|Staff)$", ErrorMessage = "Role must be Manager or Staff.")]
         public string Role { get; set; } = null!;
+        [Required(ErrorMessage = "Branch is required.")]
+        [Range(1, int.MaxValue, ErrorMessage = "Branch is required.")]
         public int? BranchId { get; set; }
     }
 }

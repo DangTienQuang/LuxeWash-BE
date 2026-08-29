@@ -5,7 +5,7 @@ namespace AutoWashPro.BLL.Services
 {
     public interface ICarModelService
     {
-        Task<List<CarModelDTO>> GetActiveCarModelsAsync();
+        Task<List<CarModelDTO>> GetActiveCarModelsAsync(bool includeInactive = false);
         Task<bool> CreateCarModelAsync(CreateCarModelDTO request);
         Task<bool> UpdateCarModelAsync(int id, UpdateCarModelDTO request);
         Task<bool> DeleteCarModelAsync(int id);

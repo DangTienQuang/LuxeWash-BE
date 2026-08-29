@@ -7,6 +7,7 @@ namespace AutoWashPro.BLL.DTOs
         public string Brand { get; set; } = null!;
         public string Name { get; set; } = null!;
         public string Status { get; set; } = null!;
+        public bool IsActive { get; set; }
         public int? RequestedByUserId { get; set; }
         public int? VehicleTypeId { get; set; }
     }

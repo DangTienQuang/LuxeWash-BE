@@ -21,6 +21,120 @@ namespace API.Controllers.Admin
             _context = context;
         }
 
+        public class SeedCustomerRequest
+        {
+            public string PhoneNumber { get; set; } = null!;
+            public string Password { get; set; } = null!;
+            public string? Email { get; set; }
+            public string? FullName { get; set; }
+        }
+
+        /// <summary>
+        /// DEV-only: tạo (hoặc kích hoạt) một tài khoản Customer đã Active, bỏ qua OTP email.
+        /// Dùng cho E2E khi SMTP không khả dụng.
+        /// </summary>
+        [HttpPost("customer")]
+        public async Task<IActionResult> SeedCustomer([FromBody] SeedCustomerRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.PhoneNumber) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest(new { statusCode = 400, message = "PhoneNumber and Password are required." });
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber);
+            if (user == null)
+            {
+                user = new AutoWashPro.DAL.Entities.User
+                {
+                    PhoneNumber = request.PhoneNumber,
+                    Email = request.Email,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                    Role = "Customer",
+                    Status = "Active",
+                };
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+                user.Role = "Customer";
+                user.Status = "Active";
+                if (!string.IsNullOrWhiteSpace(request.Email)) user.Email = request.Email;
+                user.EmailVerificationOtpHash = null;
+                user.EmailVerificationOtpExpiresAt = null;
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+            }
+
+            var tier = await _context.Tiers.FirstOrDefaultAsync(t => t.TierName == "Standard")
+                       ?? await _context.Tiers.FirstOrDefaultAsync();
+            if (tier == null)
+            {
+                tier = new Tier { TierName = "Standard", MinAccumulatedPoints = 0, PointMultiplier = 1.0, BookingWindowDays = 7 };
+                _context.Tiers.Add(tier);
+                await _context.SaveChangesAsync();
+            }
+
+            var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(p => p.UserId == user.UserId);
+            if (profile == null)
+            {
+                _context.CustomerProfiles.Add(new CustomerProfile
+                {
+                    UserId = user.UserId,
+                    FullName = string.IsNullOrWhiteSpace(request.FullName) ? "E2E Customer" : request.FullName,
+                    TierId = tier.TierId,
+                    TotalPoint = 0,
+                    CurrentYearTierPoints = 0,
+                });
+            }
+
+            var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == user.UserId);
+            if (wallet == null)
+            {
+                _context.Wallets.Add(new Wallet { UserId = user.UserId, Balance = 5000000, Status = "Active" });
+            }
+
+            // Cho E2E luồng đặt lịch: đảm bảo tài khoản có ít nhất 1 xe.
+            var hasVehicle = await _context.Vehicles.AnyAsync(v => v.UserId == user.UserId && !v.IsDeleted);
+            if (!hasVehicle)
+            {
+                var vehicleType = await _context.VehicleTypes.FirstOrDefaultAsync();
+                if (vehicleType == null)
+                {
+                    vehicleType = new VehicleType { Name = "Sedan", Description = "Standard 4-seater", BaseWeight = 1 };
+                    _context.VehicleTypes.Add(vehicleType);
+                    await _context.SaveChangesAsync();
+                }
+                var plate = "E2E-" + (user.UserId % 100000).ToString("D5");
+                var existingPlate = await _context.Vehicles.FirstOrDefaultAsync(v => v.LicensePlate == plate);
+                if (existingPlate == null)
+                {
+                    _context.Vehicles.Add(new Vehicle
+                    {
+                        UserId = user.UserId,
+                        LicensePlate = plate,
+                        VehicleTypeId = vehicleType.Id,
+                        IsDeleted = false,
+                    });
+                }
+                else
+                {
+                    existingPlate.UserId = user.UserId;
+                    existingPlate.IsDeleted = false;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                statusCode = 200,
+                message = "Customer account is Active and ready.",
+                data = new { user.UserId, user.PhoneNumber, user.Email, user.Role, user.Status },
+            });
+        }
+
         [HttpPost("seed-tiers")]
         public async Task<IActionResult> SeedAllTierCustomers()
         {

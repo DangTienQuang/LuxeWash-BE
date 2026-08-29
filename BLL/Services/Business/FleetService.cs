@@ -98,7 +98,7 @@ namespace BLL.Services
                     "File Excel chưa có dòng xe nào. Hãy nhập dữ liệu từ dòng 2, lưu file, đóng Excel rồi chọn lại file để nhập.");
             }
 
-            var fileUrl = await _cloudinaryService.UploadFileAsync(file, "fleet-imports");
+            var fileUrl = await _cloudinaryService.UploadFileAsync(file, "fleet-imports", imageOnly: false);
             var batch = new FleetImportBatch
             {
                 BusinessProfileId = business.BusinessProfileId,
@@ -269,6 +269,34 @@ namespace BLL.Services
             return await _context.FleetImportBatches
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
+        }
+
+        public async Task<List<FleetImportBatch>> GetMyImportBatchesAsync(int businessUserId)
+        {
+            var business = await _context.BusinessProfiles.FirstOrDefaultAsync(x => x.UserId == businessUserId);
+            if (business == null)
+            {
+                throw new NotFoundException("Business profile not found.");
+            }
+            return await _context.FleetImportBatches
+                .Where(x => x.BusinessProfileId == business.BusinessProfileId)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<FleetImportDetailDTO> GetMyImportBatchDetailAsync(int businessUserId, int batchId)
+        {
+            var business = await _context.BusinessProfiles.FirstOrDefaultAsync(x => x.UserId == businessUserId);
+            if (business == null)
+            {
+                throw new NotFoundException("Business profile not found.");
+            }
+            var batch = await _context.FleetImportBatches.FirstOrDefaultAsync(x => x.FleetImportBatchId == batchId);
+            if (batch == null || batch.BusinessProfileId != business.BusinessProfileId)
+            {
+                throw new NotFoundException("Vehicle import batch not found.");
+            }
+            return await GetImportBatchDetailAsync(batchId);
         }
         public async Task<FleetImportDetailDTO> GetImportBatchDetailAsync(int batchId)
         {
