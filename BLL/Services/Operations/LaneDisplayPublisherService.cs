@@ -117,6 +117,27 @@ namespace AutoWashPro.BLL.Services.Operations
             }
         }
 
+        public async Task PublishLaneStatusChangedAsync(
+            int branchId,
+            int laneId,
+            string laneName,
+            bool isActive,
+            string? reason)
+        {
+            await PublishEventAsync(new LaneDisplayEventDTO
+            {
+                BranchId = branchId,
+                Type = "LaneStatusChanged",
+                LaneId = laneId,
+                LaneName = laneName,
+                IsActive = isActive,
+                Title = isActive ? "Lane reactivated" : "Lane unavailable",
+                Message = reason,
+                ReasonCode = reason,
+                OccurredAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow
+            });
+        }
+
 
         public async Task<LaneDisplayLatestResponseDTO> GetLatestStateAsync(int branchId)
         {

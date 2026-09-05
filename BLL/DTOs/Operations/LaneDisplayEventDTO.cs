@@ -10,6 +10,7 @@ namespace AutoWashPro.BLL.DTOs.Operations
         public string? LicensePlate { get; set; }
         public int? LaneId { get; set; }
         public string? LaneName { get; set; }
+        public bool? IsActive { get; set; }
         public string? Title { get; set; }
         public string? Message { get; set; }
         public string? ReasonCode { get; set; }

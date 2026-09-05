@@ -38,6 +38,8 @@ namespace AutoWashPro.DAL.Data
         public DbSet<CarModel> CarModels { get; set; }
         public DbSet<Branch> Branches { get; set; }
         public DbSet<Lane> Lanes { get; set; }
+        public DbSet<LaneIncident> LaneIncidents { get; set; }
+        public DbSet<StaffLaneDispatch> StaffLaneDispatches { get; set; }
         public DbSet<EmployeeProfile> EmployeeProfiles { get; set; }
         public DbSet<BusinessProfile> BusinessProfiles { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
@@ -290,6 +292,39 @@ namespace AutoWashPro.DAL.Data
                 .WithMany(b => b.Lanes)
                 .HasForeignKey(l => l.BranchId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LaneIncident>()
+                .HasIndex(i => new { i.BranchId, i.Status, i.ReportedAt });
+
+            modelBuilder.Entity<LaneIncident>()
+                .HasIndex(i => new { i.LaneId, i.Status });
+
+            modelBuilder.Entity<LaneIncident>()
+                .HasOne(i => i.Lane)
+                .WithMany(l => l.LaneIncidents)
+                .HasForeignKey(i => i.LaneId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<StaffLaneDispatch>()
+                .HasIndex(d => new { d.BranchId, d.Status, d.DispatchedAt });
+
+            modelBuilder.Entity<StaffLaneDispatch>()
+                .HasIndex(d => new { d.StaffUserId, d.Status, d.DispatchedAt });
+
+            modelBuilder.Entity<StaffLaneDispatch>()
+                .HasIndex(d => d.RelatedIncidentId);
+
+            modelBuilder.Entity<StaffLaneDispatch>()
+                .HasOne(d => d.Lane)
+                .WithMany(l => l.StaffLaneDispatches)
+                .HasForeignKey(d => d.LaneId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<StaffLaneDispatch>()
+                .HasOne(d => d.RelatedIncident)
+                .WithMany(i => i.Dispatches)
+                .HasForeignKey(d => d.RelatedIncidentId)
+                .OnDelete(DeleteBehavior.SetNull);
             modelBuilder.Entity<User>()
                 .HasOne(u => u.BusinessProfile)
                 .WithOne(b => b.User)

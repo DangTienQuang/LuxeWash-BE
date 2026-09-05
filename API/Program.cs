@@ -278,6 +278,8 @@ builder.Services.AddScoped<ILaneService, LaneService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IManagerService, ManagerService>();
 builder.Services.AddScoped<IOperationStaffService, OperationStaffService>();
+builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.ILaneIncidentService, AutoWashPro.BLL.Services.Operations.LaneIncidentService>();
+builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.IStaffLaneDispatchService, AutoWashPro.BLL.Services.Operations.StaffLaneDispatchService>();
 builder.Services.AddScoped<IBusinessBookingService, BusinessBookingService>();
 builder.Services.AddScoped<AutoWashPro.BLL.Services.Operations.IOperationsMonitoringService, AutoWashPro.BLL.Services.Operations.OperationsMonitoringService>();
 builder.Services.AddHostedService<AutoWashPro.BLL.BackgroundServices.OperationsReconciliationBackgroundService>();
