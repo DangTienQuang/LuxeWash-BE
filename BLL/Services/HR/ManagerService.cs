@@ -61,10 +61,10 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
             return staffList;
         }
-        public async Task<List<ManagerBookingListDTO>> GetCheckInBookingsInBranchAsync(int managerUserId)
+        public async Task<List<ManagerBookingListDTO>> GetCheckInBookingsInBranchAsync(int managerUserId, System.DateTime? targetDate = null, bool includeAllStatuses = false)
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
-            var bookings = await _context.Bookings
+            var query = _context.Bookings
                 .Include(b => b.User)
                     .ThenInclude(u => u.CustomerProfile)
                 .Include(b => b.BusinessProfile)
@@ -73,8 +73,20 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.ProcessingLane)
                 .Include(b => b.ProcessingStaff)
                     .ThenInclude(s => s.EmployeeProfile)
-                .Where(b => b.BranchId == managerProfile.BranchId && (b.Status == "CheckedIn" || b.Status == "Pending" || b.Status == "Processing"))
-                .ToListAsync();
+                .Where(b => b.BranchId == managerProfile.BranchId);
+
+            if (targetDate == null)
+            {
+                query = query.Where(b => b.Status == "CheckedIn" || b.Status == "Pending" || b.Status == "Processing");
+            }
+            else
+            {
+                var date = targetDate.Value.Date;
+                var next = date.AddDays(1);
+                query = query.Where(b => b.ScheduledTime >= date && b.ScheduledTime < next);
+            }
+
+            var bookings = await query.ToListAsync();
             return bookings.Select(b => new ManagerBookingListDTO
             {
                 BookingId = b.BookingId,

@@ -71,9 +71,9 @@ namespace API.Controllers.Manager
         }
 
         [HttpGet("bookings")]
-        public async Task<IActionResult> GetCheckInBookings()
+        public async Task<IActionResult> GetCheckInBookings([FromQuery] System.DateTime? date = null)
         {
-            var bookings = await _managerService.GetCheckInBookingsInBranchAsync(GetUserId());
+            var bookings = await _managerService.GetCheckInBookingsInBranchAsync(GetUserId(), date, date.HasValue);
             return Ok(bookings);
         }
 

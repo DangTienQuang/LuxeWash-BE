@@ -7,7 +7,7 @@ namespace AutoWashPro.BLL.Services
     public interface IManagerService
     {
         Task<List<ManagerStaffDTO>> GetStaffInBranchAsync(int managerUserId);
-        Task<List<ManagerBookingListDTO>> GetCheckInBookingsInBranchAsync(int managerUserId);
+        Task<List<ManagerBookingListDTO>> GetCheckInBookingsInBranchAsync(int managerUserId, System.DateTime? targetDate = null, bool includeAllStatuses = false);
         Task<bool> ConfirmCheckInAndAssignLaneAsync(int managerUserId, int bookingId, AssignBookingToLaneDTO assignment);
         Task<List<LaneDTO>> GetLanesInBranchAsync(int managerUserId);
         Task<List<TimeSlotAdminResponseDTO>> GetTimeSlotsInBranchAsync(int managerUserId);
