@@ -30,32 +30,85 @@ namespace AutoWashPro.BLL.Services
             _capacityService = capacityService;
         }
 
-        public async Task HandleCustomerDecisionAsync(int userId, long affectedBookingId, string decision, int? targetBranchId, int? targetSlotId)
+        public async Task<IncidentDecisionResponseDTO> ProcessIncidentDecisionAsync(int userId, int bookingId, IncidentDecisionRequestDTO request)
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             var caseRecord = await _context.IncidentAffectedBookings
+                .Include(c => c.Incident)
                 .Include(c => c.Booking)
                 .ThenInclude(b => b.BookingDetails)
-                .FirstOrDefaultAsync(c => c.Id == affectedBookingId && c.UserId == userId);
+                .FirstOrDefaultAsync(c => c.Id == request.CaseId && c.BookingId == bookingId && c.UserId == userId);
 
             if (caseRecord == null)
                 throw new NotFoundException("Affected booking record not found.");
             
+            if (caseRecord.Incident != null && caseRecord.Incident.Version != request.ExpectedVersion)
+                throw new ConflictException("INCIDENT_VERSION_CHANGED");
+
+            // For idempotency.
             if (caseRecord.Status != "AwaitingCustomer")
-                throw new BadRequestException($"Cannot make decision. Status is currently: {caseRecord.Status}");
+            {
+                if (caseRecord.Decision == request.Decision)
+                {
+                    // Assuming Transfer target matches too if applicable
+                    if (request.Decision == "Transfer" && (caseRecord.TargetBranchId != request.TargetBranchId || caseRecord.TargetSlotId != request.TargetSlotId))
+                    {
+                        throw new ConflictException("DECISION_ALREADY_FINAL");
+                    }
+                    
+                    // Same request => Return identical result (idempotency rule)
+                    UserVoucher? existingVoucher = null;
+                    if (caseRecord.CompensationUserVoucherId.HasValue)
+                    {
+                        existingVoucher = await _context.UserVouchers.FindAsync(caseRecord.CompensationUserVoucherId.Value);
+                    }
+                    
+                    return new IncidentDecisionResponseDTO
+                    {
+                        Decision = caseRecord.Decision,
+                        Booking = caseRecord.Booking,
+                        CaseStatus = caseRecord.Status,
+                        Refund = caseRecord.Decision == "Cancel" ? new RefundPreviewDTO
+                        {
+                            Amount = caseRecord.Booking.FinalAmount,
+                            Destination = "Wallet",
+                            PointsRestored = caseRecord.Booking.PointsUsed,
+                            OriginalVoucherRestored = caseRecord.Booking.AppliedVoucherId.HasValue
+                        } : null,
+                        CompensationVoucher = existingVoucher != null ? new CompensationVoucherDTO
+                        {
+                            VoucherId = existingVoucher.VoucherId,
+                            DiscountPercent = 20,
+                            ExpiresAt = existingVoucher.ExpiryDate.ToString("yyyy-MM-dd")
+                        } : null
+                    };
+                }
+                
+                throw new ConflictException("DECISION_ALREADY_FINAL");
+            }
 
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
-            if (decision == "Cancel")
+            if (request.Decision == "Cancel")
             {
                 await HandleCancelDecisionAsync(caseRecord, now);
             }
-            else if (decision == "Transfer")
+            else if (request.Decision == "Transfer")
             {
-                if (targetBranchId == null || targetSlotId == null)
+                if (request.TargetBranchId == null || request.TargetSlotId == null)
                     throw new BadRequestException("Target branch and slot must be provided for Transfer.");
 
-                await HandleTransferDecisionAsync(userId, caseRecord, targetBranchId.Value, targetSlotId.Value, now);
+                await HandleTransferDecisionAsync(userId, caseRecord, request.TargetBranchId.Value, request.TargetSlotId.Value, now);
+            }
+            else if (request.Decision == "Keep")
+            {
+                if (caseRecord.Incident == null || caseRecord.Incident.Status != "Resolved")
+                    throw new BadRequestException("You can only keep the original booking if the incident has been resolved.");
+
+                // Logic for Keep
+                caseRecord.Status = "Kept";
+                caseRecord.Decision = "Keep";
+                caseRecord.DecidedAtVn = now;
             }
             else
             {
@@ -63,95 +116,36 @@ namespace AutoWashPro.BLL.Services
             }
 
             // Issue compensation voucher 20% / 6 months
-            var voucher = await IssueCompensationVoucherAsync(userId, caseRecord, now);
+            UserVoucher? voucher = null;
+            if (request.Decision != "Keep")
+            {
+                voucher = await IssueCompensationVoucherAsync(userId, caseRecord, now);
+            }
             
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            return new IncidentDecisionResponseDTO
+            {
+                Decision = request.Decision,
+                Booking = caseRecord.Booking, // Could be mapped to a smaller DTO
+                CaseStatus = caseRecord.Status,
+                Refund = request.Decision == "Cancel" ? new RefundPreviewDTO
+                {
+                    Amount = caseRecord.Booking.FinalAmount,
+                    Destination = "Wallet",
+                    PointsRestored = caseRecord.Booking.PointsUsed,
+                    OriginalVoucherRestored = caseRecord.Booking.AppliedVoucherId.HasValue
+                } : null,
+                CompensationVoucher = voucher != null ? new CompensationVoucherDTO
+                {
+                    VoucherId = voucher.VoucherId,
+                    DiscountPercent = 20,
+                    ExpiresAt = voucher.ExpiryDate.ToString("yyyy-MM-dd")
+                } : null
+            };
         }
 
-        public async Task SystemCancelAsync(long affectedBookingId)
-        {
-            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var caseRecord = await _context.IncidentAffectedBookings
-                .Include(c => c.Booking)
-                .FirstOrDefaultAsync(c => c.Id == affectedBookingId);
-
-            if (caseRecord == null || caseRecord.Status != "AwaitingCustomer")
-                return;
-
-            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-
-            caseRecord.Status = "CancelledBySystem";
-            caseRecord.Decision = "Cancel";
-            caseRecord.DecidedAtVn = now;
-
-            var booking = caseRecord.Booking;
-            booking.Status = "Cancelled";
-            booking.UpdatedAt = now;
-
-            // Refund Money
-            if (booking.FinalAmount > 0)
-            {
-                await _walletService.RefundBalanceAsync(booking.UserId ?? 0, booking.FinalAmount, "Refund - Incident Cancel");
-                _context.IncidentFinancialOperations.Add(new IncidentFinancialOperation
-                {
-                    CaseId = caseRecord.Id,
-                    Kind = "MoneyRefund",
-                    Amount = booking.FinalAmount,
-                    CreatedAtVn = now
-                });
-            }
-
-            // Refund Points
-            if (booking.PointsUsed > 0)
-            {
-                var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(p => p.UserId == booking.UserId);
-                if (profile != null)
-                {
-                    profile.TotalPoint += booking.PointsUsed;
-                    _context.PointLedgers.Add(new PointLedger
-                    {
-                        UserId = booking.UserId ?? 0,
-                        PointsAdded = booking.PointsUsed,
-                        Reason = "Refund: Incident cancellation points refund",
-                        TransactionDate = now
-                    });
-                }
-                _context.IncidentFinancialOperations.Add(new IncidentFinancialOperation
-                {
-                    CaseId = caseRecord.Id,
-                    Kind = "PointsRefund",
-                    Amount = booking.PointsUsed,
-                    CreatedAtVn = now
-                });
-            }
-
-            // Restore Voucher
-            if (booking.AppliedVoucherId.HasValue)
-            {
-                var uv = await _context.UserVouchers.FirstOrDefaultAsync(v => v.UserId == booking.UserId && v.VoucherId == booking.AppliedVoucherId && v.IsUsed);
-                if (uv != null)
-                {
-                    uv.IsUsed = false;
-                }
-                _context.IncidentFinancialOperations.Add(new IncidentFinancialOperation
-                {
-                    CaseId = caseRecord.Id,
-                    Kind = "RestoreOriginalVoucher",
-                    ExternalReference = booking.AppliedVoucherId.ToString(),
-                    CreatedAtVn = now
-                });
-            }
-
-            if (booking.UserId.HasValue)
-            {
-                var voucher = await IssueCompensationVoucherAsync(booking.UserId.Value, caseRecord, now);
-                caseRecord.CompensationUserVoucherId = voucher.Id;
-            }
-
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-        }
 
         private async Task HandleCancelDecisionAsync(IncidentAffectedBooking caseRecord, DateTime now)
         {
@@ -194,26 +188,35 @@ namespace AutoWashPro.BLL.Services
                 });
             }
 
-            // Restore Voucher
+            // Return Voucher
             if (booking.AppliedVoucherId.HasValue)
             {
-                var uv = await _context.UserVouchers.FirstOrDefaultAsync(v => v.UserId == booking.UserId && v.VoucherId == booking.AppliedVoucherId && v.IsUsed);
-                if (uv != null)
+                var userVoucher = await _context.UserVouchers
+                    .FirstOrDefaultAsync(uv => uv.UserId == booking.UserId && uv.VoucherId == booking.AppliedVoucherId.Value);
+                if (userVoucher != null)
                 {
-                    uv.IsUsed = false;
-                    uv.UsedDate = null;
+                    userVoucher.IsUsed = false;
+                    userVoucher.UsedDate = null;
                 }
                 _context.IncidentFinancialOperations.Add(new IncidentFinancialOperation
                 {
                     CaseId = caseRecord.Id,
-                    Kind = "RestoreOriginalVoucher",
-                    ExternalReference = booking.AppliedVoucherId.ToString(),
+                    Kind = "VoucherReturn",
                     CreatedAtVn = now
                 });
             }
 
+            // Update Booking Status
             booking.Status = "Cancelled";
             booking.UpdatedAt = now;
+
+            // Release Capacity
+            var dailyCapacity = await _context.DailySlotCapacities
+                .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.TimeSlot.StartTime <= booking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > booking.ScheduledTime.TimeOfDay);
+            if (dailyCapacity != null)
+            {
+                dailyCapacity.BookedWeight = Math.Max(0, dailyCapacity.BookedWeight - (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1));
+            }
 
             caseRecord.Status = "Cancelled";
             caseRecord.Decision = "Cancel";
@@ -246,8 +249,32 @@ namespace AutoWashPro.BLL.Services
 
             if (cap.AvailableWeight < ctx.CapacityWeight)
             {
-                throw new BadRequestException($"Khung giờ tại chi nhánh mới đã đầy hoặc đang có sự cố (còn lại: {cap.AvailableWeight}, cần: {ctx.CapacityWeight}).");
+                throw new ConflictException("DESTINATION_CAPACITY_CHANGED");
             }
+
+            // Release Old Capacity
+            var oldCapacity = await _context.DailySlotCapacities
+                .FirstOrDefaultAsync(c => c.BranchId == originalBooking.BranchId && c.Date == originalBooking.ScheduledTime.Date && c.TimeSlot.StartTime <= originalBooking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > originalBooking.ScheduledTime.TimeOfDay);
+            if (oldCapacity != null)
+            {
+                oldCapacity.BookedWeight = Math.Max(0, oldCapacity.BookedWeight - ctx.CapacityWeight);
+            }
+
+            // Take New Capacity
+            var newCapacity = await _context.DailySlotCapacities
+                .FirstOrDefaultAsync(c => c.SlotId == targetSlotId && c.BranchId == targetBranchId && c.Date == targetDate);
+            if (newCapacity == null)
+            {
+                newCapacity = new AutoWashPro.DAL.Entities.DailySlotCapacity
+                {
+                    SlotId = targetSlotId,
+                    BranchId = targetBranchId,
+                    Date = targetDate,
+                    BookedWeight = 0
+                };
+                _context.DailySlotCapacities.Add(newCapacity);
+            }
+            newCapacity.BookedWeight += ctx.CapacityWeight;
 
             originalBooking.BranchId = targetBranchId;
             // No TimeSlotId in Booking
@@ -263,22 +290,12 @@ namespace AutoWashPro.BLL.Services
 
         private async Task<UserVoucher> IssueCompensationVoucherAsync(int userId, IncidentAffectedBooking caseRecord, DateTime now)
         {
-            // Find or create the 20% system voucher
+            // Find the 20% system voucher
             var sysVoucherCode = "INCIDENT_COMP_20";
             var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == sysVoucherCode);
             if (voucher == null)
             {
-                voucher = new Voucher
-                {
-                    Code = sysVoucherCode,
-                    DiscountAmount = 0, // Using percentage
-                    DiscountPercent = 20,
-                    IsActive = true,
-                    StartDate = now.Date,
-                    ExpiryDate = now.AddYears(10) // essentially no end date for the definition
-                };
-                _context.Vouchers.Add(voucher);
-                await _context.SaveChangesAsync();
+                throw new InvalidOperationException("System compensation voucher missing.");
             }
 
             var uv = new UserVoucher
@@ -302,29 +319,39 @@ namespace AutoWashPro.BLL.Services
             return uv;
         }
 
-        public async Task<IncidentAffectedBookingMobileDTO> GetAffectedBookingDetailsAsync(int userId, int bookingId)
+        public async Task<IncidentOptionsResponseDTO?> GetIncidentOptionsAsync(int userId, int bookingId)
         {
             var caseRecord = await _context.IncidentAffectedBookings
                 .Include(c => c.Booking)
                 .ThenInclude(b => b.Vehicle)
                 .Include(c => c.Booking)
                 .ThenInclude(b => b.BookingDetails)
+                .Include(c => c.Incident)
                 .FirstOrDefaultAsync(c => c.BookingId == bookingId && c.UserId == userId);
 
             if (caseRecord == null)
-                throw new NotFoundException("Affected booking record not found.");
+                return null;
 
             var branch = await _context.Branches.FirstOrDefaultAsync(b => b.BranchId == caseRecord.OriginalBranchId);
 
-            var result = new IncidentAffectedBookingMobileDTO
+            var result = new IncidentOptionsResponseDTO
             {
-                AffectedBookingId = caseRecord.Id,
-                BookingId = caseRecord.BookingId,
-                Status = caseRecord.Status,
-                CustomerDeadlineVn = caseRecord.ResponseDeadlineAtVn,
-                BranchName = branch?.Name ?? "",
-                ScheduledTime = caseRecord.OriginalScheduledTimeVn.ToString("yyyy-MM-dd HH:mm"),
-                LicensePlate = caseRecord.Booking?.Vehicle?.LicensePlate ?? ""
+                CaseId = caseRecord.Id,
+                IncidentId = caseRecord.IncidentId,
+                CaseStatus = caseRecord.Status,
+                OriginalBooking = new { BookingId = caseRecord.BookingId, ScheduledTime = caseRecord.OriginalScheduledTimeVn.ToString("yyyy-MM-dd HH:mm"), LicensePlate = caseRecord.Booking?.Vehicle?.LicensePlate },
+                Reason = caseRecord.Incident?.Reason ?? "System incident",
+                Eta = caseRecord.Incident?.EstimatedEndAtVn.ToString("yyyy-MM-dd HH:mm") ?? "",
+                ResponseDeadlineAt = caseRecord.ResponseDeadlineAtVn.ToString("yyyy-MM-dd HH:mm"),
+                AllowedActions = new List<string> { "Cancel" }, // "Keep" is conditional, "Transfer" is conditional
+                Version = caseRecord.Incident?.Version ?? 1,
+                RefundPreview = new RefundPreviewDTO
+                {
+                    Amount = caseRecord.Booking?.FinalAmount ?? 0,
+                    Destination = "Wallet",
+                    PointsRestored = caseRecord.Booking?.PointsUsed ?? 0,
+                    OriginalVoucherRestored = caseRecord.Booking?.AppliedVoucherId.HasValue ?? false
+                }
             };
 
             if (caseRecord.Status == "AwaitingCustomer")
@@ -350,14 +377,23 @@ namespace AutoWashPro.BLL.Services
                         var slots = await _bookingService.GetAvailableSlotsAsync(userId, slotsReq);
                         if (slots != null && slots.Count > 0)
                         {
-                            var altOpt = new AlternativeBranchSlotDTO
+                            result.AllowedActions.Add("Transfer");
+                            foreach(var s in slots)
                             {
-                                BranchId = b.BranchId,
-                                BranchName = b.Name,
-                                DistanceKm = 0, // distance logic omitted
-                                Slots = slots.Select(s => new AvailableSlotDTO { SlotId = s.SlotId, Time = s.TimeRange }).ToList()
-                            };
-                            result.AlternativeOptions.Add(altOpt);
+                                var parts = s.TimeRange.Split('-'); // simple parsing
+                                string start = parts.Length > 0 ? parts[0].Trim() : "";
+                                string end = parts.Length > 1 ? parts[1].Trim() : "";
+                                result.Alternatives.Add(new IncidentAlternativeDTO
+                                {
+                                    BranchId = b.BranchId,
+                                    BranchName = b.Name,
+                                    SlotId = s.SlotId,
+                                    StartAt = start,
+                                    EndAt = end,
+                                    DistanceKm = 0,
+                                    AvailableWeight = 1 // Simplified
+                                });
+                            }
                         }
                     }
                     catch

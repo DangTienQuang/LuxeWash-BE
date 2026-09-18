@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace AutoWashPro.API.Controllers.Manager
 {
     [Route("api/v1/manager/incidents")]
-    [Route("api/manager/incidents")]
     [ApiController]
     [Authorize(Roles = "Manager")]
     public class IncidentController : ControllerBase

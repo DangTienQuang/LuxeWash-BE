@@ -447,7 +447,7 @@ namespace AutoWashPro.BLL.Services
             var isRefunded = txList.Any(t => t.TransactionType == "Refund");
             var tx = txList.FirstOrDefault(t => t.TransactionType != "Refund");
 
-            var paymentStatus = isRefunded
+                var paymentStatus = isRefunded
                 ? "Refunded"
                 : tx == null
                 ? "Unpaid"
@@ -460,6 +460,12 @@ namespace AutoWashPro.BLL.Services
                     "cancelled" => "Failed",
                     _           => "Unpaid"
                 };
+
+            var incidentCase = await _context.IncidentAffectedBookings
+                .Where(c => c.BookingId == bookingId && c.UserId == userId && c.Status == "AwaitingCustomer")
+                .Select(c => c.Id)
+                .FirstOrDefaultAsync();
+
             return new BookingResponseDTO
             {
                 BookingId = booking.BookingId,
@@ -480,7 +486,9 @@ namespace AutoWashPro.BLL.Services
                 CheckInImageUrl = booking.CheckInImageUrl,
                 CheckOutImageUrl = booking.CheckOutImageUrl,
                 PaymentStatus = paymentStatus,
-                PaymentMethod = tx?.PaymentMethod
+                PaymentMethod = tx?.PaymentMethod,
+                HasPendingIncidentAction = incidentCase > 0,
+                IncidentCaseId = incidentCase > 0 ? incidentCase : (long?)null
             };
         }
         private string NormalizeLicensePlate(string plate)
@@ -1692,6 +1700,13 @@ namespace AutoWashPro.BLL.Services
                 .Distinct()
                 .ToListAsync();
             var bookingIds = bookings.Select(b => b.BookingId).ToList();
+
+            var incidentCases = await _context.IncidentAffectedBookings
+                .Where(c => c.UserId == userId && bookingIds.Contains(c.BookingId) && c.Status == "AwaitingCustomer")
+                .Select(c => new { c.BookingId, c.Id })
+                .ToListAsync();
+            var incidentCasesByBooking = incidentCases.ToDictionary(c => c.BookingId, c => c.Id);
+
             var paymentTransactions = await _context.Transactions
                 .Where(t => t.ReferenceBookingId.HasValue
                     && bookingIds.Contains(t.ReferenceBookingId.Value)
@@ -1759,6 +1774,11 @@ namespace AutoWashPro.BLL.Services
                 if (activeSuggestions.Contains(b.BookingId))
                 {
                     b.HasPendingOverloadSuggestion = true;
+                }
+                if (incidentCasesByBooking.TryGetValue(b.BookingId, out var incidentCaseId))
+                {
+                    b.HasPendingIncidentAction = true;
+                    b.IncidentCaseId = incidentCaseId;
                 }
             }
             return bookings;

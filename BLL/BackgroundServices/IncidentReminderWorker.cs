@@ -50,6 +50,7 @@ namespace AutoWashPro.BLL.BackgroundServices
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             
             var overdueCases = await context.IncidentAffectedBookings
+                .Include(c => c.Incident)
                 .Where(c => c.Status == "AwaitingCustomer" && c.ResponseDeadlineAtVn <= now)
                 .ToListAsync(stoppingToken);
 
@@ -57,8 +58,24 @@ namespace AutoWashPro.BLL.BackgroundServices
             {
                 try
                 {
-                    // Auto-cancel
-                    await customerService.HandleCustomerDecisionAsync(caseRecord.UserId ?? 0, caseRecord.Id, "Cancel", null, null);
+                    // Auto-cancel using the same path
+                    var request = new AutoWashPro.BLL.DTOs.IncidentDecisionRequestDTO
+                    {
+                        IncidentId = caseRecord.IncidentId,
+                        CaseId = caseRecord.Id,
+                        ExpectedVersion = caseRecord.Incident?.Version ?? 1,
+                        Decision = "Cancel"
+                    };
+                    await customerService.ProcessIncidentDecisionAsync(caseRecord.UserId ?? 0, caseRecord.BookingId, request);
+
+                    context.OutboxMessages.Add(new AutoWashPro.DAL.Entities.OutboxMessage
+                    {
+                        Type = "INCIDENT_ACTION_REQUIRED",
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = caseRecord.BookingId, IncidentId = caseRecord.IncidentId, Note = "Cancelled due to timeout" }),
+                        CreatedAt = now,
+                        NextRetryAt = now
+                    });
+                    await context.SaveChangesAsync(stoppingToken);
                 }
                 catch (Exception ex)
                 {

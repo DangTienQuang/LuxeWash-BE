@@ -147,7 +147,7 @@ namespace AutoWashPro.BLL.Services
             var activeBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
                 .Include(b => b.BookingDetails)
-                .Where(b => b.BranchId == request.BranchId && (b.Status == "Pending" || b.Status == "Confirmed"))
+                .Where(b => b.BranchId == request.BranchId && b.UserId != null && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime < request.EstimatedEndAtVn && b.ScheduledTime.AddMinutes(60) > now) // Approximation
                 .ToListAsync();
 
@@ -237,6 +237,25 @@ namespace AutoWashPro.BLL.Services
 
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
+            // Seed System Compensation Voucher if not exists
+            var sysVoucherCode = "INCIDENT_COMP_20";
+            var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == sysVoucherCode);
+            if (voucher == null)
+            {
+                voucher = new Voucher
+                {
+                    Code = sysVoucherCode,
+                    DiscountAmount = 0,
+                    DiscountPercent = 20,
+                    IsActive = true,
+                    StartDate = now.Date,
+                    ExpiryDate = now.AddYears(10)
+                };
+                _context.Vouchers.Add(voucher);
+                // Save immediately so subsequent processes can use it
+                await _context.SaveChangesAsync();
+            }
+
             var incident = new BranchIncident
             {
                 BranchId = request.BranchId,
@@ -287,7 +306,7 @@ namespace AutoWashPro.BLL.Services
             var activeBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
                 .Include(b => b.BookingDetails)
-                .Where(b => b.BranchId == request.BranchId && (b.Status == "Pending" || b.Status == "Confirmed"))
+                .Where(b => b.BranchId == request.BranchId && b.UserId != null && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime < request.EstimatedEndAtVn && b.ScheduledTime.AddMinutes(60) > now)
                 .ToListAsync();
 
@@ -402,6 +421,17 @@ namespace AutoWashPro.BLL.Services
 
             var oldEnd = incident.EstimatedEndAtVn;
 
+            // Mock the incident extension for accurate capacity calculation
+            var simulatedIncident = new BranchIncident
+            {
+                BranchId = incident.BranchId,
+                Type = incident.Type,
+                Scope = incident.Scope,
+                StartedAtVn = incident.StartedAtVn,
+                EstimatedEndAtVn = request.NewEstimatedEndAtVn,
+                IncidentLanes = incident.IncidentLanes
+            };
+
             incident.EstimatedEndAtVn = request.NewEstimatedEndAtVn;
             incident.UpdatedAtVn = now;
             incident.Version++;
@@ -410,7 +440,7 @@ namespace AutoWashPro.BLL.Services
             var newBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
                 .Include(b => b.BookingDetails)
-                .Where(b => b.BranchId == incident.BranchId && (b.Status == "Pending" || b.Status == "Confirmed"))
+                .Where(b => b.BranchId == incident.BranchId && b.UserId != null && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime >= oldEnd && b.ScheduledTime < request.NewEstimatedEndAtVn)
                 .ToListAsync();
 
@@ -419,6 +449,10 @@ namespace AutoWashPro.BLL.Services
 
             foreach (var b in newBookings)
             {
+                // Idempotency check
+                if (await _context.IncidentAffectedBookings.AnyAsync(c => c.BookingId == b.BookingId && c.IncidentId == incident.Id))
+                    continue;
+
                 bool isAffected = incident.Scope == "WholeBranch";
                 
                 if (!isAffected)
@@ -435,7 +469,7 @@ namespace AutoWashPro.BLL.Services
                     var slot = slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay);
                     int slotId = slot?.SlotId ?? 0;
                     
-                    var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now);
+                    var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now, simulatedIncident);
                     if (cap.AvailableWeight < ctx.CapacityWeight)
                     {
                         isAffected = true;
@@ -509,7 +543,7 @@ namespace AutoWashPro.BLL.Services
 
             var slots = await _context.TimeSlots.Where(s => s.BranchId == incident.BranchId).ToListAsync();
 
-            var casesToCancel = new List<long>();
+            var casesToCancel = new List<AutoWashPro.DAL.Entities.IncidentAffectedBooking>();
 
             foreach (var c in pendingCases)
             {
@@ -547,7 +581,7 @@ namespace AutoWashPro.BLL.Services
                 else
                 {
                     // Still not enough capacity (maybe someone else booked), we must system-cancel
-                    casesToCancel.Add(c.Id);
+                    casesToCancel.Add(c);
 
                     _context.OutboxMessages.Add(new OutboxMessage
                     {
@@ -563,9 +597,16 @@ namespace AutoWashPro.BLL.Services
             await transaction.CommitAsync();
 
             // Perform system cancel in its own transaction context
-            foreach (var caseId in casesToCancel)
+            foreach (var c in casesToCancel)
             {
-                await _customerService.SystemCancelAsync(caseId);
+                var request = new AutoWashPro.BLL.DTOs.IncidentDecisionRequestDTO
+                {
+                    IncidentId = incident.Id,
+                    CaseId = c.Id,
+                    ExpectedVersion = incident.Version,
+                    Decision = "Cancel"
+                };
+                await _customerService.ProcessIncidentDecisionAsync(c.UserId ?? 0, c.BookingId, request);
             }
         }
     }

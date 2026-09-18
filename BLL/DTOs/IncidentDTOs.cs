@@ -91,31 +91,75 @@ namespace AutoWashPro.BLL.DTOs
 }
 namespace AutoWashPro.BLL.DTOs
 {
-    public class IncidentAffectedBookingMobileDTO
+    public class IncidentOptionsResponseDTO
     {
-        public long AffectedBookingId { get; set; }
-        public int BookingId { get; set; }
-        public string Status { get; set; } = null!;
-        public DateTime CustomerDeadlineVn { get; set; }
-        public string BranchName { get; set; } = null!;
-        public string ScheduledTime { get; set; } = null!;
-        public string LicensePlate { get; set; } = null!;
-        
-        // Options available for transfer
-        public List<AlternativeBranchSlotDTO> AlternativeOptions { get; set; } = new List<AlternativeBranchSlotDTO>();
+        public long CaseId { get; set; }
+        public long IncidentId { get; set; }
+        public string CaseStatus { get; set; } = null!;
+        public object? OriginalBooking { get; set; } 
+        public string Reason { get; set; } = null!;
+        public string Eta { get; set; } = null!;
+        public string ResponseDeadlineAt { get; set; } = null!;
+        public List<string> AllowedActions { get; set; } = new List<string>();
+        public List<IncidentAlternativeDTO> Alternatives { get; set; } = new List<IncidentAlternativeDTO>();
+        public RefundPreviewDTO RefundPreview { get; set; } = new RefundPreviewDTO();
+        public VoucherTermsDTO VoucherTerms { get; set; } = new VoucherTermsDTO();
+        public int Version { get; set; }
     }
 
-    public class AlternativeBranchSlotDTO
+    public class IncidentAlternativeDTO
     {
         public int BranchId { get; set; }
         public string BranchName { get; set; } = null!;
-        public double DistanceKm { get; set; }
-        public List<AvailableSlotDTO> Slots { get; set; } = new List<AvailableSlotDTO>();
+        public int SlotId { get; set; }
+        public string StartAt { get; set; } = null!;
+        public string EndAt { get; set; } = null!;
+        public double? DistanceKm { get; set; }
+        public int AvailableWeight { get; set; }
+        public decimal PriceDifferenceCharged { get; set; } = 0;
     }
 
-    public class AvailableSlotDTO
+    public class RefundPreviewDTO
     {
-        public int SlotId { get; set; }
-        public string Time { get; set; } = null!; // e.g. "08:00 - 08:30"
+        public decimal Amount { get; set; }
+        public string Destination { get; set; } = "Wallet";
+        public int PointsRestored { get; set; }
+        public bool OriginalVoucherRestored { get; set; }
+    }
+
+    public class VoucherTermsDTO
+    {
+        public int DiscountPercent { get; set; } = 20;
+        public string Code { get; set; } = "INCIDENT_COMP_20";
+    }
+
+    public class IncidentDecisionRequestDTO
+    {
+        [Required]
+        public long IncidentId { get; set; }
+        [Required]
+        public long CaseId { get; set; }
+        [Required]
+        public int ExpectedVersion { get; set; }
+        [Required]
+        public string Decision { get; set; } = null!; // "Cancel", "Transfer", "Keep"
+        public int? TargetBranchId { get; set; }
+        public int? TargetSlotId { get; set; }
+    }
+
+    public class IncidentDecisionResponseDTO
+    {
+        public string Decision { get; set; } = null!;
+        public object? Booking { get; set; }
+        public RefundPreviewDTO? Refund { get; set; }
+        public CompensationVoucherDTO? CompensationVoucher { get; set; }
+        public string CaseStatus { get; set; } = null!;
+    }
+
+    public class CompensationVoucherDTO
+    {
+        public int VoucherId { get; set; }
+        public int DiscountPercent { get; set; }
+        public string ExpiresAt { get; set; } = null!;
     }
 }

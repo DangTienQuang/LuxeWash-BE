@@ -156,6 +156,8 @@ namespace AutoWashPro.BLL.DTOs
         public bool HasPendingOverloadSuggestion { get; set; }
         public string PaymentStatus { get; set; } = "Unpaid";
         public string? PaymentMethod { get; set; }
+        public bool HasPendingIncidentAction { get; set; } = false;
+        public long? IncidentCaseId { get; set; }
     }
     public class AdminBookingResponseDTO : BookingResponseDTO
     {

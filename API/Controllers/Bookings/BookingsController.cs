@@ -206,5 +206,24 @@ namespace AutoWashPro.API.Controllers
             var result = await _bookingService.HandleOverloadDecisionAsync(GetUserId(), id, request);
             return Ok(new { statusCode = 200, message = "Overload suggestion handled successfully.", data = result });
         }
+
+        [HttpGet("{bookingId}/incident-options")]
+        public async Task<IActionResult> GetIncidentOptions(int bookingId)
+        {
+            var incidentCustomerService = _serviceProvider.GetRequiredService<AutoWashPro.BLL.Services.Interface.IIncidentCustomerService>();
+            var result = await incidentCustomerService.GetIncidentOptionsAsync(GetUserId(), bookingId);
+            
+            // Contract requires 200 OK with data=null if no case
+            return Ok(new { data = result });
+        }
+
+        [HttpPost("{bookingId}/incident-decision")]
+        public async Task<IActionResult> MakeIncidentDecision(int bookingId, [FromBody] IncidentDecisionRequestDTO request, [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey)
+        {
+            // Note: Idempotency is handled simply by checking caseRecord.Status != "AwaitingCustomer" inside ProcessIncidentDecisionAsync for now.
+            var incidentCustomerService = _serviceProvider.GetRequiredService<AutoWashPro.BLL.Services.Interface.IIncidentCustomerService>();
+            var result = await incidentCustomerService.ProcessIncidentDecisionAsync(GetUserId(), bookingId, request);
+            return Ok(result);
+        }
     }
 }
