@@ -212,7 +212,7 @@ namespace AutoWashPro.BLL.Services
                 });
             }
 
-            booking.Status = "CancelledBySystem";
+            booking.Status = "Cancelled";
             booking.UpdatedAt = now;
 
             caseRecord.Status = "Cancelled";

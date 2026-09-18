@@ -141,8 +141,12 @@ namespace AutoWashPro.BLL.Services
             if (request.EstimatedEndAtVn <= now)
                 throw new BadRequestException("Estimated end time must be in the future.");
 
+            if (request.Scope == "SelectedLanes" && (request.LaneIds == null || request.LaneIds.Count == 0))
+                throw new BadRequestException("LaneIds must be provided when scope is SelectedLanes.");
+
             var activeBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
+                .Include(b => b.BookingDetails)
                 .Where(b => b.BranchId == request.BranchId && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime < request.EstimatedEndAtVn && b.ScheduledTime.AddMinutes(60) > now) // Approximation
                 .ToListAsync();
@@ -194,6 +198,7 @@ namespace AutoWashPro.BLL.Services
                         IsBusiness = b.BusinessProfileId.HasValue,
                         IsVipEligible = false, // Approximated
                         VehicleTypeId = b.Vehicle?.VehicleTypeId,
+                        ServiceIds = b.BookingDetails.Select(d => d.ServiceId).ToList(),
                         CapacityWeight = b.CapacityWeight > 0 ? b.CapacityWeight : 1
                     };
                     
@@ -227,6 +232,9 @@ namespace AutoWashPro.BLL.Services
             if (request.EstimatedEndAtVn <= now)
                 throw new BadRequestException("Estimated end time must be in the future.");
 
+            if (request.Scope == "SelectedLanes" && (request.LaneIds == null || request.LaneIds.Count == 0))
+                throw new BadRequestException("LaneIds must be provided when scope is SelectedLanes.");
+
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
             var incident = new BranchIncident
@@ -249,6 +257,13 @@ namespace AutoWashPro.BLL.Services
 
             if (request.Scope == "SelectedLanes" && request.LaneIds != null)
             {
+                // Validate that all LaneIds belong to the specified Branch
+                var validLanes = await _context.Lanes.Where(l => l.BranchId == request.BranchId && request.LaneIds.Contains(l.LaneId)).Select(l => l.LaneId).ToListAsync();
+                if (validLanes.Count != request.LaneIds.Count)
+                {
+                    throw new BadRequestException("One or more LaneIds do not belong to the specified branch.");
+                }
+
                 foreach (var laneId in request.LaneIds)
                 {
                     _context.IncidentLanes.Add(new IncidentLane
@@ -271,6 +286,7 @@ namespace AutoWashPro.BLL.Services
             // Find affected bookings and create IncidentAffectedBooking records
             var activeBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
+                .Include(b => b.BookingDetails)
                 .Where(b => b.BranchId == request.BranchId && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime < request.EstimatedEndAtVn && b.ScheduledTime.AddMinutes(60) > now)
                 .ToListAsync();
@@ -303,6 +319,7 @@ namespace AutoWashPro.BLL.Services
                         IsBusiness = b.BusinessProfileId.HasValue,
                         IsVipEligible = false, 
                         VehicleTypeId = b.Vehicle?.VehicleTypeId,
+                        ServiceIds = b.BookingDetails.Select(d => d.ServiceId).ToList(),
                         CapacityWeight = b.CapacityWeight > 0 ? b.CapacityWeight : 1
                     };
                     
@@ -392,6 +409,7 @@ namespace AutoWashPro.BLL.Services
             // Handle newly affected bookings if extended...
             var newBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
+                .Include(b => b.BookingDetails)
                 .Where(b => b.BranchId == incident.BranchId && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime >= oldEnd && b.ScheduledTime < request.NewEstimatedEndAtVn)
                 .ToListAsync();
@@ -410,6 +428,7 @@ namespace AutoWashPro.BLL.Services
                         IsBusiness = b.BusinessProfileId.HasValue,
                         IsVipEligible = false, 
                         VehicleTypeId = b.Vehicle?.VehicleTypeId,
+                        ServiceIds = b.BookingDetails.Select(d => d.ServiceId).ToList(),
                         CapacityWeight = b.CapacityWeight > 0 ? b.CapacityWeight : 1
                     };
                     
@@ -483,10 +502,14 @@ namespace AutoWashPro.BLL.Services
             var pendingCases = await _context.IncidentAffectedBookings
                 .Include(b => b.Booking)
                 .ThenInclude(b => b.Vehicle)
+                .Include(b => b.Booking)
+                .ThenInclude(b => b.BookingDetails)
                 .Where(b => b.IncidentId == incident.Id && b.Status == "AwaitingCustomer")
                 .ToListAsync();
 
             var slots = await _context.TimeSlots.Where(s => s.BranchId == incident.BranchId).ToListAsync();
+
+            var casesToCancel = new List<long>();
 
             foreach (var c in pendingCases)
             {
@@ -496,6 +519,7 @@ namespace AutoWashPro.BLL.Services
                     IsBusiness = b.BusinessProfileId.HasValue,
                     IsVipEligible = false, 
                     VehicleTypeId = b.Vehicle?.VehicleTypeId,
+                    ServiceIds = b.BookingDetails.Select(d => d.ServiceId).ToList(),
                     CapacityWeight = b.CapacityWeight > 0 ? b.CapacityWeight : 1
                 };
                 
@@ -523,7 +547,7 @@ namespace AutoWashPro.BLL.Services
                 else
                 {
                     // Still not enough capacity (maybe someone else booked), we must system-cancel
-                    await _customerService.SystemCancelAsync(c.Id);
+                    casesToCancel.Add(c.Id);
 
                     _context.OutboxMessages.Add(new OutboxMessage
                     {
@@ -537,6 +561,12 @@ namespace AutoWashPro.BLL.Services
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Perform system cancel in its own transaction context
+            foreach (var caseId in casesToCancel)
+            {
+                await _customerService.SystemCancelAsync(caseId);
+            }
         }
     }
 }
