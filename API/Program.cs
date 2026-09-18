@@ -266,6 +266,9 @@ builder.Services.AddScoped<ITimeSlotService, TimeSlotService>();
 builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
 builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
 builder.Services.AddScoped<IOverloadSuggestionService, OverloadSuggestionService>();
+builder.Services.AddScoped<IIncidentCapacityService, IncidentCapacityService>();
+builder.Services.AddScoped<IIncidentService, IncidentService>();
+builder.Services.AddScoped<IIncidentCustomerService, IncidentCustomerService>();
 builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
 builder.Services.AddScoped<IAIModerationService, AIModerationService>();
 builder.Services.AddHttpClient<ILLMService, GeminiAIService>();
@@ -324,6 +327,7 @@ builder.Services.AddScoped<IScenarioExecutionLogger, ScenarioExecutionLogger>();
 builder.Services.AddHostedService<AutoWashPro.API.Workers.AnnualTierResetWorker>();
 builder.Services.AddHostedService<AutoWashPro.API.Workers.CRMCampaignWorker>();
 builder.Services.AddHostedService<AutoWashPro.BLL.BackgroundServices.OutboxProcessorService>();
+builder.Services.AddHostedService<AutoWashPro.BLL.BackgroundServices.IncidentReminderWorker>();
 
 // ==============================================================================
 // 8. SIGNALR & SWAGGER CONFIGURATION

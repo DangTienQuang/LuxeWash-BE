@@ -228,6 +228,37 @@ namespace AutoWashPro.BLL.BackgroundServices
                             }
                             message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             break;
+                            
+                        case "INCIDENT_ACTION_REQUIRED":
+                            {
+                                var payload = JsonDocument.Parse(message.Payload);
+                                int bookingId = payload.RootElement.GetProperty("BookingId").GetInt32();
+                                long incidentId = payload.RootElement.GetProperty("IncidentId").GetInt64();
+                                
+                                var notificationService = scope.ServiceProvider.GetRequiredService<AutoWashPro.BLL.Services.Interface.IUserNotificationService>();
+                                var booking = await context.Bookings.FindAsync(bookingId);
+                                if (booking != null && booking.UserId.HasValue)
+                                {
+                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Lịch đặt của bạn bị ảnh hưởng bởi sự cố", "Vui lòng vào ứng dụng để chọn hướng xử lý.", "Booking", bookingId.ToString());
+                                }
+                                message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+                            }
+                            break;
+
+                        case "INCIDENT_RESOLVED_EARLY":
+                            {
+                                var payload = JsonDocument.Parse(message.Payload);
+                                int bookingId = payload.RootElement.GetProperty("BookingId").GetInt32();
+                                
+                                var notificationService = scope.ServiceProvider.GetRequiredService<AutoWashPro.BLL.Services.Interface.IUserNotificationService>();
+                                var booking = await context.Bookings.FindAsync(bookingId);
+                                if (booking != null && booking.UserId.HasValue)
+                                {
+                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Sự cố đã được khắc phục sớm", "Lịch hẹn của bạn sẽ được giữ nguyên.", "Booking", bookingId.ToString());
+                                }
+                                message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+                            }
+                            break;
 
                         default:
                             _logger.LogWarning($"Unsupported outbox message type: {message.Type}. Skipping without marking as processed.");

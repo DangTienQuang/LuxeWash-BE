@@ -29,5 +29,15 @@ namespace AutoWashPro.DAL.Entities
         public DateTime ExpiryDate { get; set; }
         public DateTime? LastUsedDate { get; set; }
         public string? TriggerKey { get; set; }
+
+        public long? SourceIncidentAffectedBookingId { get; set; }
+        
+        [ForeignKey("SourceIncidentAffectedBookingId")]
+        public virtual IncidentAffectedBooking? SourceIncidentAffectedBooking { get; set; }
+
+        public int? ExcludedBookingId { get; set; }
+        
+        [ForeignKey("ExcludedBookingId")]
+        public virtual Booking? ExcludedBooking { get; set; }
     }
 }

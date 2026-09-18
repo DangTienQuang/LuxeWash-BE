@@ -29,6 +29,7 @@ namespace AutoWashPro.BLL.Services
         private readonly AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator _laneCoordinator;
         private readonly global::BLL.Services.Interface.IPhotoService _photoService;
         private readonly IUserNotificationService _userNotificationService;
+        private readonly IIncidentCapacityService _incidentCapacityService;
         private readonly ILogger<BookingService> _logger;
 
         public BookingService(
@@ -45,6 +46,7 @@ namespace AutoWashPro.BLL.Services
             AutoWashPro.BLL.Services.Operations.ILaneAdmissionCoordinator laneCoordinator,
             global::BLL.Services.Interface.IPhotoService photoService,
             IUserNotificationService userNotificationService,
+            IIncidentCapacityService incidentCapacityService,
             ILogger<BookingService> logger)
         {
             _context = context;
@@ -60,6 +62,7 @@ namespace AutoWashPro.BLL.Services
             _laneCoordinator = laneCoordinator;
             _photoService = photoService;
             _userNotificationService = userNotificationService;
+            _incidentCapacityService = incidentCapacityService;
             _logger = logger;
         }
         public async Task<List<TimeSlotResponseDTO>> GetAvailableSlotsAsync(int userId, CheckAvailableSlotsRequestDTO request)
@@ -103,6 +106,16 @@ namespace AutoWashPro.BLL.Services
                 .Where(dc => dc.BranchId == request.BranchId && dc.Date == request.TargetDate.Date)
                 .ToDictionaryAsync(dc => dc.SlotId, dc => dc.BookedWeight);
             bool isVip = userProfile.TotalPoint >= 5000 || (userProfile.Tier != null && (string.Equals(userProfile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase)));
+            
+            var bookingContext = new BookingContextDTO
+            {
+                IsBusiness = false,
+                IsVipEligible = isVip,
+                VehicleTypeId = request.VehicleTypeId,
+                ServiceIds = request.ServiceIds ?? new List<int>(),
+                CapacityWeight = totalRequestWeight
+            };
+
             foreach (var slot in allSlots)
             {
                 var slotDto = new TimeSlotResponseDTO
@@ -122,11 +135,16 @@ namespace AutoWashPro.BLL.Services
                     slotDto.IsAvailable = false;
                     slotDto.Reason = "Past time";
                 }
-                int bookedWeight = dailyCapacities.TryGetValue(slot.SlotId, out int weight) ? weight : 0;
-                if (bookedWeight + totalRequestWeight > slot.MaxCapacity)
+                else
                 {
-                    slotDto.IsAvailable = false;
-                    slotDto.Reason = totalRequestWeight > 0 ? "Insufficient capacity for your cart" : "Fully booked";
+                    var effectiveCapacity = await _incidentCapacityService.GetEffectiveSlotCapacityAsync(request.BranchId, request.TargetDate.Date, slot.SlotId, bookingContext, currentDateTimeInVN);
+                    if (effectiveCapacity.AvailableWeight < (totalRequestWeight > 0 ? totalRequestWeight : 1))
+                    {
+                        slotDto.IsAvailable = false;
+                        slotDto.Reason = effectiveCapacity.ClosedReason != null && effectiveCapacity.ClosedReason != "INCIDENT_PARTIAL" 
+                            ? effectiveCapacity.ClosedReason 
+                            : (totalRequestWeight > 0 ? "Insufficient capacity for your cart" : "Fully booked");
+                    }
                 }
                 response.Add(slotDto);
             }
@@ -1459,8 +1477,23 @@ namespace AutoWashPro.BLL.Services
                     dailyCapacity = await _context.DailySlotCapacities.FirstAsync(dc => dc.SlotId == slot.SlotId && dc.BranchId == request.BranchId && dc.Date == targetDateTime.Date);
                 }
             }
-            if (dailyCapacity.BookedWeight + maxCapacityWeight > slot.MaxCapacity)
-                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Insufficient shop capacity for this vehicle. Please choose another time slot.");
+            var userProfile = await _context.CustomerProfiles.Include(p => p.Tier).FirstOrDefaultAsync(p => p.UserId == userId);
+            bool isVip = userProfile != null && (userProfile.TotalPoint >= 5000 || (userProfile.Tier != null && (string.Equals(userProfile.Tier.TierName, "Gold", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Platinum", StringComparison.OrdinalIgnoreCase) || string.Equals(userProfile.Tier.TierName, "Diamond", StringComparison.OrdinalIgnoreCase))));
+            var currentDateTimeInVN = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            
+            var bookingContext = new BookingContextDTO
+            {
+                IsBusiness = false,
+                IsVipEligible = isVip,
+                VehicleTypeId = vehicleTypeQuery.VehicleTypeId,
+                ServiceIds = request.ServiceIds ?? new List<int>(),
+                CapacityWeight = maxCapacityWeight
+            };
+            var effectiveCapacity = await _incidentCapacityService.GetEffectiveSlotCapacityAsync(request.BranchId, targetDateTime.Date, slot.SlotId, bookingContext, currentDateTimeInVN);
+            if (effectiveCapacity.AvailableWeight < (maxCapacityWeight > 0 ? maxCapacityWeight : 1))
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException(effectiveCapacity.ClosedReason != null && effectiveCapacity.ClosedReason != "INCIDENT_PARTIAL" 
+                    ? $"Cannot book: {effectiveCapacity.ClosedReason}" 
+                    : "Insufficient shop capacity for this vehicle. Please choose another time slot.");
             var (voucherDiscount, pointDiscount, pointsUsed, finalAmount, userVoucher) =
                 await CalculateBookingPricingAsync(userId, totalOriginalPrice, request.VoucherId, request.PointsToUse, targetDateTime, vehicleTypeQuery.VehicleTypeId, request.BranchId);
             var paymentMethod = request.PaymentMethod?.Trim() ?? "Wallet";

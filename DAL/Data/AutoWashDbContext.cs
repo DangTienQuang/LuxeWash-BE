@@ -75,6 +75,14 @@ namespace AutoWashPro.DAL.Data
         public DbSet<VehicleVisionFeedback> VehicleVisionFeedbacks { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
 
+        public DbSet<BranchIncident> BranchIncidents { get; set; }
+        public DbSet<IncidentLane> IncidentLanes { get; set; }
+        public DbSet<IncidentChange> IncidentChanges { get; set; }
+        public DbSet<IncidentAffectedBooking> IncidentAffectedBookings { get; set; }
+        public DbSet<IncidentCaseCause> IncidentCaseCauses { get; set; }
+        public DbSet<IncidentFinancialOperation> IncidentFinancialOperations { get; set; }
+        public DbSet<LaneSlotCapacity> LaneSlotCapacities { get; set; }
+        public DbSet<IncidentDelivery> IncidentDeliveries { get; set; }
 
         public override int SaveChanges()
         {
@@ -117,7 +125,9 @@ namespace AutoWashPro.DAL.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder); modelBuilder.Entity<LaneOccupancy>().HasIndex(lo => lo.LaneId).IsUnique();
+            base.OnModelCreating(modelBuilder); 
+            
+            modelBuilder.Entity<LaneOccupancy>().HasIndex(lo => lo.LaneId).IsUnique();
 
             modelBuilder.Entity<Booking>()
                 .HasIndex(b => new { b.LicensePlate, b.Status });
@@ -501,6 +511,56 @@ namespace AutoWashPro.DAL.Data
                     x.CustomerId,
                     x.CreatedAt
                 });
+
+            // Incident Management Constraints
+            modelBuilder.Entity<BranchIncident>()
+                .HasIndex(i => new { i.BranchId, i.Status, i.StartedAtVn, i.EstimatedEndAtVn });
+            
+            // Wait, EF Core might complain if we have `EstimatedEndAtVn > StartedAtVn` check constraint here, but we will handle logic in service.
+
+            modelBuilder.Entity<IncidentLane>()
+                .HasKey(il => new { il.IncidentId, il.LaneId });
+            modelBuilder.Entity<IncidentLane>()
+                .HasOne(il => il.Incident)
+                .WithMany(i => i.IncidentLanes)
+                .HasForeignKey(il => il.IncidentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<IncidentChange>()
+                .HasIndex(c => new { c.IncidentId, c.OccurredAtVn });
+
+            modelBuilder.Entity<IncidentAffectedBooking>()
+                .HasIndex(b => new { b.IncidentId, b.BookingId })
+                .IsUnique();
+            modelBuilder.Entity<IncidentAffectedBooking>()
+                .HasIndex(b => b.ActiveBookingId)
+                .IsUnique();
+            modelBuilder.Entity<IncidentAffectedBooking>()
+                .HasIndex(b => new { b.Status, b.ResponseDeadlineAtVn });
+            modelBuilder.Entity<IncidentAffectedBooking>()
+                .HasIndex(b => new { b.UserId, b.Status });
+            modelBuilder.Entity<IncidentAffectedBooking>()
+                .HasOne(b => b.Incident)
+                .WithMany(i => i.AffectedBookings)
+                .HasForeignKey(b => b.IncidentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<IncidentCaseCause>()
+                .HasKey(c => new { c.CaseId, c.IncidentId });
+
+            modelBuilder.Entity<IncidentFinancialOperation>()
+                .HasIndex(f => new { f.CaseId, f.Kind })
+                .IsUnique();
+
+            modelBuilder.Entity<LaneSlotCapacity>()
+                .HasKey(c => new { c.LaneId, c.SlotId });
+            modelBuilder.Entity<LaneSlotCapacity>()
+                .HasIndex(c => new { c.LaneId, c.SlotId })
+                .IsUnique();
+
+            modelBuilder.Entity<IncidentDelivery>()
+                .HasIndex(d => new { d.AffectedBookingId, d.Channel, d.EventKind, d.IncidentVersion })
+                .IsUnique();
         }
     }
 }
