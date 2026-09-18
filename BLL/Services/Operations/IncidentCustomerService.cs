@@ -17,17 +17,20 @@ namespace AutoWashPro.BLL.Services
         private readonly IBookingService _bookingService;
         private readonly IWalletService _walletService;
         private readonly IIncidentCapacityService _capacityService;
+        private readonly IEmailService _emailService;
 
         public IncidentCustomerService(
             AutoWashDbContext context, 
             IBookingService bookingService,
             IWalletService walletService,
-            IIncidentCapacityService capacityService)
+            IIncidentCapacityService capacityService,
+            IEmailService emailService)
         {
             _context = context;
             _bookingService = bookingService;
             _walletService = walletService;
             _capacityService = capacityService;
+            _emailService = emailService;
         }
 
         public async Task<IncidentDecisionResponseDTO> ProcessIncidentDecisionAsync(int userId, int bookingId, IncidentDecisionRequestDTO request)
@@ -225,13 +228,24 @@ namespace AutoWashPro.BLL.Services
 
             booking.Status = "Cancelled";
             booking.UpdatedAt = now;
-
-
-            var dailyCapacity = await _context.DailySlotCapacities
-                .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.TimeSlot.StartTime <= booking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > booking.ScheduledTime.TimeOfDay);
-            if (dailyCapacity != null)
+            if (booking.ScheduledTime.Date == now.Date)
             {
-                dailyCapacity.BookedWeight = Math.Max(0, dailyCapacity.BookedWeight - (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1));
+                var oldCapacity = await _context.DailySlotCapacities
+                    .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.TimeSlot.StartTime <= booking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > booking.ScheduledTime.TimeOfDay);
+
+                if (oldCapacity != null)
+                {
+                    oldCapacity.BookedWeight -= (booking.CapacityWeight > 0 ? booking.CapacityWeight : 1);
+                    if (oldCapacity.BookedWeight < 0) oldCapacity.BookedWeight = 0;
+                }
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == booking.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                var subject = $"LuxeWash - Thông báo hủy lịch do sự cố hệ thống";
+                var body = $"Chào bạn,<br/><br/>Lịch đặt rửa xe của bạn vào lúc {booking.ScheduledTime:dd/MM/yyyy HH:mm} đã bị hủy do sự cố bất khả kháng tại chi nhánh.<br/>Chúng tôi đã hoàn lại toàn bộ số tiền <b>{booking.FinalAmount} VNĐ</b> và <b>{booking.PointsUsed} điểm</b> vào tài khoản của bạn.<br/><br/>Ngoài ra, hệ thống đã gửi tặng bạn một Voucher giảm giá 20% như một lời xin lỗi chân thành nhất.<br/><br/>Xin lỗi bạn vì sự bất tiện này!";
+                _ = Task.Run(() => _emailService.SendEmailAsync(user.Email, subject, body));
             }
 
             caseRecord.Status = "Cancelled";
@@ -384,44 +398,79 @@ namespace AutoWashPro.BLL.Services
                 var serviceIds = caseRecord.Booking?.BookingDetails.Select(d => d.ServiceId).ToList() ?? new System.Collections.Generic.List<int>();
 
                 var otherBranches = await _context.Branches.Where(b => b.BranchId != originalBranchId && b.IsActive).ToListAsync();
+                var otherBranchIds = otherBranches.Select(b => b.BranchId).ToList();
+
+                var allAltSlots = await _context.TimeSlots
+                    .Where(s => otherBranchIds.Contains(s.BranchId))
+                    .ToListAsync();
+
+                var allAltDailyCaps = await _context.DailySlotCapacities
+                    .Where(dc => otherBranchIds.Contains(dc.BranchId) && dc.Date == targetDate.Date)
+                    .ToListAsync();
+
+                var allActiveIncidents = await _context.BranchIncidents
+                    .Include(i => i.IncidentLanes)
+                    .Where(i => otherBranchIds.Contains(i.BranchId) && i.Status == "Active" 
+                                && i.StartedAtVn < targetDate.Date.AddDays(1) 
+                                && i.EstimatedEndAtVn > targetDate.Date)
+                    .ToListAsync();
+
+                var capacityWeight = caseRecord.Booking?.CapacityWeight > 0 ? caseRecord.Booking.CapacityWeight : 1;
+                bool canTransfer = false;
+                var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
                 foreach (var b in otherBranches)
                 {
-                    try
+                    var branchSlots = allAltSlots.Where(s => s.BranchId == b.BranchId).OrderBy(s => s.StartTime).ToList();
+                    var branchCaps = allAltDailyCaps.Where(c => c.BranchId == b.BranchId).ToDictionary(c => c.SlotId, c => c.BookedWeight);
+                    var branchIncidents = allActiveIncidents.Where(i => i.BranchId == b.BranchId).ToList();
+
+                    foreach (var s in branchSlots)
                     {
-                        var slotsReq = new CheckAvailableSlotsRequestDTO
+                        var slotStart = targetDate.Date.Add(s.StartTime);
+                        var slotEnd = targetDate.Date.Add(s.EndTime);
+                        if (s.EndTime <= s.StartTime) slotEnd = slotEnd.AddDays(1);
+
+                        // Skip past slots if targetDate is today
+                        if (slotStart <= now) continue;
+
+                        var incident = branchIncidents.FirstOrDefault(i => i.StartedAtVn < slotEnd && i.EstimatedEndAtVn > slotStart);
+                        int availableWeight = s.MaxCapacity;
+                        
+                        if (incident != null)
                         {
-                            BranchId = b.BranchId,
-                            TargetDate = targetDate,
-                            VehicleTypeId = vehicleTypeId,
-                            ServiceIds = serviceIds
-                        };
-                        var slots = await _bookingService.GetAvailableSlotsAsync(userId, slotsReq);
-                        if (slots != null && slots.Count > 0)
-                        {
-                            result.AllowedActions.Add("Transfer");
-                            foreach(var s in slots)
+                            if (incident.Scope == "WholeBranch") availableWeight = 0;
+                            else if (incident.Scope == "SelectedLanes" && incident.IncidentLanes != null)
                             {
-                                var parts = s.TimeRange.Split('-'); // simple parsing
-                                string start = parts.Length > 0 ? parts[0].Trim() : "";
-                                string end = parts.Length > 1 ? parts[1].Trim() : "";
-                                result.Alternatives.Add(new IncidentAlternativeDTO
-                                {
-                                    BranchId = b.BranchId,
-                                    BranchName = b.Name,
-                                    SlotId = s.SlotId,
-                                    StartAt = start,
-                                    EndAt = end,
-                                    DistanceKm = 0,
-                                    AvailableWeight = 1 // Simplified
-                                });
+                                 availableWeight = Math.Max(0, s.MaxCapacity - incident.IncidentLanes.Count);
                             }
                         }
-                    }
-                    catch
-                    {
 
+                        int bookedWeight = branchCaps.ContainsKey(s.SlotId) ? branchCaps[s.SlotId] : 0;
+                        availableWeight -= bookedWeight;
+
+                        if (availableWeight >= capacityWeight)
+                        {
+                            canTransfer = true;
+                            string start = s.StartTime.ToString(@"hh\:mm");
+                            string end = s.EndTime.ToString(@"hh\:mm");
+                            result.Alternatives.Add(new IncidentAlternativeDTO
+                            {
+                                BranchId = b.BranchId,
+                                BranchName = b.Name,
+                                SlotId = s.SlotId,
+                                StartAt = start,
+                                EndAt = end,
+                                DistanceKm = 0,
+                                AvailableWeight = availableWeight
+                            });
+                        }
                     }
+                }
+                
+                if (canTransfer)
+                {
+                    result.AllowedActions.Add("Transfer");
                 }
             }
 
