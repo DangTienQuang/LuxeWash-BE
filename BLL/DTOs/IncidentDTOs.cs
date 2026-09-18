@@ -10,9 +10,11 @@ namespace AutoWashPro.BLL.DTOs
         public int BranchId { get; set; }
         
         [Required]
+        [RegularExpression("^(LaneFailure|PowerOutage|WaterOutage|Other)$", ErrorMessage = "Invalid Type")]
         public string Type { get; set; } = null!; // "LaneFailure", "PowerOutage", "WaterOutage", "Other"
 
         [Required]
+        [RegularExpression("^(SelectedLanes|WholeBranch)$", ErrorMessage = "Invalid Scope")]
         public string Scope { get; set; } = null!; // "SelectedLanes", "WholeBranch"
 
         public List<int>? LaneIds { get; set; }
@@ -25,6 +27,7 @@ namespace AutoWashPro.BLL.DTOs
     {
         public int AffectedBookingsCount { get; set; }
         public int TotalCapacityLoss { get; set; }
+        public string? ExpectedAffectedHash { get; set; }
         public List<AffectedBookingSummaryDTO> AffectedBookings { get; set; } = new List<AffectedBookingSummaryDTO>();
     }
 
@@ -41,6 +44,7 @@ namespace AutoWashPro.BLL.DTOs
         [Required]
         public string Reason { get; set; } = null!;
         public int? ExpectedAffectedCount { get; set; }
+        public string? ExpectedAffectedHash { get; set; }
     }
 
     public class ExtendIncidentRequestDTO

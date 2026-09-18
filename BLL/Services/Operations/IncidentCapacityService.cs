@@ -16,7 +16,7 @@ namespace AutoWashPro.BLL.Services
             _context = context;
         }
 
-        public async Task<EffectiveSlotCapacityResult> GetEffectiveSlotCapacityAsync(int branchId, DateTime date, int slotId, BookingContextDTO bookingContext, DateTime nowVn, AutoWashPro.DAL.Entities.BranchIncident? simulatedIncident = null)
+        public async Task<EffectiveSlotCapacityResult> GetEffectiveSlotCapacityAsync(int branchId, DateTime date, int slotId, BookingContextDTO bookingContext, DateTime nowVn, AutoWashPro.DAL.Entities.BranchIncident? simulatedIncident = null, long? ignoreIncidentId = null)
         {
             var slot = await _context.TimeSlots
                 .FirstOrDefaultAsync(s => s.SlotId == slotId && s.BranchId == branchId);
@@ -35,12 +35,18 @@ namespace AutoWashPro.BLL.Services
                 slotEnd = slotEnd.AddDays(1);
             }
 
-            var activeIncidents = await _context.BranchIncidents
+            var activeIncidentsQuery = _context.BranchIncidents
                 .Include(i => i.IncidentLanes)
                 .Where(i => i.BranchId == branchId && i.Status == "Active")
                 // Intersection check
-                .Where(i => i.StartedAtVn < slotEnd && i.EstimatedEndAtVn > slotStart)
-                .ToListAsync();
+                .Where(i => i.StartedAtVn < slotEnd && i.EstimatedEndAtVn > slotStart);
+
+            if (ignoreIncidentId.HasValue)
+            {
+                activeIncidentsQuery = activeIncidentsQuery.Where(i => i.Id != ignoreIncidentId.Value);
+            }
+
+            var activeIncidents = await activeIncidentsQuery.ToListAsync();
 
             if (simulatedIncident != null)
             {

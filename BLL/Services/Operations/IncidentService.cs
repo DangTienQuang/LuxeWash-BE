@@ -221,6 +221,11 @@ namespace AutoWashPro.BLL.Services
             }
 
             response.TotalCapacityLoss = totalCapacityLoss;
+
+            var affectedBookingIds = response.AffectedBookings.Select(b => b.BookingId).OrderBy(id => id).ToList();
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join(",", affectedBookingIds)));
+            response.ExpectedAffectedHash = Convert.ToBase64String(hashBytes);
+
             return response;
         }
 
@@ -363,6 +368,14 @@ namespace AutoWashPro.BLL.Services
                 throw new ConflictException($"Dữ liệu đã thay đổi (dự kiến {request.ExpectedAffectedCount.Value}, thực tế {affectedBookingIds.Count}), vui lòng tải lại trang hoặc Preview lại sự cố.");
             }
 
+            var currentHashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join(",", affectedBookingIds.OrderBy(id => id))));
+            var currentHash = Convert.ToBase64String(currentHashBytes);
+
+            if (!string.IsNullOrEmpty(request.ExpectedAffectedHash) && currentHash != request.ExpectedAffectedHash)
+            {
+                throw new ConflictException("Dữ liệu đã thay đổi, vui lòng tải lại trang hoặc Preview lại sự cố.");
+            }
+
             foreach (var b in activeBookings)
             {
                 if (affectedBookingIds.Contains(b.BookingId))
@@ -401,10 +414,13 @@ namespace AutoWashPro.BLL.Services
         public async Task ExtendIncidentAsync(int managerUserId, long incidentId, ExtendIncidentRequestDTO request)
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var incident = await _context.BranchIncidents.FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active");
-            if (incident == null) throw new NotFoundException("Active incident not found");
+            
+            var employee = await _context.EmployeeProfiles.FirstOrDefaultAsync(e => e.EmployeeId == managerUserId);
+            if (employee == null || !employee.BranchId.HasValue) throw new UnauthorizedException("User is not authorized for any branch.");
+            int branchId = employee.BranchId.Value;
 
-            await ValidateManagerBranchAsync(managerUserId, incident.BranchId);
+            var incident = await _context.BranchIncidents.FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active" && i.BranchId == branchId);
+            if (incident == null) throw new NotFoundException("Active incident not found in your branch.");
 
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
@@ -509,10 +525,13 @@ namespace AutoWashPro.BLL.Services
         public async Task ResolveIncidentAsync(int managerUserId, long incidentId)
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var incident = await _context.BranchIncidents.FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active");
-            if (incident == null) throw new NotFoundException("Active incident not found");
 
-            await ValidateManagerBranchAsync(managerUserId, incident.BranchId);
+            var employee = await _context.EmployeeProfiles.FirstOrDefaultAsync(e => e.EmployeeId == managerUserId);
+            if (employee == null || !employee.BranchId.HasValue) throw new UnauthorizedException("User is not authorized for any branch.");
+            int branchId = employee.BranchId.Value;
+
+            var incident = await _context.BranchIncidents.FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active" && i.BranchId == branchId);
+            if (incident == null) throw new NotFoundException("Active incident not found in your branch.");
 
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
@@ -544,6 +563,7 @@ namespace AutoWashPro.BLL.Services
             var slots = await _context.TimeSlots.Where(s => s.BranchId == incident.BranchId).ToListAsync();
 
             var casesToCancel = new List<AutoWashPro.DAL.Entities.IncidentAffectedBooking>();
+            var slotBookedWeights = new Dictionary<int, int>();
 
             foreach (var c in pendingCases)
             {
@@ -560,12 +580,15 @@ namespace AutoWashPro.BLL.Services
                 var slot = slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay);
                 int slotId = slot?.SlotId ?? 0;
                 
-
-                var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now);
+                var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now, ignoreIncidentId: incident.Id);
                 
-                if (cap.AvailableWeight >= ctx.CapacityWeight)
+                if (!slotBookedWeights.ContainsKey(slotId))
                 {
-
+                    slotBookedWeights[slotId] = cap.BookedWeight;
+                }
+                
+                if (cap.EffectiveCapacity >= slotBookedWeights[slotId])
+                {
                     c.Status = "Kept";
                     c.Decision = "Keep";
                     c.DecidedAtVn = now;
@@ -580,12 +603,12 @@ namespace AutoWashPro.BLL.Services
                 }
                 else
                 {
-
                     casesToCancel.Add(c);
+                    slotBookedWeights[slotId] = Math.Max(0, slotBookedWeights[slotId] - ctx.CapacityWeight);
 
                     _context.OutboxMessages.Add(new OutboxMessage
                     {
-                        Type = "INCIDENT_ACTION_REQUIRED",
+                        Type = "INCIDENT_SYSTEM_CANCELLED",
                         Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = c.BookingId, IncidentId = incident.Id, Note = "Cancelled due to overcapacity after resolution" }),
                         CreatedAt = now,
                         NextRetryAt = now
@@ -593,21 +616,13 @@ namespace AutoWashPro.BLL.Services
                 }
             }
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-
             foreach (var c in casesToCancel)
             {
-                var request = new AutoWashPro.BLL.DTOs.IncidentDecisionRequestDTO
-                {
-                    IncidentId = incident.Id,
-                    CaseId = c.Id,
-                    ExpectedVersion = incident.Version,
-                    Decision = "Cancel"
-                };
-                await _customerService.ProcessIncidentDecisionAsync(c.UserId ?? 0, c.BookingId, request);
+                await _customerService.SystemCancelAsync(c.UserId ?? 0, c.BookingId, c.Id);
             }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
     }
 }

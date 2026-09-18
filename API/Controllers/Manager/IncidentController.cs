@@ -21,7 +21,7 @@ namespace AutoWashPro.API.Controllers.Manager
 
         private int GetUserId()
         {
-            return int.Parse(User.FindFirstValue("userId") ?? "0");
+            return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
         }
 
         [HttpPost("preview")]

@@ -7,5 +7,6 @@ namespace AutoWashPro.BLL.Services.Interface
     {
         Task<IncidentDecisionResponseDTO> ProcessIncidentDecisionAsync(int userId, int bookingId, IncidentDecisionRequestDTO request);
         Task<IncidentOptionsResponseDTO?> GetIncidentOptionsAsync(int userId, int bookingId);
+        Task SystemCancelAsync(int userId, int bookingId, long caseId);
     }
 }

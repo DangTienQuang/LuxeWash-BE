@@ -237,9 +237,33 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 
                                 var notificationService = scope.ServiceProvider.GetRequiredService<AutoWashPro.BLL.Services.Interface.IUserNotificationService>();
                                 var booking = await context.Bookings.FindAsync(bookingId);
+                                var caseRecord = await context.IncidentAffectedBookings.FirstOrDefaultAsync(c => c.BookingId == bookingId && c.IncidentId == incidentId);
+
                                 if (booking != null && booking.UserId.HasValue)
                                 {
-                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Lịch đặt của bạn bị ảnh hưởng bởi sự cố", "Vui lòng vào ứng dụng để chọn hướng xử lý.", "Booking", bookingId.ToString());
+                                    string refType = caseRecord != null ? "IncidentCase" : "Booking";
+                                    string refId = caseRecord != null ? caseRecord.Id.ToString() : bookingId.ToString();
+                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Lịch đặt của bạn bị ảnh hưởng bởi sự cố", "Vui lòng vào ứng dụng để chọn hướng xử lý.", refType, refId);
+                                }
+                                message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+                            }
+                            break;
+
+                        case "INCIDENT_SYSTEM_CANCELLED":
+                            {
+                                var payload = JsonDocument.Parse(message.Payload);
+                                int bookingId = payload.RootElement.GetProperty("BookingId").GetInt32();
+                                long incidentId = payload.RootElement.GetProperty("IncidentId").GetInt64();
+                                
+                                var notificationService = scope.ServiceProvider.GetRequiredService<AutoWashPro.BLL.Services.Interface.IUserNotificationService>();
+                                var booking = await context.Bookings.FindAsync(bookingId);
+                                var caseRecord = await context.IncidentAffectedBookings.FirstOrDefaultAsync(c => c.BookingId == bookingId && c.IncidentId == incidentId);
+
+                                if (booking != null && booking.UserId.HasValue)
+                                {
+                                    string refType = caseRecord != null ? "IncidentCase" : "Booking";
+                                    string refId = caseRecord != null ? caseRecord.Id.ToString() : bookingId.ToString();
+                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Lịch đặt đã bị hủy do sự cố", "Lịch của bạn đã bị hủy do hệ thống không còn đủ chỗ sau khi khắc phục sự cố.", refType, refId);
                                 }
                                 message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             }
@@ -249,12 +273,17 @@ namespace AutoWashPro.BLL.BackgroundServices
                             {
                                 var payload = JsonDocument.Parse(message.Payload);
                                 int bookingId = payload.RootElement.GetProperty("BookingId").GetInt32();
+                                long incidentId = payload.RootElement.GetProperty("IncidentId").GetInt64();
                                 
                                 var notificationService = scope.ServiceProvider.GetRequiredService<AutoWashPro.BLL.Services.Interface.IUserNotificationService>();
                                 var booking = await context.Bookings.FindAsync(bookingId);
+                                var caseRecord = await context.IncidentAffectedBookings.FirstOrDefaultAsync(c => c.BookingId == bookingId && c.IncidentId == incidentId);
+                                
                                 if (booking != null && booking.UserId.HasValue)
                                 {
-                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Sự cố đã được khắc phục sớm", "Lịch hẹn của bạn sẽ được giữ nguyên.", "Booking", bookingId.ToString());
+                                    string refType = caseRecord != null ? "IncidentCase" : "Booking";
+                                    string refId = caseRecord != null ? caseRecord.Id.ToString() : bookingId.ToString();
+                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Sự cố đã được khắc phục sớm", "Lịch hẹn của bạn sẽ được giữ nguyên.", refType, refId);
                                 }
                                 message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             }

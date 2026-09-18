@@ -45,6 +45,8 @@ namespace AutoWashPro.BLL.Services
             if (caseRecord.Incident != null && caseRecord.Incident.Version != request.ExpectedVersion)
                 throw new ConflictException("INCIDENT_VERSION_CHANGED");
 
+            if (caseRecord.Status == "AwaitingCustomer" && now > caseRecord.ResponseDeadlineAtVn)
+                throw new BadRequestException("Response deadline has expired.");
 
             if (caseRecord.Status != "AwaitingCustomer")
             {
@@ -146,6 +148,20 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
+        public async Task SystemCancelAsync(int userId, int bookingId, long caseId)
+        {
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            var caseRecord = await _context.IncidentAffectedBookings
+                .Include(c => c.Booking)
+                .ThenInclude(b => b.BookingDetails)
+                .FirstOrDefaultAsync(c => c.Id == caseId && c.BookingId == bookingId && c.UserId == userId);
+
+            if (caseRecord == null)
+                throw new NotFoundException("Affected booking record not found.");
+
+            await HandleCancelDecisionAsync(caseRecord, now);
+            await IssueCompensationVoucherAsync(userId, caseRecord, now);
+        }
 
         private async Task HandleCancelDecisionAsync(IncidentAffectedBooking caseRecord, DateTime now)
         {
@@ -253,28 +269,33 @@ namespace AutoWashPro.BLL.Services
             }
 
 
-            var oldCapacity = await _context.DailySlotCapacities
-                .FirstOrDefaultAsync(c => c.BranchId == originalBooking.BranchId && c.Date == originalBooking.ScheduledTime.Date && c.TimeSlot.StartTime <= originalBooking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > originalBooking.ScheduledTime.TimeOfDay);
-            if (oldCapacity != null)
-            {
-                oldCapacity.BookedWeight = Math.Max(0, oldCapacity.BookedWeight - ctx.CapacityWeight);
-            }
+            var oldCapacityRows = await _context.DailySlotCapacities
+                .Where(c => c.BranchId == originalBooking.BranchId && c.Date == originalBooking.ScheduledTime.Date && c.TimeSlot.StartTime <= originalBooking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > originalBooking.ScheduledTime.TimeOfDay)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.BookedWeight, c => Math.Max(0, c.BookedWeight - ctx.CapacityWeight)));
 
+            var newCapacityRows = await _context.DailySlotCapacities
+                .Where(c => c.SlotId == targetSlotId && c.BranchId == targetBranchId && c.Date == targetDate && (c.BookedWeight + ctx.CapacityWeight <= cap.EffectiveCapacity))
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.BookedWeight, c => c.BookedWeight + ctx.CapacityWeight));
 
-            var newCapacity = await _context.DailySlotCapacities
-                .FirstOrDefaultAsync(c => c.SlotId == targetSlotId && c.BranchId == targetBranchId && c.Date == targetDate);
-            if (newCapacity == null)
+            if (newCapacityRows == 0)
             {
-                newCapacity = new AutoWashPro.DAL.Entities.DailySlotCapacity
+                var exists = await _context.DailySlotCapacities.AnyAsync(c => c.SlotId == targetSlotId && c.BranchId == targetBranchId && c.Date == targetDate);
+                if (exists)
                 {
-                    SlotId = targetSlotId,
-                    BranchId = targetBranchId,
-                    Date = targetDate,
-                    BookedWeight = 0
-                };
-                _context.DailySlotCapacities.Add(newCapacity);
+                    throw new ConflictException("DESTINATION_CAPACITY_CHANGED");
+                }
+                else
+                {
+                    var newCapacity = new AutoWashPro.DAL.Entities.DailySlotCapacity
+                    {
+                        SlotId = targetSlotId,
+                        BranchId = targetBranchId,
+                        Date = targetDate,
+                        BookedWeight = ctx.CapacityWeight
+                    };
+                    _context.DailySlotCapacities.Add(newCapacity);
+                }
             }
-            newCapacity.BookedWeight += ctx.CapacityWeight;
 
             originalBooking.BranchId = targetBranchId;
 
@@ -327,6 +348,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(c => c.Booking)
                 .ThenInclude(b => b.BookingDetails)
                 .Include(c => c.Incident)
+                .OrderByDescending(c => c.Id)
                 .FirstOrDefaultAsync(c => c.BookingId == bookingId && c.UserId == userId);
 
             if (caseRecord == null)
