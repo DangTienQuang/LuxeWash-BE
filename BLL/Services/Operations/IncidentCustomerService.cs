@@ -218,6 +218,24 @@ namespace AutoWashPro.BLL.Services
             caseRecord.Status = "Cancelled";
             caseRecord.Decision = "Cancel";
             caseRecord.DecidedAtVn = now;
+
+            // Free up slot capacity
+            if (booking.CapacityWeight > 0)
+            {
+                var slot = await _context.TimeSlots
+                    .FirstOrDefaultAsync(s => s.BranchId == booking.BranchId && s.StartTime == booking.ScheduledTime.TimeOfDay);
+
+                if (slot != null)
+                {
+                    var dailyCapacity = await _context.DailySlotCapacities
+                        .FirstOrDefaultAsync(c => c.SlotId == slot.SlotId && c.Date == booking.ScheduledTime.Date);
+
+                    if (dailyCapacity != null)
+                    {
+                        dailyCapacity.BookedWeight = Math.Max(0, dailyCapacity.BookedWeight - booking.CapacityWeight);
+                    }
+                }
+            }
         }
 
         private async Task HandleTransferDecisionAsync(int userId, IncidentAffectedBooking caseRecord, int targetBranchId, int targetSlotId, DateTime now)
@@ -249,6 +267,47 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException($"Khung giờ tại chi nhánh mới đã đầy hoặc đang có sự cố (còn lại: {cap.AvailableWeight}, cần: {ctx.CapacityWeight}).");
             }
 
+            // Free up old slot
+            if (originalBooking.CapacityWeight > 0)
+            {
+                var oldSlot = await _context.TimeSlots
+                    .FirstOrDefaultAsync(s => s.BranchId == originalBooking.BranchId && s.StartTime == originalBooking.ScheduledTime.TimeOfDay);
+
+                if (oldSlot != null)
+                {
+                    var oldDailyCapacity = await _context.DailySlotCapacities
+                        .FirstOrDefaultAsync(c => c.SlotId == oldSlot.SlotId && c.Date == originalBooking.ScheduledTime.Date);
+
+                    if (oldDailyCapacity != null)
+                    {
+                        oldDailyCapacity.BookedWeight = Math.Max(0, oldDailyCapacity.BookedWeight - originalBooking.CapacityWeight);
+                    }
+                }
+            }
+
+            // Occupy new slot
+            if (ctx.CapacityWeight > 0)
+            {
+                var newDailyCapacity = await _context.DailySlotCapacities
+                    .FirstOrDefaultAsync(c => c.SlotId == targetSlotId && c.Date == targetDate);
+
+                if (newDailyCapacity == null)
+                {
+                    newDailyCapacity = new DailySlotCapacity
+                    {
+                        SlotId = targetSlotId,
+                        BranchId = targetBranchId,
+                        Date = targetDate,
+                        BookedWeight = ctx.CapacityWeight
+                    };
+                    _context.DailySlotCapacities.Add(newDailyCapacity);
+                }
+                else
+                {
+                    newDailyCapacity.BookedWeight += ctx.CapacityWeight;
+                }
+            }
+
             originalBooking.BranchId = targetBranchId;
             // No TimeSlotId in Booking
             originalBooking.ScheduledTime = originalBooking.ScheduledTime.Date.Add(targetSlot.StartTime);
@@ -278,7 +337,17 @@ namespace AutoWashPro.BLL.Services
                     ExpiryDate = now.AddYears(10) // essentially no end date for the definition
                 };
                 _context.Vouchers.Add(voucher);
-                await _context.SaveChangesAsync();
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateException)
+                {
+                    // If another thread created it concurrently, fetch it again
+                    _context.Entry(voucher).State = EntityState.Detached; // Detach the unsaved entity
+                    voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == sysVoucherCode);
+                    if (voucher == null) throw; // Re-throw if something else is wrong
+                }
             }
 
             var uv = new UserVoucher
@@ -306,9 +375,9 @@ namespace AutoWashPro.BLL.Services
         {
             var caseRecord = await _context.IncidentAffectedBookings
                 .Include(c => c.Booking)
-                .ThenInclude(b => b.Vehicle)
+                    .ThenInclude(b => b.Vehicle)
                 .Include(c => c.Booking)
-                .ThenInclude(b => b.BookingDetails)
+                    .ThenInclude(b => b.BookingDetails)
                 .FirstOrDefaultAsync(c => c.BookingId == bookingId && c.UserId == userId);
 
             if (caseRecord == null)

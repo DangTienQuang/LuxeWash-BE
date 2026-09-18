@@ -435,7 +435,7 @@ namespace AutoWashPro.BLL.Services
                     var slot = slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay);
                     int slotId = slot?.SlotId ?? 0;
                     
-                    var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now);
+                    var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now, simulatedIncident: incident);
                     if (cap.AvailableWeight < ctx.CapacityWeight)
                     {
                         isAffected = true;
@@ -444,27 +444,33 @@ namespace AutoWashPro.BLL.Services
 
                 if (isAffected)
                 {
-                    var affectedBooking = new IncidentAffectedBooking
-                    {
-                        IncidentId = incident.Id,
-                        BookingId = b.BookingId,
-                        ActiveBookingId = b.BookingId,
-                        UserId = b.UserId,
-                        Status = "AwaitingCustomer",
-                        ResponseDeadlineAtVn = deadline,
-                        OriginalBranchId = incident.BranchId,
-                        OriginalScheduledTimeVn = b.ScheduledTime
-                    };
-                    _context.IncidentAffectedBookings.Add(affectedBooking);
+                    bool exists = await _context.IncidentAffectedBookings
+                        .AnyAsync(a => a.IncidentId == incident.Id && a.BookingId == b.BookingId);
 
-                    var msg = new OutboxMessage
+                    if (!exists)
                     {
-                        Type = "INCIDENT_ACTION_REQUIRED",
-                        Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = b.BookingId, IncidentId = incident.Id }),
-                        CreatedAt = now,
-                        NextRetryAt = now
-                    };
-                    _context.OutboxMessages.Add(msg);
+                        var affectedBooking = new IncidentAffectedBooking
+                        {
+                            IncidentId = incident.Id,
+                            BookingId = b.BookingId,
+                            ActiveBookingId = b.BookingId,
+                            UserId = b.UserId,
+                            Status = "AwaitingCustomer",
+                            ResponseDeadlineAtVn = deadline,
+                            OriginalBranchId = incident.BranchId,
+                            OriginalScheduledTimeVn = b.ScheduledTime
+                        };
+                        _context.IncidentAffectedBookings.Add(affectedBooking);
+
+                        var msg = new OutboxMessage
+                        {
+                            Type = "INCIDENT_ACTION_REQUIRED",
+                            Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = b.BookingId, IncidentId = incident.Id }),
+                            CreatedAt = now,
+                            NextRetryAt = now
+                        };
+                        _context.OutboxMessages.Add(msg);
+                    }
                 }
             }
 
