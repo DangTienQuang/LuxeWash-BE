@@ -368,6 +368,8 @@ namespace AutoWashPro.BLL.Services
             var incident = await _context.BranchIncidents.FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active");
             if (incident == null) throw new NotFoundException("Active incident not found");
 
+            await ValidateManagerBranchAsync(managerUserId, incident.BranchId);
+
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
             _context.IncidentChanges.Add(new IncidentChange
@@ -457,6 +459,8 @@ namespace AutoWashPro.BLL.Services
             var incident = await _context.BranchIncidents.FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active");
             if (incident == null) throw new NotFoundException("Active incident not found");
 
+            await ValidateManagerBranchAsync(managerUserId, incident.BranchId);
+
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
             incident.Status = "Resolved";
@@ -511,7 +515,7 @@ namespace AutoWashPro.BLL.Services
                     _context.OutboxMessages.Add(new OutboxMessage
                     {
                         Type = "INCIDENT_RESOLVED_EARLY",
-                        Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = c.BookingId }),
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = c.BookingId, IncidentId = incident.Id }),
                         CreatedAt = now,
                         NextRetryAt = now
                     });
@@ -524,7 +528,7 @@ namespace AutoWashPro.BLL.Services
                     _context.OutboxMessages.Add(new OutboxMessage
                     {
                         Type = "INCIDENT_ACTION_REQUIRED",
-                        Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = c.BookingId, Note = "Cancelled due to overcapacity after resolution" }),
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = c.BookingId, IncidentId = incident.Id, Note = "Cancelled due to overcapacity after resolution" }),
                         CreatedAt = now,
                         NextRetryAt = now
                     });
