@@ -45,18 +45,18 @@ namespace AutoWashPro.BLL.Services
             if (caseRecord.Incident != null && caseRecord.Incident.Version != request.ExpectedVersion)
                 throw new ConflictException("INCIDENT_VERSION_CHANGED");
 
-            // For idempotency.
+
             if (caseRecord.Status != "AwaitingCustomer")
             {
                 if (caseRecord.Decision == request.Decision)
                 {
-                    // Assuming Transfer target matches too if applicable
+
                     if (request.Decision == "Transfer" && (caseRecord.TargetBranchId != request.TargetBranchId || caseRecord.TargetSlotId != request.TargetSlotId))
                     {
                         throw new ConflictException("DECISION_ALREADY_FINAL");
                     }
                     
-                    // Same request => Return identical result (idempotency rule)
+
                     UserVoucher? existingVoucher = null;
                     if (caseRecord.CompensationUserVoucherId.HasValue)
                     {
@@ -105,7 +105,7 @@ namespace AutoWashPro.BLL.Services
                 if (caseRecord.Incident == null || caseRecord.Incident.Status != "Resolved")
                     throw new BadRequestException("You can only keep the original booking if the incident has been resolved.");
 
-                // Logic for Keep
+
                 caseRecord.Status = "Kept";
                 caseRecord.Decision = "Keep";
                 caseRecord.DecidedAtVn = now;
@@ -115,7 +115,7 @@ namespace AutoWashPro.BLL.Services
                 throw new BadRequestException("Invalid decision.");
             }
 
-            // Issue compensation voucher 20% / 6 months
+
             UserVoucher? voucher = null;
             if (request.Decision != "Keep")
             {
@@ -151,7 +151,7 @@ namespace AutoWashPro.BLL.Services
         {
             var booking = caseRecord.Booking;
             
-            // Refund Money
+
             if (booking.FinalAmount > 0)
             {
                 await _walletService.RefundBalanceAsync(booking.UserId ?? 0, booking.FinalAmount, "Refund - Incident Cancel");
@@ -164,7 +164,7 @@ namespace AutoWashPro.BLL.Services
                 });
             }
 
-            // Refund Points
+
             if (booking.PointsUsed > 0)
             {
                 var profile = await _context.CustomerProfiles.FirstOrDefaultAsync(p => p.UserId == booking.UserId);
@@ -188,7 +188,7 @@ namespace AutoWashPro.BLL.Services
                 });
             }
 
-            // Return Voucher
+
             if (booking.AppliedVoucherId.HasValue)
             {
                 var userVoucher = await _context.UserVouchers
@@ -206,11 +206,11 @@ namespace AutoWashPro.BLL.Services
                 });
             }
 
-            // Update Booking Status
+
             booking.Status = "Cancelled";
             booking.UpdatedAt = now;
 
-            // Release Capacity
+
             var dailyCapacity = await _context.DailySlotCapacities
                 .FirstOrDefaultAsync(c => c.BranchId == booking.BranchId && c.Date == booking.ScheduledTime.Date && c.TimeSlot.StartTime <= booking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > booking.ScheduledTime.TimeOfDay);
             if (dailyCapacity != null)
@@ -227,7 +227,7 @@ namespace AutoWashPro.BLL.Services
         {
             var originalBooking = caseRecord.Booking;
             
-            // Validate new slot
+
             var targetSlot = await _context.TimeSlots.FindAsync(targetSlotId);
             if (targetSlot == null || targetSlot.BranchId != targetBranchId)
                 throw new BadRequestException("Invalid target slot/branch.");
@@ -252,7 +252,7 @@ namespace AutoWashPro.BLL.Services
                 throw new ConflictException("DESTINATION_CAPACITY_CHANGED");
             }
 
-            // Release Old Capacity
+
             var oldCapacity = await _context.DailySlotCapacities
                 .FirstOrDefaultAsync(c => c.BranchId == originalBooking.BranchId && c.Date == originalBooking.ScheduledTime.Date && c.TimeSlot.StartTime <= originalBooking.ScheduledTime.TimeOfDay && c.TimeSlot.EndTime > originalBooking.ScheduledTime.TimeOfDay);
             if (oldCapacity != null)
@@ -260,7 +260,7 @@ namespace AutoWashPro.BLL.Services
                 oldCapacity.BookedWeight = Math.Max(0, oldCapacity.BookedWeight - ctx.CapacityWeight);
             }
 
-            // Take New Capacity
+
             var newCapacity = await _context.DailySlotCapacities
                 .FirstOrDefaultAsync(c => c.SlotId == targetSlotId && c.BranchId == targetBranchId && c.Date == targetDate);
             if (newCapacity == null)
@@ -277,7 +277,7 @@ namespace AutoWashPro.BLL.Services
             newCapacity.BookedWeight += ctx.CapacityWeight;
 
             originalBooking.BranchId = targetBranchId;
-            // No TimeSlotId in Booking
+
             originalBooking.ScheduledTime = originalBooking.ScheduledTime.Date.Add(targetSlot.StartTime);
             originalBooking.UpdatedAt = now;
 
@@ -290,7 +290,7 @@ namespace AutoWashPro.BLL.Services
 
         private async Task<UserVoucher> IssueCompensationVoucherAsync(int userId, IncidentAffectedBooking caseRecord, DateTime now)
         {
-            // Find the 20% system voucher
+
             var sysVoucherCode = "INCIDENT_COMP_20";
             var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == sysVoucherCode);
             if (voucher == null)
@@ -398,7 +398,7 @@ namespace AutoWashPro.BLL.Services
                     }
                     catch
                     {
-                        // ignore errors from single branch
+
                     }
                 }
             }

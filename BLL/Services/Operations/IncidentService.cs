@@ -172,13 +172,13 @@ namespace AutoWashPro.BLL.Services
                 
                 foreach (var slot in slots)
                 {
-                    // A simple approximation for preview
+
                     totalCapacityLoss += slot.MaxCapacity;
                 }
             }
             else
             {
-                // Lane partial failure
+
                 var simulatedIncident = new BranchIncident
                 {
                     BranchId = request.BranchId,
@@ -237,7 +237,7 @@ namespace AutoWashPro.BLL.Services
 
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
-            // Seed System Compensation Voucher if not exists
+
             var sysVoucherCode = "INCIDENT_COMP_20";
             var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.Code == sysVoucherCode);
             if (voucher == null)
@@ -252,7 +252,7 @@ namespace AutoWashPro.BLL.Services
                     ExpiryDate = now.AddYears(10)
                 };
                 _context.Vouchers.Add(voucher);
-                // Save immediately so subsequent processes can use it
+
                 await _context.SaveChangesAsync();
             }
 
@@ -276,7 +276,7 @@ namespace AutoWashPro.BLL.Services
 
             if (request.Scope == "SelectedLanes" && request.LaneIds != null)
             {
-                // Validate that all LaneIds belong to the specified Branch
+
                 var validLanes = await _context.Lanes.Where(l => l.BranchId == request.BranchId && request.LaneIds.Contains(l.LaneId)).Select(l => l.LaneId).ToListAsync();
                 if (validLanes.Count != request.LaneIds.Count)
                 {
@@ -302,7 +302,7 @@ namespace AutoWashPro.BLL.Services
                 OccurredAtVn = now
             });
 
-            // Find affected bookings and create IncidentAffectedBooking records
+
             var activeBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
                 .Include(b => b.BookingDetails)
@@ -380,7 +380,7 @@ namespace AutoWashPro.BLL.Services
                     };
                     _context.IncidentAffectedBookings.Add(affectedBooking);
 
-                    // Add Outbox message to notify the user
+
                     var msg = new OutboxMessage
                     {
                         Type = "INCIDENT_ACTION_REQUIRED",
@@ -421,7 +421,7 @@ namespace AutoWashPro.BLL.Services
 
             var oldEnd = incident.EstimatedEndAtVn;
 
-            // Mock the incident extension for accurate capacity calculation
+
             var simulatedIncident = new BranchIncident
             {
                 BranchId = incident.BranchId,
@@ -436,7 +436,7 @@ namespace AutoWashPro.BLL.Services
             incident.UpdatedAtVn = now;
             incident.Version++;
 
-            // Handle newly affected bookings if extended...
+
             var newBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
                 .Include(b => b.BookingDetails)
@@ -449,7 +449,7 @@ namespace AutoWashPro.BLL.Services
 
             foreach (var b in newBookings)
             {
-                // Idempotency check
+
                 if (await _context.IncidentAffectedBookings.AnyAsync(c => c.BookingId == b.BookingId && c.IncidentId == incident.Id))
                     continue;
 
@@ -530,9 +530,9 @@ namespace AutoWashPro.BLL.Services
                 OccurredAtVn = now
             });
 
-            // Find all pending AwaitingCustomer bookings and auto-handle them if needed, or leave them.
-            // Plan says: "nếu sự cố xong trước hạn, các booking chưa Cancel có thể Keep".
-            // We can resolve them to Kept if they haven't decided.
+
+
+
             var pendingCases = await _context.IncidentAffectedBookings
                 .Include(b => b.Booking)
                 .ThenInclude(b => b.Vehicle)
@@ -560,12 +560,12 @@ namespace AutoWashPro.BLL.Services
                 var slot = slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay);
                 int slotId = slot?.SlotId ?? 0;
                 
-                // Re-evaluate with NO active incident
+
                 var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now);
                 
                 if (cap.AvailableWeight >= ctx.CapacityWeight)
                 {
-                    // Enough capacity, we can keep it
+
                     c.Status = "Kept";
                     c.Decision = "Keep";
                     c.DecidedAtVn = now;
@@ -580,7 +580,7 @@ namespace AutoWashPro.BLL.Services
                 }
                 else
                 {
-                    // Still not enough capacity (maybe someone else booked), we must system-cancel
+
                     casesToCancel.Add(c);
 
                     _context.OutboxMessages.Add(new OutboxMessage
@@ -596,7 +596,7 @@ namespace AutoWashPro.BLL.Services
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            // Perform system cancel in its own transaction context
+
             foreach (var c in casesToCancel)
             {
                 var request = new AutoWashPro.BLL.DTOs.IncidentDecisionRequestDTO
