@@ -16,7 +16,7 @@ namespace AutoWashPro.BLL.Services
             _context = context;
         }
 
-        public async Task<EffectiveSlotCapacityResult> GetEffectiveSlotCapacityAsync(int branchId, DateTime date, int slotId, BookingContextDTO bookingContext, DateTime nowVn)
+        public async Task<EffectiveSlotCapacityResult> GetEffectiveSlotCapacityAsync(int branchId, DateTime date, int slotId, BookingContextDTO bookingContext, DateTime nowVn, AutoWashPro.DAL.Entities.BranchIncident? simulatedIncident = null)
         {
             var slot = await _context.TimeSlots
                 .FirstOrDefaultAsync(s => s.SlotId == slotId && s.BranchId == branchId);
@@ -41,6 +41,15 @@ namespace AutoWashPro.BLL.Services
                 // Intersection check
                 .Where(i => i.StartedAtVn < slotEnd && i.EstimatedEndAtVn > slotStart)
                 .ToListAsync();
+
+            if (simulatedIncident != null)
+            {
+                // Check if simulated incident intersects with this slot
+                if (simulatedIncident.StartedAtVn < slotEnd && simulatedIncident.EstimatedEndAtVn > slotStart)
+                {
+                    activeIncidents.Add(simulatedIncident);
+                }
+            }
 
             var dailyCapacity = await _context.DailySlotCapacities
                 .FirstOrDefaultAsync(c => c.BranchId == branchId && c.SlotId == slotId && c.Date == date.Date);

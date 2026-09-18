@@ -9,5 +9,9 @@ namespace AutoWashPro.BLL.Services.Interface
         Task<long> CreateIncidentAsync(int managerUserId, CreateIncidentRequestDTO request);
         Task ExtendIncidentAsync(int managerUserId, long incidentId, ExtendIncidentRequestDTO request);
         Task ResolveIncidentAsync(int managerUserId, long incidentId);
+        
+        Task<IncidentPagedResponseDTO> GetIncidentsAsync(int managerUserId, int page = 1, int pageSize = 10);
+        Task<BranchIncidentDTO> GetIncidentAsync(int managerUserId, long incidentId);
+        Task<List<IncidentAffectedBookingDTO>> GetIncidentImpactAsync(int managerUserId, long incidentId);
     }
 }

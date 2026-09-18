@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AutoWashPro.API.Controllers.Customer
 {
-    [Route("api/incidents/actions")]
+    [Route("api/v1/incidents/actions")]
     [ApiController]
     [Authorize(Roles = "Customer")]
     public class IncidentActionController : ControllerBase
@@ -28,6 +28,13 @@ namespace AutoWashPro.API.Controllers.Customer
         {
             await _incidentCustomerService.HandleCustomerDecisionAsync(GetUserId(), affectedBookingId, request.Decision, request.TargetBranchId, request.TargetSlotId);
             return Ok(new { success = true, message = "Decision processed successfully. A 20% discount voucher has been added to your account." });
+        }
+
+        [HttpGet("affected-booking-by-booking/{bookingId}")]
+        public async Task<IActionResult> GetAffectedBookingDetails(int bookingId)
+        {
+            var result = await _incidentCustomerService.GetAffectedBookingDetailsAsync(GetUserId(), bookingId);
+            return Ok(result);
         }
     }
 

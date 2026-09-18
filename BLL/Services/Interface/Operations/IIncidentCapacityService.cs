@@ -6,7 +6,7 @@ namespace AutoWashPro.BLL.Services.Interface
 {
     public interface IIncidentCapacityService
     {
-        Task<EffectiveSlotCapacityResult> GetEffectiveSlotCapacityAsync(int branchId, DateTime date, int slotId, BookingContextDTO bookingContext, DateTime nowVn);
+        Task<EffectiveSlotCapacityResult> GetEffectiveSlotCapacityAsync(int branchId, DateTime date, int slotId, BookingContextDTO bookingContext, DateTime nowVn, AutoWashPro.DAL.Entities.BranchIncident? simulatedIncident = null);
     }
 
     public class EffectiveSlotCapacityResult

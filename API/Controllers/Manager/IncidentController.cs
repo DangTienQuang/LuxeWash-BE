@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AutoWashPro.API.Controllers.Manager
 {
-    [Route("api/manager/incidents")]
+    [Route("api/v1/manager/incidents")]
     [ApiController]
     [Authorize(Roles = "Manager")]
     public class IncidentController : ControllerBase
@@ -50,6 +50,27 @@ namespace AutoWashPro.API.Controllers.Manager
         {
             await _incidentService.ResolveIncidentAsync(GetUserId(), id);
             return Ok(new { success = true, message = "Incident resolved successfully" });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetIncidents([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            var result = await _incidentService.GetIncidentsAsync(GetUserId(), page, pageSize);
+            return Ok(new { success = true, data = result });
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetIncident(long id)
+        {
+            var result = await _incidentService.GetIncidentAsync(GetUserId(), id);
+            return Ok(new { success = true, data = result });
+        }
+
+        [HttpGet("{id}/impact")]
+        public async Task<IActionResult> GetIncidentImpact(long id)
+        {
+            var result = await _incidentService.GetIncidentImpactAsync(GetUserId(), id);
+            return Ok(new { success = true, data = result });
         }
     }
 }
