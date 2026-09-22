@@ -120,7 +120,10 @@ namespace AutoWashPro.BLL.Services
                 {
                     AffectedBookingId = b.Id,
                     BookingId = b.BookingId,
-                    LicensePlate = b.Booking.Vehicle != null ? b.Booking.Vehicle.LicensePlate : "",
+                    // Booking.LicensePlate is the canonical snapshot for both personal and
+                    // business bookings. Fleet bookings do not have Booking.Vehicle, so
+                    // reading the personal-vehicle navigation hides their license plate.
+                    LicensePlate = b.Booking.LicensePlate,
                     ScheduledTime = b.Booking.ScheduledTime.ToString("yyyy-MM-dd HH:mm"),
                     CustomerAction = b.Status, // AwaitingCustomer, Kept, CancelledBySystem, etc.
                     SystemResolution = b.Decision ?? "",
@@ -208,7 +211,7 @@ namespace AutoWashPro.BLL.Services
                         response.AffectedBookings.Add(new AffectedBookingSummaryDTO
                         {
                             BookingId = b.BookingId,
-                            LicensePlate = b.Vehicle?.LicensePlate ?? "",
+                            LicensePlate = b.LicensePlate,
                             ScheduledTime = b.ScheduledTime.ToString("yyyy-MM-dd HH:mm"),
                             CapacityWeight = weight
                         });
