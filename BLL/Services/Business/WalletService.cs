@@ -744,7 +744,14 @@ namespace AutoWashPro.BLL.Services
         public async Task RefundBalanceAsync(int userId, decimal amount, string reason)
         {
             if (amount <= 0) throw new BadRequestException("Refund amount must be greater than 0.");
-            using var dbTransaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            // Refunds are used both as standalone operations and as one step in larger
+            // booking/incident workflows. Reuse the caller's transaction when one is
+            // already active so the whole workflow stays atomic and MySQL is not asked
+            // to create an unsupported nested transaction on the same connection.
+            var ownsTransaction = _context.Database.CurrentTransaction == null;
+            await using var dbTransaction = ownsTransaction
+                ? await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable)
+                : null;
             try
             {
                 var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
@@ -761,11 +768,17 @@ namespace AutoWashPro.BLL.Services
                 };
                 _context.Transactions.Add(transaction);
                 await _context.SaveChangesAsync();
-                await dbTransaction.CommitAsync();
+                if (dbTransaction != null)
+                {
+                    await dbTransaction.CommitAsync();
+                }
             }
             catch
             {
-                await dbTransaction.RollbackAsync();
+                if (dbTransaction != null)
+                {
+                    await dbTransaction.RollbackAsync();
+                }
                 throw;
             }
         }

@@ -67,11 +67,13 @@ namespace AutoWashPro.BLL.Services
                     {
                         existingVoucher = await _context.UserVouchers.FindAsync(caseRecord.CompensationUserVoucherId.Value);
                     }
+                    existingVoucher ??= await _context.UserVouchers
+                        .FirstOrDefaultAsync(uv => uv.SourceIncidentAffectedBookingId == caseRecord.Id);
                     
                     return new IncidentDecisionResponseDTO
                     {
                         Decision = caseRecord.Decision,
-                        Booking = caseRecord.Booking,
+                        Booking = ToDecisionBookingDTO(caseRecord.Booking),
                         CaseStatus = caseRecord.Status,
                         Refund = caseRecord.Decision == "Cancel" ? new RefundPreviewDTO
                         {
@@ -128,12 +130,17 @@ namespace AutoWashPro.BLL.Services
             }
             
             await _context.SaveChangesAsync();
+            if (voucher != null)
+            {
+                caseRecord.CompensationUserVoucherId = voucher.Id;
+                await _context.SaveChangesAsync();
+            }
             await transaction.CommitAsync();
 
             return new IncidentDecisionResponseDTO
             {
                 Decision = request.Decision,
-                Booking = caseRecord.Booking, // Could be mapped to a smaller DTO
+                Booking = ToDecisionBookingDTO(caseRecord.Booking),
                 CaseStatus = caseRecord.Status,
                 Refund = request.Decision == "Cancel" ? new RefundPreviewDTO
                 {
@@ -151,19 +158,66 @@ namespace AutoWashPro.BLL.Services
             };
         }
 
+        private static IncidentDecisionBookingDTO ToDecisionBookingDTO(Booking booking)
+        {
+            return new IncidentDecisionBookingDTO
+            {
+                BookingId = booking.BookingId,
+                BranchId = booking.BranchId,
+                ScheduledTime = booking.ScheduledTime,
+                Status = booking.Status
+            };
+        }
+
         public async Task SystemCancelAsync(int userId, int bookingId, long caseId)
         {
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var caseRecord = await _context.IncidentAffectedBookings
-                .Include(c => c.Booking)
-                .ThenInclude(b => b.BookingDetails)
-                .FirstOrDefaultAsync(c => c.Id == caseId && c.BookingId == bookingId && c.UserId == userId);
+            var ownsTransaction = _context.Database.CurrentTransaction == null;
+            await using var transaction = ownsTransaction
+                ? await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable)
+                : null;
 
-            if (caseRecord == null)
-                throw new NotFoundException("Affected booking record not found.");
+            try
+            {
+                var caseRecord = await _context.IncidentAffectedBookings
+                    .Include(c => c.Booking)
+                    .ThenInclude(b => b.BookingDetails)
+                    .FirstOrDefaultAsync(c => c.Id == caseId && c.BookingId == bookingId && c.UserId == userId);
 
-            await HandleCancelDecisionAsync(caseRecord, now);
-            await IssueCompensationVoucherAsync(userId, caseRecord, now);
+                if (caseRecord == null)
+                    throw new NotFoundException("Affected booking record not found.");
+
+                // A customer may submit a decision at the same time that the timeout
+                // worker runs. Do not refund or issue compensation twice.
+                if (caseRecord.Status != "AwaitingCustomer")
+                {
+                    if (caseRecord.Status == "Cancelled" && caseRecord.Decision == "Cancel")
+                    {
+                        return;
+                    }
+
+                    throw new ConflictException("DECISION_ALREADY_FINAL");
+                }
+
+                await HandleCancelDecisionAsync(caseRecord, now);
+                var voucher = await IssueCompensationVoucherAsync(userId, caseRecord, now);
+                await _context.SaveChangesAsync();
+                caseRecord.CompensationUserVoucherId = voucher.Id;
+                await _context.SaveChangesAsync();
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
+                throw;
+            }
         }
 
         private async Task HandleCancelDecisionAsync(IncidentAffectedBooking caseRecord, DateTime now)

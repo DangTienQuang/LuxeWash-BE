@@ -52,21 +52,23 @@ namespace AutoWashPro.BLL.BackgroundServices
             var overdueCases = await context.IncidentAffectedBookings
                 .Include(c => c.Incident)
                 .Where(c => c.Status == "AwaitingCustomer" && c.ResponseDeadlineAtVn <= now)
+                .AsNoTracking()
                 .ToListAsync(stoppingToken);
 
             foreach (var caseRecord in overdueCases)
             {
                 try
                 {
-                    // Auto-cancel using the same path
-                    var request = new AutoWashPro.BLL.DTOs.IncidentDecisionRequestDTO
-                    {
-                        IncidentId = caseRecord.IncidentId,
-                        CaseId = caseRecord.Id,
-                        ExpectedVersion = caseRecord.Incident?.Version ?? 1,
-                        Decision = "Cancel"
-                    };
-                    await customerService.ProcessIncidentDecisionAsync(caseRecord.UserId ?? 0, caseRecord.BookingId, request);
+                    // This is a system action after the response deadline. It must not
+                    // use the customer endpoint, which correctly rejects late input.
+                    await using var transaction = await context.Database.BeginTransactionAsync(
+                        System.Data.IsolationLevel.Serializable,
+                        stoppingToken);
+
+                    await customerService.SystemCancelAsync(
+                        caseRecord.UserId ?? 0,
+                        caseRecord.BookingId,
+                        caseRecord.Id);
 
                     context.OutboxMessages.Add(new AutoWashPro.DAL.Entities.OutboxMessage
                     {
@@ -76,10 +78,15 @@ namespace AutoWashPro.BLL.BackgroundServices
                         NextRetryAt = now
                     });
                     await context.SaveChangesAsync(stoppingToken);
+                    await transaction.CommitAsync(stoppingToken);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to auto-cancel case {CaseId}", caseRecord.Id);
+                    // A rolled-back EF transaction does not reset tracked entity states.
+                    // Clear them so one failed case cannot leak pending changes into the
+                    // next case processed by this worker scope.
+                    context.ChangeTracker.Clear();
                 }
             }
         }

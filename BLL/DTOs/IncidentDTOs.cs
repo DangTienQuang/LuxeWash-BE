@@ -154,10 +154,18 @@ namespace AutoWashPro.BLL.DTOs
     public class IncidentDecisionResponseDTO
     {
         public string Decision { get; set; } = null!;
-        public object? Booking { get; set; }
+        public IncidentDecisionBookingDTO? Booking { get; set; }
         public RefundPreviewDTO? Refund { get; set; }
         public CompensationVoucherDTO? CompensationVoucher { get; set; }
         public string CaseStatus { get; set; } = null!;
+    }
+
+    public class IncidentDecisionBookingDTO
+    {
+        public int BookingId { get; set; }
+        public int BranchId { get; set; }
+        public DateTime ScheduledTime { get; set; }
+        public string Status { get; set; } = null!;
     }
 
     public class CompensationVoucherDTO

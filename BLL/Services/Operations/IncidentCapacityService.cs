@@ -69,6 +69,26 @@ namespace AutoWashPro.BLL.Services
                 CapacityVersion = activeIncidents.Count > 0 ? activeIncidents.Sum(i => i.Version) : 0
             };
 
+            if (slot.IsVipOnly && !bookingContext.IsVipEligible)
+            {
+                result.EffectiveCapacity = 0;
+                result.ClosedReason = "VIP_ONLY";
+                result.AvailableWeight = 0;
+                return result;
+            }
+
+            // TimeSlot.MaxCapacity was the source of truth before lane-level incident
+            // capacity was introduced. Keep that behaviour for an unaffected branch so
+            // legacy branches that have valid slots but no Lane records do not become
+            // completely unavailable. Lane configuration is required only when an
+            // active partial incident needs capacity to be recalculated per lane.
+            if (activeIncidents.Count == 0)
+            {
+                result.EffectiveCapacity = slot.MaxCapacity;
+                result.AvailableWeight = Math.Max(0, result.EffectiveCapacity - bookedWeight);
+                return result;
+            }
+
             var allLanes = await _context.Lanes
                 .Where(l => l.BranchId == branchId && l.IsActive)
                 .ToListAsync();
@@ -107,13 +127,6 @@ namespace AutoWashPro.BLL.Services
                 eligibleLanes = eligibleLanes.Where(l => !l.IsBusinessLane).ToList();
             }
 
-            if (slot.IsVipOnly && !bookingContext.IsVipEligible)
-            {
-                result.EffectiveCapacity = 0;
-                result.ClosedReason = "VIP_ONLY";
-                return result;
-            }
-
             result.EligibleLaneIds = eligibleLanes.Select(l => l.LaneId).ToList();
 
             if (result.EligibleLaneIds.Count == 0)
@@ -124,32 +137,26 @@ namespace AutoWashPro.BLL.Services
                 return result;
             }
 
-            if (activeIncidents.Count > 0)
+            // Calculate effective capacity based on remaining lanes.
+            // Fail closed when lane capacity has not been calibrated because an
+            // incident is active and TimeSlot.MaxCapacity is no longer sufficient.
+            if (laneCapacities.Count == 0 || laneCapacities.Any(lc => !lc.IsCalibrated))
             {
-                // Calculate effective capacity based on remaining lanes
-                // First, check if configuration exists
-                if (laneCapacities.Count == 0 || laneCapacities.Any(lc => !lc.IsCalibrated))
-                {
-                    // Fail closed if uncalibrated
-                    result.EffectiveCapacity = 0;
-                    result.ClosedReason = "CONFIGURATION_REQUIRED";
-                    result.AvailableWeight = 0;
-                    return result;
-                }
-
-                // Sum of max weight of ALL remaining un-affected lanes (not just eligible for this booking, but the total capacity of the branch for this slot)
-                var remainingLanesAll = allLanes.Where(l => !affectedLaneIds.Contains(l.LaneId)).Select(l => l.LaneId).ToList();
-                int effectiveTotalCapacity = laneCapacities
-                    .Where(lc => remainingLanesAll.Contains(lc.LaneId))
-                    .Sum(lc => lc.MaxWeightUnits);
-
-                result.EffectiveCapacity = Math.Min(slot.MaxCapacity, effectiveTotalCapacity);
-                result.ClosedReason = "INCIDENT_PARTIAL";
+                result.EffectiveCapacity = 0;
+                result.ClosedReason = "CONFIGURATION_REQUIRED";
+                result.AvailableWeight = 0;
+                return result;
             }
-            else
-            {
-                result.EffectiveCapacity = slot.MaxCapacity;
-            }
+
+            // Sum the capacity of every remaining unaffected lane. Eligibility for
+            // this booking is checked separately above.
+            var remainingLanesAll = allLanes.Where(l => !affectedLaneIds.Contains(l.LaneId)).Select(l => l.LaneId).ToList();
+            int effectiveTotalCapacity = laneCapacities
+                .Where(lc => remainingLanesAll.Contains(lc.LaneId))
+                .Sum(lc => lc.MaxWeightUnits);
+
+            result.EffectiveCapacity = Math.Min(slot.MaxCapacity, effectiveTotalCapacity);
+            result.ClosedReason = "INCIDENT_PARTIAL";
 
             result.AvailableWeight = Math.Max(0, result.EffectiveCapacity - bookedWeight);
             
