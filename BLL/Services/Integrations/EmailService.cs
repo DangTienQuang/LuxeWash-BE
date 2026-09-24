@@ -50,12 +50,14 @@ namespace AutoWashPro.BLL.Services
             string? attachmentFileName,
             string? attachmentContentType)
         {
-            var smtpServer = _config["EmailSettings:SmtpServer"];
-            var senderEmail = _config["EmailSettings:SenderEmail"];
-            var senderName = _config["EmailSettings:SenderName"] ?? "LuxeWash System";
-            var username = _config["EmailSettings:Username"] ?? senderEmail;
-            var password = _config["EmailSettings:Password"];
-            var portValue = _config["EmailSettings:Port"];
+
+            var password = _config["SendGridSettings:ApiKey"] ?? _config["EmailSettings:Password"];
+            var senderEmail = _config["SendGridSettings:SenderEmail"] ?? _config["EmailSettings:SenderEmail"];
+            var senderName = _config["SendGridSettings:SenderName"] ?? _config["EmailSettings:SenderName"] ?? "LuxeWash System";
+            var isSendGrid = !string.IsNullOrEmpty(_config["SendGridSettings:ApiKey"]);
+            var smtpServer = isSendGrid ? "smtp.sendgrid.net" : _config["EmailSettings:SmtpServer"];
+            var portValue = isSendGrid ? "587" : _config["EmailSettings:Port"];
+            var username = isSendGrid ? "apikey" : (_config["EmailSettings:Username"] ?? senderEmail);
 
             if (string.IsNullOrWhiteSpace(smtpServer))
                 throw new InvalidOperationException("SMTP server is not configured.");
@@ -66,7 +68,7 @@ namespace AutoWashPro.BLL.Services
             if (string.IsNullOrWhiteSpace(username))
                 throw new InvalidOperationException("SMTP username is not configured.");
             if (string.IsNullOrWhiteSpace(password))
-                throw new InvalidOperationException("SMTP password is not configured.");
+                throw new InvalidOperationException("SMTP password or API key is not configured.");
 
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(senderName, senderEmail));
