@@ -784,9 +784,9 @@ namespace AutoWashPro.BLL.Services
         }
         private static long GenerateOrderCode()
         {
-            var timestampPart = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1_000_000_000_000;
-            var randomPart = Random.Shared.Next(0, 1_000_000);
-            return timestampPart * 1_000_000 + randomPart;
+            var timestampPart = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 10_000_000_000;
+            var randomPart = Random.Shared.Next(0, 100_000);
+            return timestampPart * 100_000 + randomPart;
         }
 
         // OrderCode is enforced unique at the DB level. A collision (two requests generating the
