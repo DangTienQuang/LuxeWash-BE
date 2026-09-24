@@ -241,11 +241,6 @@ namespace AutoWashPro.BLL.Services
                     {
                         throw new BadRequestException("LANE_INACTIVE");
                     }
-                    bool isBusinessBooking = booking.BookingType == "Business";
-                    if (validLane.IsBusinessLane != isBusinessBooking)
-                    {
-                        throw new BadRequestException("LANE_TYPE_MISMATCH");
-                    }
                     bool laneOccupied = await _context.Bookings.AnyAsync(b => 
                         b.ProcessingLaneId == assignment.LaneId 
                         && b.BookingId != bookingId 

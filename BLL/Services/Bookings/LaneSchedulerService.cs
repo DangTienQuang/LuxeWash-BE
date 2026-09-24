@@ -21,7 +21,9 @@ namespace BLL.Services
         public async Task<Dictionary<int, DateTime>> GetLaneProjectedFreeTimesAsync(int branchId, DateTime slotStart, bool isBusinessLane = false)
         {
             var lanes = await _context.Lanes
-                .Where(x => x.BranchId == branchId && x.IsActive && x.IsBusinessLane == isBusinessLane)
+                .Where(x => x.BranchId == branchId && x.IsActive)
+                .OrderBy(x => x.IsBusinessLane == isBusinessLane ? 0 : 1)
+                .ThenBy(x => x.LaneId)
                 .ToListAsync();
             var occupancies = await _context.LaneOccupancies
                 .Include(o => o.Booking)
@@ -142,11 +144,12 @@ namespace BLL.Services
             var candidateSlots = allSlots.Skip(startingIndex).ToList();
 
             var lanes = await _context.Lanes
-                .Where(x => x.BranchId == branchId && x.IsActive && x.IsBusinessLane)
-                .OrderBy(x => x.LaneId)
+                .Where(x => x.BranchId == branchId && x.IsActive)
+                .OrderBy(x => x.IsBusinessLane ? 0 : 1)
+                .ThenBy(x => x.LaneId)
                 .ToListAsync();
             if (!lanes.Any())
-                return LaneScheduleResult.Fail("No available business lane in this branch.");
+                return LaneScheduleResult.Fail("No available lane in this branch.");
 
             var dayStart = targetDate.Date;
             var dayEnd = dayStart.AddDays(1);

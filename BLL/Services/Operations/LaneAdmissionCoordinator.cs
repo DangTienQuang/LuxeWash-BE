@@ -27,8 +27,9 @@ namespace AutoWashPro.BLL.Services.Operations
         private IQueryable<Lane> BuildCompatibleLaneQuery(int branchId, bool isBusiness)
         {
             return _context.Lanes
-                .Where(l => l.BranchId == branchId && l.IsActive && l.IsBusinessLane == isBusiness)
-                .OrderBy(l => l.Name);
+                .Where(l => l.BranchId == branchId && l.IsActive)
+                .OrderBy(l => l.IsBusinessLane == isBusiness ? 0 : 1)
+                .ThenBy(l => l.Name);
         }
 
         public async Task<GateCheckInResult> CheckInAtEntryGateAsync(
@@ -137,7 +138,7 @@ namespace AutoWashPro.BLL.Services.Operations
                         .AnyAsync(o => o.LaneId == forcedLaneId.Value, cancellationToken);
                     
                     var lane = await _context.Lanes.FindAsync(new object[] { forcedLaneId.Value }, cancellationToken);
-                    if (lane == null || lane.BranchId != branchId || !lane.IsActive || lane.IsBusinessLane != isBusiness)
+                    if (lane == null || lane.BranchId != branchId || !lane.IsActive)
                     {
                         throw new InvalidOperationException("LANE_UNAVAILABLE");
                     }
@@ -610,8 +611,7 @@ namespace AutoWashPro.BLL.Services.Operations
                 .Include(b => b.User)
                     .ThenInclude(u => u.CustomerProfile)
                         .ThenInclude(cp => cp.Tier)
-                .Where(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null 
-                         && (lane.IsBusinessLane ? (b.BookingType == "Business" || b.BookingType == "Fleet") : (b.BookingType != "Business" && b.BookingType != "Fleet")))
+                .Where(b => b.BranchId == branchId && b.Status == "CheckedIn" && b.ProcessingLaneId == null)
                 .ToListAsync(cancellationToken);
 
             var waitingBookingObj = waitingBookings
@@ -628,24 +628,38 @@ namespace AutoWashPro.BLL.Services.Operations
                         Booking = b,
                         LicensePlate = b.LicensePlate ?? b.Vehicle?.LicensePlate,
                         IsVip = isVip,
+                        IsPreferredForLane = lane.IsBusinessLane
+                            ? b.BookingType == "Business" || b.BookingType == "Fleet"
+                            : b.BookingType != "Business" && b.BookingType != "Fleet",
                         WaitTime = b.UpdatedAt ?? b.CreatedAt
                     };
                 })
-                .OrderByDescending(x => x.IsVip)
+                .OrderByDescending(x => x.IsPreferredForLane)
+                .ThenByDescending(x => x.IsVip)
                 .ThenBy(x => x.WaitTime)
                 .FirstOrDefault();
 
             var waitingFleet = await _context.FleetWashLogs
                 .Include(f => f.FleetVehicle)
                 .Where(f => f.BranchId == branchId && f.Status == "CheckedIn" &&
-                            f.LaneId == null && f.BookingId == null && lane.IsBusinessLane)
+                            f.LaneId == null && f.BookingId == null)
                 .OrderBy(f => f.CheckInTime)
                 .FirstOrDefaultAsync(cancellationToken);
 
             AdmissionResult? admission = null;
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
 
-            if (waitingBookingObj != null && (waitingBookingObj.IsVip || waitingFleet == null || waitingBookingObj.WaitTime < waitingFleet.CheckInTime))
+            var chooseBooking = waitingBookingObj != null && waitingFleet == null;
+            if (waitingBookingObj != null && waitingFleet != null)
+            {
+                var bookingPreference = waitingBookingObj.IsPreferredForLane ? 0 : 1;
+                var fleetPreference = lane.IsBusinessLane ? 0 : 1;
+                chooseBooking = bookingPreference < fleetPreference
+                    || (bookingPreference == fleetPreference
+                        && (waitingBookingObj.IsVip || waitingBookingObj.WaitTime <= waitingFleet.CheckInTime));
+            }
+
+            if (waitingBookingObj != null && chooseBooking)
             {
                 if (string.IsNullOrEmpty(waitingBookingObj.LicensePlate) || waitingBookingObj.LicensePlate == "UNKNOWN")
                 {

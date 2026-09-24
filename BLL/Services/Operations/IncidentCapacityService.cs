@@ -115,17 +115,6 @@ namespace AutoWashPro.BLL.Services
             result.IncidentIds = activeIncidents.Select(i => i.Id).ToList();
 
             var eligibleLanes = allLanes.Where(l => !affectedLaneIds.Contains(l.LaneId)).ToList();
-            
-            // Check booking context rules
-            if (bookingContext.IsBusiness)
-            {
-                eligibleLanes = eligibleLanes.Where(l => l.IsBusinessLane).ToList();
-            }
-            else
-            {
-                // Looking at old logic, maybe business lanes are strictly for business?
-                eligibleLanes = eligibleLanes.Where(l => !l.IsBusinessLane).ToList();
-            }
 
             result.EligibleLaneIds = eligibleLanes.Select(l => l.LaneId).ToList();
 
