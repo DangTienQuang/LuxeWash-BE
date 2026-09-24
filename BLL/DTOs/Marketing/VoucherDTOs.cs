@@ -151,6 +151,11 @@ namespace AutoWashPro.BLL.DTOs
     }
     public class CreateWinbackVouchersDTO : CreateAutomatedVoucherBaseDTO
     {
+        [Range(1, 3650)]
+        public int InactiveDays { get; set; }
+
+        [Range(1, 3650)]
+        public int ResendAfterDays { get; set; }
     }
     public class CreateVipVouchersDTO : CreateAutomatedVoucherBaseDTO
     {

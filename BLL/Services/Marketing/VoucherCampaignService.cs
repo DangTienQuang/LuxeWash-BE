@@ -29,7 +29,11 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<CampaignVoucherResponseDTO> CreateWinbackVouchersAsync(CreateWinbackVouchersDTO request)
         {
-            var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Winback);
+            var voucher = await CreateCampaignVoucherAsync(request, VoucherCampaignType.Winback, v =>
+            {
+                v.InactiveDays = request.InactiveDays;
+                v.ResendAfterDays = request.ResendAfterDays;
+            });
             return MapCampaignDto(voucher);
         }
 
@@ -62,7 +66,10 @@ namespace AutoWashPro.BLL.Services
             var date = (targetDate ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow).Date;
             var activeCampaigns = await GetActiveCampaignsQuery(now)
                 .Where(v => v.CampaignType == VoucherCampaignType.Birthday
-                         || v.CampaignType == VoucherCampaignType.Vip)
+                         || v.CampaignType == VoucherCampaignType.Vip
+                         || (v.CampaignType == VoucherCampaignType.Winback
+                             && v.InactiveDays.HasValue && v.InactiveDays.Value > 0
+                             && v.ResendAfterDays.HasValue && v.ResendAfterDays.Value > 0))
                 .ToListAsync();
 
             var results = new List<VoucherCampaignProcessResultDTO>();
