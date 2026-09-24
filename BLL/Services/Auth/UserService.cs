@@ -57,7 +57,8 @@ namespace AutoWashPro.BLL.Services
                 Vehicles = user.Vehicles.Select(v => new VehicleDTO
                 {
                     LicensePlate = v.LicensePlate,
-                    VehicleType = v.VehicleType?.Name
+                    VehicleType = v.VehicleType?.Name,
+                    IsDeleted = v.IsDeleted
                 }).ToList(),
                 DateOfBirth = user.CustomerProfile?.DateOfBirth
             };

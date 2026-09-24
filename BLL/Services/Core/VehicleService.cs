@@ -40,7 +40,8 @@ namespace AutoWashPro.BLL.Services
                     RegistrationPhotoUrl = v.RegistrationPhotoUrl,
                     CarModel = v.CarModelId.HasValue ? v.CarModelEntity.Name : v.CarModel,
                     Brand = v.CarModelId.HasValue ? v.CarModelEntity.Brand : null,
-                    UserNote = v.UserNote
+                    UserNote = v.UserNote,
+                    IsDeleted = v.IsDeleted
                 }).ToListAsync();
         }
         private string NormalizeLicensePlate(string plate)
@@ -156,7 +157,8 @@ namespace AutoWashPro.BLL.Services
                 RegistrationPhotoUrl = finalPhotoUrl,
                 CarModel = finalCarModelId.HasValue ? carModel?.Name : finalCarModel,
                 Brand = finalCarModelId.HasValue ? carModel?.Brand : null,
-                UserNote = request.UserNote
+                UserNote = request.UserNote,
+                IsDeleted = false
             };
         }
         public async Task<List<AdminOtherVehicleDTO>> GetOtherVehiclesAsync()

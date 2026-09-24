@@ -28,6 +28,7 @@ namespace AutoWashPro.BLL.DTOs
         public string? CarModel { get; set; }
         public string? Brand { get; set; }
         public string? UserNote { get; set; }
+        public bool IsDeleted { get; set; }
     }
     public class CreateVehicleDTO
     {
