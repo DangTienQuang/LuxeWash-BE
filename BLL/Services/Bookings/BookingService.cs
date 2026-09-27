@@ -993,7 +993,9 @@ namespace AutoWashPro.BLL.Services
             var activeBooking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails).ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
-                .Where(b => b.LicensePlate == normalizedPlate
+                .Include(b => b.Vehicle)
+                .Where(b => (b.LicensePlate == normalizedPlate ||
+                             (b.Vehicle != null && b.Vehicle.LicensePlate == normalizedPlate))
                          && (b.Status == BookingStatuses.CheckedIn || b.Status == BookingStatuses.Processing))
                 .OrderByDescending(b => b.BookingId)
                 .FirstOrDefaultAsync();
