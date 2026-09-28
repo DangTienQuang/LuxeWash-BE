@@ -46,5 +46,13 @@ namespace AutoWashPro.API.Controllers
             await _voucherService.RedeemVoucherAsync(userId, request.VoucherId);
             return Ok(new { statusCode = 200, message = "Voucher redeemed successfully." });
         }
+        [Authorize]
+        [HttpPost("refund")]
+        public async Task<IActionResult> RefundVoucher([FromBody] RedeemVoucherRequestDTO request)
+        {
+            var userId = ClaimHelper.GetUserId(User);
+            await _voucherService.RefundVoucherAsync(userId, request.VoucherId);
+            return Ok(new { statusCode = 200, message = "Hoàn điểm voucher thành công." });
+        }
     }
 }

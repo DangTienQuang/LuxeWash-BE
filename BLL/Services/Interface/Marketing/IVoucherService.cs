@@ -8,6 +8,7 @@ namespace AutoWashPro.BLL.Services
         Task<List<VoucherResponseDTO>> GetMyVouchersAsync(int userId);
         Task<List<RedeemableVoucherResponseDTO>> GetRedeemableVouchersAsync(int userId);
         Task RedeemVoucherAsync(int userId, int voucherId);
+        Task RefundVoucherAsync(int userId, int voucherId);
         Task<List<AdminVoucherDTO>> GetAllVouchersAsync();
         Task GrantVouchersAsync(int voucherId, List<int> userIds);
         Task<AdminVoucherDTO> CreateVoucherAsync(CreateOrUpdateVoucherDTO request);

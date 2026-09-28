@@ -177,6 +177,44 @@ namespace AutoWashPro.BLL.Services
             }
         }
 
+        public async Task RefundVoucherAsync(int userId, int voucherId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
+            try
+            {
+                var userVoucher = await _context.UserVouchers
+                    .Include(uv => uv.Voucher)
+                    .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VoucherId == voucherId);
+
+                if (userVoucher == null) throw new NotFoundException("Bạn không sở hữu voucher này.");
+
+                if (userVoucher.IsUsed || userVoucher.UsageCount > 0)
+                    throw new BadRequestException("Voucher đã được sử dụng, không thể hoàn điểm.");
+
+                if (userVoucher.Voucher.PointsRequired > 0)
+                {
+                    await _walletService.RefundSpendablePointsAsync(userId, userVoucher.Voucher.PointsRequired, $"Hoàn điểm voucher: {userVoucher.Voucher.Code}");
+                }
+
+                _context.UserVouchers.Remove(userVoucher);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                await _userNotificationService.CreateNotificationAsync(
+                    userId,
+                    "Hoàn điểm thành công",
+                    $"Hệ thống đã hoàn lại {userVoucher.Voucher.PointsRequired} điểm từ voucher {userVoucher.Voucher.Code}.",
+                    "Voucher",
+                    userVoucher.VoucherId.ToString()
+                );
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
         public async Task<List<AdminVoucherDTO>> GetAllVouchersAsync()
         {
             var vouchers = await _context.Vouchers.Include(v => v.RequiredTier).OrderByDescending(v => v.ExpiryDate).ToListAsync();
