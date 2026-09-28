@@ -341,10 +341,11 @@ namespace AutoWashPro.BLL.Services
             if (isCompletingNow && booking.UserId > 0)
             {
                  var userProfile = await _context.CustomerProfiles
+                        .Include(cp => cp.Tier)
                         .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
-                 if (userProfile != null && booking.FinalAmount > 0)
+                 if (userProfile?.Tier != null && booking.FinalAmount > 0)
                  {
-                        int pointsEarned = PointConstants.CalculateEarnedPoints(booking.FinalAmount);
+                        int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
                         if (pointsEarned > 0)
                         {
                             await _walletService.AwardCompletionPointsAsync(

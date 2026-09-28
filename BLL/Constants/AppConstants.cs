@@ -29,16 +29,6 @@ namespace AutoWashPro.BLL.Constants
         public const int VndPerEarnedPoint = 1000;
         public const string CompletionReasonPrefix = "Service completion";
         public const string RefundPointsReasonPrefix = "Refund points due to booking cancellation";
-
-        public static int CalculateEarnedPoints(decimal finalAmount)
-        {
-            if (finalAmount <= 0)
-            {
-                return 0;
-            }
-
-            return decimal.ToInt32(decimal.Floor(finalAmount / VndPerEarnedPoint));
-        }
     }
 
     public static class WalletConstants
