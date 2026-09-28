@@ -24,6 +24,13 @@ namespace API.Controllers.Staff
             return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         }
 
+        [HttpGet("lane-assignment")]
+        public async Task<IActionResult> GetLaneAssignment()
+        {
+            var assignment = await _staffService.GetBranchContextAsync(GetUserId());
+            return Ok(assignment);
+        }
+
         [HttpGet("tasks")]
         [HttpGet("/api/v1/staff/tasks/bookings")]
         public async Task<IActionResult> GetAssignedTasks([FromQuery] System.DateTime? date)

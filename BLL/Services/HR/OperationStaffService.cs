@@ -31,6 +31,29 @@ namespace AutoWashPro.BLL.Services
             _laneCoordinator = laneCoordinator;
             _photoService = photoService;
         }
+        public async Task<StaffLaneTaskDTO> GetBranchContextAsync(int staffUserId)
+        {
+            var employee = await _context.EmployeeProfiles
+                .AsNoTracking()
+                .Include(profile => profile.Branch)
+                .FirstOrDefaultAsync(profile => profile.EmployeeId == staffUserId);
+
+            if (employee?.BranchId == null || employee.Branch == null)
+            {
+                throw new UnauthorizedException(
+                    "Staff account has not been assigned to a branch.",
+                    "BRANCH_REQUIRED");
+            }
+
+            return new StaffLaneTaskDTO
+            {
+                LaneId = 0,
+                LaneName = "All Lanes",
+                BranchId = employee.BranchId.Value,
+                BranchName = employee.Branch.Name,
+                AssignedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date
+            };
+        }
         public async Task<Operations.GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null, bool allowOutsideScheduledTime = false)
         {
             var booking = await _context.Bookings
@@ -318,11 +341,10 @@ namespace AutoWashPro.BLL.Services
             if (isCompletingNow && booking.UserId > 0)
             {
                  var userProfile = await _context.CustomerProfiles
-                        .Include(cp => cp.Tier)
                         .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
-                 if (userProfile?.Tier != null && booking.FinalAmount > 0)
+                 if (userProfile != null && booking.FinalAmount > 0)
                  {
-                        int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
+                        int pointsEarned = PointConstants.CalculateEarnedPoints(booking.FinalAmount);
                         if (pointsEarned > 0)
                         {
                             await _walletService.AwardCompletionPointsAsync(

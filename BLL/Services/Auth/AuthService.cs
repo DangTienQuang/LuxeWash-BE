@@ -192,6 +192,7 @@ namespace AutoWashPro.BLL.Services
                 PhoneNumber = user.PhoneNumber,
                 FullName = GetFullName(user),
                 Role = user.Role,
+                BranchId = user.EmployeeProfile?.BranchId,
                 Token = token,
                 RefreshToken = refreshToken
             };
@@ -249,6 +250,7 @@ namespace AutoWashPro.BLL.Services
                 PhoneNumber = user.PhoneNumber,
                 FullName = user.CustomerProfile?.FullName,
                 Role = user.Role,
+                BranchId = user.EmployeeProfile?.BranchId,
                 Token = token,
                 RefreshToken = refreshToken
             };
@@ -288,6 +290,7 @@ namespace AutoWashPro.BLL.Services
                 PhoneNumber = user.PhoneNumber,
                 FullName = GetFullName(user),
                 Role = user.Role,
+                BranchId = user.EmployeeProfile?.BranchId,
                 Token = newAccessToken,
                 RefreshToken = newRefreshToken
             };

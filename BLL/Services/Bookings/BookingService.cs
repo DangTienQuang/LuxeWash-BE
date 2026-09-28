@@ -990,24 +990,49 @@ namespace AutoWashPro.BLL.Services
             var normalizedPlate = NormalizeLicensePlate(licensePlate);
             if (string.IsNullOrEmpty(normalizedPlate))
                 throw new AutoWashPro.BLL.Exceptions.BadRequestException("Invalid license plate.");
+
+            // LaneOccupancy is the physical source of truth for a vehicle that is
+            // currently inside a wash bay. Use its linked ids as a fallback in case
+            // a legacy booking/fleet record stored the plate in a different format.
+            var activeOccupancy = await _context.LaneOccupancies
+                .AsNoTracking()
+                .Where(occupancy => occupancy.LicensePlate == normalizedPlate)
+                .OrderByDescending(occupancy => occupancy.Id)
+                .Select(occupancy => new
+                {
+                    occupancy.BookingId,
+                    occupancy.FleetWashLogId
+                })
+                .FirstOrDefaultAsync();
+
+            var occupancyBookingId = activeOccupancy?.BookingId;
+            var occupancyFleetWashLogId = activeOccupancy?.FleetWashLogId;
             var activeBooking = await _context.Bookings.Include(b => b.AppliedVoucher)
                 .Include(b => b.BookingDetails).ThenInclude(bd => bd.Service)
                 .Include(b => b.ProcessingLane)
                 .Include(b => b.Vehicle)
                 .Where(b => (b.LicensePlate == normalizedPlate ||
-                             (b.Vehicle != null && b.Vehicle.LicensePlate == normalizedPlate))
+                             (b.Vehicle != null && b.Vehicle.LicensePlate == normalizedPlate) ||
+                             (occupancyBookingId.HasValue && b.BookingId == occupancyBookingId.Value))
                          && (b.Status == BookingStatuses.CheckedIn || b.Status == BookingStatuses.Processing))
                 .OrderByDescending(b => b.BookingId)
                 .FirstOrDefaultAsync();
             var activeFleetLog = await _context.FleetWashLogs
                 .Include(x => x.FleetVehicle)
                 .Include(x => x.Booking).ThenInclude(b => b!.BookingDetails).ThenInclude(bd => bd.Service)
-                .Where(x => x.FleetVehicle.LicensePlate == normalizedPlate
+                .Where(x => (x.FleetVehicle.LicensePlate == normalizedPlate ||
+                             (occupancyFleetWashLogId.HasValue && x.FleetWashLogId == occupancyFleetWashLogId.Value))
                          && (x.Status == BookingStatuses.CheckedIn || x.Status == BookingStatuses.Processing || x.Status == "Assigned"))
                 .OrderByDescending(x => x.FleetWashLogId)
                 .FirstOrDefaultAsync();
             if (activeBooking == null && activeFleetLog == null)
             {
+                _logger.LogWarning(
+                    "Camera checkout found no active session for plate {Plate}. Occupancy booking id: {BookingId}; fleet wash log id: {FleetWashLogId}.",
+                    normalizedPlate,
+                    occupancyBookingId,
+                    occupancyFleetWashLogId);
+
                 var recentCompletion = await GetRecentCameraCheckOutAsync(normalizedPlate);
                 if (recentCompletion != null)
                 {
@@ -1290,11 +1315,10 @@ namespace AutoWashPro.BLL.Services
                     if (booking.UserId > 0)
                     {
                         var userProfile = await _context.CustomerProfiles
-                            .Include(cp => cp.Tier)
                             .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
-                        if (userProfile?.Tier != null && booking.FinalAmount > 0)
+                        if (userProfile != null && booking.FinalAmount > 0)
                         {
-                            int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
+                            int pointsEarned = PointConstants.CalculateEarnedPoints(booking.FinalAmount);
                             if (pointsEarned > 0)
                             {
                                 await _walletService.AwardCompletionPointsAsync(
@@ -2917,11 +2941,10 @@ namespace AutoWashPro.BLL.Services
                     if (booking.UserId > 0)
                     {
                         var userProfile = await _context.CustomerProfiles
-                            .Include(cp => cp.Tier)
                             .FirstOrDefaultAsync(cp => cp.UserId == booking.UserId);
-                        if (userProfile?.Tier != null && booking.FinalAmount > 0)
+                        if (userProfile != null && booking.FinalAmount > 0)
                         {
-                            int pointsEarned = (int)((booking.FinalAmount / PointConstants.VndPerEarnedPoint) * (decimal)userProfile.Tier.PointMultiplier);
+                            int pointsEarned = PointConstants.CalculateEarnedPoints(booking.FinalAmount);
                             if (pointsEarned > 0)
                             {
                                 await _walletService.AwardCompletionPointsAsync(booking.UserId.Value, pointsEarned, booking.BookingId);
