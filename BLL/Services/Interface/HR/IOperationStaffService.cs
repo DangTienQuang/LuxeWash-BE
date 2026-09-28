@@ -7,6 +7,7 @@ namespace AutoWashPro.BLL.Services
 {
     public interface IOperationStaffService
     {
+        Task<StaffLaneTaskDTO> GetBranchContextAsync(int staffUserId);
         Task<List<StaffBookingDTO>> GetAssignedBookingsAsync(int staffUserId, System.DateTime? date = null);
         Task<bool> UpdateBookingStatusAsync(int staffUserId, int bookingId, string newStatus, Microsoft.AspNetCore.Http.IFormFile? checkOutImage = null);
         Task<GateCheckInResult> CheckInBookingAsync(int staffUserId, int bookingId, Microsoft.AspNetCore.Http.IFormFile? checkInImage = null, bool allowOutsideScheduledTime = false);

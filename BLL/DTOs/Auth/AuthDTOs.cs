@@ -51,6 +51,7 @@ namespace AutoWashPro.BLL.DTOs
         public string Token { get; set; } = null!;
         public string RefreshToken { get; set; } = null!;
         public string Role { get; set; } = null!;
+        public int? BranchId { get; set; }
     }
     public class RefreshTokenDTO
     {

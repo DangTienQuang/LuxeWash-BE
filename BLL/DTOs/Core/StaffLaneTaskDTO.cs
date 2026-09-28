@@ -5,6 +5,8 @@ namespace AutoWashPro.BLL.DTOs
     {
         public int LaneId { get; set; }
         public string LaneName { get; set; } = null!;
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = null!;
         public DateTime AssignedDate { get; set; }
     }
 }

@@ -50,6 +50,7 @@ namespace AutoWashPro.BLL.Services
                 Status = user.Status,   
                 FullName = fullName,
                 PhoneNumber = user.PhoneNumber,
+                BranchId = user.EmployeeProfile?.BranchId,
                 TierName = user.CustomerProfile?.Tier?.TierName,
                 TotalPoint = user.CustomerProfile?.TotalPoint ?? 0,
                 PromotionPoint = user.CustomerProfile?.PromotionPoint ?? 0,
