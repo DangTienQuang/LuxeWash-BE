@@ -203,32 +203,31 @@ namespace AutoWashPro.BLL.Services
                 int effectiveCapacity = cap.EffectiveCapacity;
                 int overbookedAmount = cap.BookedWeight - effectiveCapacity;
 
-                if (overbookedAmount > 0)
+                foreach (var b in slotBookings)
                 {
-                    foreach (var b in slotBookings)
+                    int weight = b.CapacityWeight > 0 ? b.CapacityWeight : 1;
+                    
+                    bool isOverbooked = false;
+                    if (overbookedAmount > 0)
                     {
-                        int weight = b.CapacityWeight > 0 ? b.CapacityWeight : 1;
-                        response.AffectedBookings.Add(new AffectedBookingSummaryDTO
-                        {
-                            BookingId = b.BookingId,
-                            LicensePlate = b.LicensePlate,
-                            ScheduledTime = b.ScheduledTime.ToString("yyyy-MM-dd HH:mm"),
-                            CapacityWeight = weight
-                        });
-                        
+                        isOverbooked = true;
                         overbookedAmount -= weight;
-                        if (overbookedAmount <= 0) break;
                     }
+
+                    response.AffectedBookings.Add(new AffectedBookingSummaryDTO
+                    {
+                        BookingId = b.BookingId,
+                        LicensePlate = b.LicensePlate,
+                        ScheduledTime = b.ScheduledTime.ToString("yyyy-MM-dd HH:mm"),
+                        CapacityWeight = weight,
+                        IsOverbooked = isOverbooked
+                    });
                 }
             }
             
             response.AffectedBookingsCount = response.AffectedBookings.Count;
 
             response.TotalCapacityLoss = totalCapacityLoss;
-
-            var affectedBookingIds = response.AffectedBookings.Select(b => b.BookingId).OrderBy(id => id).ToList();
-            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join(",", affectedBookingIds)));
-            response.ExpectedAffectedHash = Convert.ToBase64String(hashBytes);
 
             return response;
         }
@@ -320,80 +319,12 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
 
             var deadline = now.AddMinutes(30);
-            var slots = await _context.TimeSlots.Where(s => s.BranchId == request.BranchId).ToListAsync();
+            
+            var affectedBookingIds = request.SelectedBookingIds != null ? new HashSet<int>(request.SelectedBookingIds) : new HashSet<int>();
 
-            var simulatedIncident = new BranchIncident
-            {
-                BranchId = request.BranchId,
-                Type = request.Type,
-                Scope = request.Scope,
-                StartedAtVn = now,
-                EstimatedEndAtVn = request.EstimatedEndAtVn,
-                Status = "Active",
-                Version = 1,
-                IncidentLanes = request.LaneIds?.Select(id => new IncidentLane { LaneId = id }).ToList() ?? new List<IncidentLane>()
-            };
-
-            var affectedBookingIds = new HashSet<int>();
-
-            var bookingsBySlot = activeBookings.GroupBy(b => slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay)?.SlotId ?? 0);
-
-            foreach (var group in bookingsBySlot)
-            {
-                int slotId = group.Key;
-                if (slotId == 0) continue;
-
-                var slotBookings = group.OrderByDescending(b => b.BookingId).ToList(); // LIFO
-                var firstBooking = slotBookings.First();
-
-                if (request.Scope == "WholeBranch")
-                {
-                    foreach (var b in slotBookings)
-                    {
-                        affectedBookingIds.Add(b.BookingId);
-                    }
-                }
-                else
-                {
-                    var ctx = new BookingContextDTO
-                    {
-                        IsBusiness = firstBooking.BusinessProfileId.HasValue,
-                        IsVipEligible = false, 
-                        VehicleTypeId = firstBooking.Vehicle?.VehicleTypeId,
-                        ServiceIds = firstBooking.BookingDetails.Select(d => d.ServiceId).ToList(),
-                        CapacityWeight = 1
-                    };
-
-                    var cap = await _capacityService.GetEffectiveSlotCapacityAsync(request.BranchId, firstBooking.ScheduledTime.Date, slotId, ctx, now, simulatedIncident);
-                    
-                    int effectiveCapacity = cap.EffectiveCapacity;
-                    int overbookedAmount = cap.BookedWeight - effectiveCapacity;
-
-                    if (overbookedAmount > 0)
-                    {
-                        foreach (var b in slotBookings)
-                        {
-                            affectedBookingIds.Add(b.BookingId);
-                            int weight = b.CapacityWeight > 0 ? b.CapacityWeight : 1;
-                            overbookedAmount -= weight;
-                            if (overbookedAmount <= 0) break;
-                        }
-                    }
-                }
-            }
-
-            if (request.ExpectedAffectedCount.HasValue && affectedBookingIds.Count != request.ExpectedAffectedCount.Value)
-            {
-                throw new ConflictException($"Dữ liệu đã thay đổi (dự kiến {request.ExpectedAffectedCount.Value}, thực tế {affectedBookingIds.Count}), vui lòng tải lại trang hoặc Preview lại sự cố.");
-            }
-
-            var currentHashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join(",", affectedBookingIds.OrderBy(id => id))));
-            var currentHash = Convert.ToBase64String(currentHashBytes);
-
-            if (!string.IsNullOrEmpty(request.ExpectedAffectedHash) && currentHash != request.ExpectedAffectedHash)
-            {
-                throw new ConflictException("Dữ liệu đã thay đổi, vui lòng tải lại trang hoặc Preview lại sự cố.");
-            }
+            // Basic safety check: Only allow affecting bookings that actually overlap the timeframe for this branch
+            var validActiveBookingIds = activeBookings.Select(b => b.BookingId).ToHashSet();
+            affectedBookingIds.IntersectWith(validActiveBookingIds);
 
             foreach (var b in activeBookings)
             {
@@ -480,33 +411,16 @@ namespace AutoWashPro.BLL.Services
                 .ToListAsync();
 
             var deadline = now.AddMinutes(30);
-            var slots = await _context.TimeSlots.Where(s => s.BranchId == incident.BranchId).ToListAsync();
-            var bookingsBySlot = newBookings.GroupBy(b => slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay)?.SlotId ?? 0);
+            
+            var affectedBookingIds = request.SelectedBookingIds != null ? new HashSet<int>(request.SelectedBookingIds) : new HashSet<int>();
+            var validNewBookingIds = newBookings.Select(b => b.BookingId).ToHashSet();
+            affectedBookingIds.IntersectWith(validNewBookingIds);
 
-            foreach (var group in bookingsBySlot)
+            foreach (var b in newBookings)
             {
-                int slotId = group.Key;
-                if (slotId == 0) continue;
-
-                var slotBookings = group.OrderByDescending(b => b.BookingId).ToList(); // LIFO
-                
-                // Filter out bookings already affected
-                var unaffectedSlotBookings = new List<Booking>();
-                foreach (var b in slotBookings)
+                if (affectedBookingIds.Contains(b.BookingId))
                 {
                     if (!await _context.IncidentAffectedBookings.AnyAsync(c => c.BookingId == b.BookingId && c.IncidentId == incident.Id))
-                    {
-                        unaffectedSlotBookings.Add(b);
-                    }
-                }
-                
-                if (unaffectedSlotBookings.Count == 0) continue;
-                
-                var firstBooking = unaffectedSlotBookings.First();
-
-                if (incident.Scope == "WholeBranch")
-                {
-                    foreach (var b in unaffectedSlotBookings)
                     {
                         var affectedBooking = new IncidentAffectedBooking
                         {
@@ -529,53 +443,6 @@ namespace AutoWashPro.BLL.Services
                             NextRetryAt = now
                         };
                         _context.OutboxMessages.Add(msg);
-                    }
-                }
-                else
-                {
-                    var ctx = new BookingContextDTO
-                    {
-                        IsBusiness = firstBooking.BusinessProfileId.HasValue,
-                        IsVipEligible = false, 
-                        VehicleTypeId = firstBooking.Vehicle?.VehicleTypeId,
-                        ServiceIds = firstBooking.BookingDetails.Select(d => d.ServiceId).ToList(),
-                        CapacityWeight = 1
-                    };
-
-                    var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, firstBooking.ScheduledTime.Date, slotId, ctx, now, simulatedIncident);
-                    
-                    int effectiveCapacity = cap.EffectiveCapacity;
-                    int overbookedAmount = cap.BookedWeight - effectiveCapacity;
-
-                    if (overbookedAmount > 0)
-                    {
-                        foreach (var b in unaffectedSlotBookings)
-                        {
-                            var affectedBooking = new IncidentAffectedBooking
-                            {
-                                IncidentId = incident.Id,
-                                BookingId = b.BookingId,
-                                ActiveBookingId = b.BookingId,
-                                UserId = b.UserId,
-                                Status = "AwaitingCustomer",
-                                ResponseDeadlineAtVn = deadline,
-                                OriginalBranchId = incident.BranchId,
-                                OriginalScheduledTimeVn = b.ScheduledTime
-                            };
-                            _context.IncidentAffectedBookings.Add(affectedBooking);
-
-                            var msg = new OutboxMessage
-                            {
-                                Type = "INCIDENT_ACTION_REQUIRED",
-                                Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = b.BookingId, IncidentId = incident.Id }),
-                                CreatedAt = now,
-                                NextRetryAt = now
-                            };
-                            _context.OutboxMessages.Add(msg);
-                            int weight = b.CapacityWeight > 0 ? b.CapacityWeight : 1;
-                            overbookedAmount -= weight;
-                            if (overbookedAmount <= 0) break;
-                        }
                     }
                 }
             }

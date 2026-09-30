@@ -37,14 +37,14 @@ namespace AutoWashPro.BLL.DTOs
         public string LicensePlate { get; set; } = null!;
         public string ScheduledTime { get; set; } = null!;
         public int CapacityWeight { get; set; }
+        public bool IsOverbooked { get; set; }
     }
 
     public class CreateIncidentRequestDTO : PreviewIncidentRequestDTO
     {
         [Required]
         public string Reason { get; set; } = null!;
-        public int? ExpectedAffectedCount { get; set; }
-        public string? ExpectedAffectedHash { get; set; }
+        public List<int>? SelectedBookingIds { get; set; }
     }
 
     public class ExtendIncidentRequestDTO
@@ -52,6 +52,7 @@ namespace AutoWashPro.BLL.DTOs
         [Required]
         public DateTime NewEstimatedEndAtVn { get; set; }
         public string? Note { get; set; }
+        public List<int>? SelectedBookingIds { get; set; }
     }
 
     public class BranchIncidentDTO
