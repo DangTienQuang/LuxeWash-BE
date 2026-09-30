@@ -17,6 +17,8 @@ namespace BLL.DTOs.Business
         public DateTime? ProcessingStartTime { get; set; }
         public DateTime? CompletedTime { get; set; }
         public int? ActualDurationMinutes { get; set; }
+        public bool HasPendingIncident { get; set; }
+        public long? IncidentCaseId { get; set; }
     }
     public class BusinessVehicleStatusDTO
     {

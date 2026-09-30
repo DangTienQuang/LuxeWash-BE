@@ -403,6 +403,11 @@ namespace BLL.Services
                 throw new NotFoundException("Booking not found.");
             if (booking.Status != "Pending")
                 throw new BadRequestException("Can only reschedule bookings in pending status.");
+            if (await _context.IncidentAffectedBookings.AnyAsync(x =>
+                    x.BookingId == booking.BookingId && x.Status == "AwaitingCustomer"))
+                throw new ConflictException(
+                    "Booking is affected by an active incident. Please use the incident resolution flow.",
+                    "INCIDENT_DECISION_REQUIRED");
             if (booking.ScheduledTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddHours(24))
                 throw new BadRequestException(
                     "Cannot reschedule within 24 hours of the appointment time. " +
@@ -569,7 +574,14 @@ namespace BLL.Services
                     BranchName = x.Branch != null ? x.Branch.Name : string.Empty,
                     ProcessingStartTime = x.ProcessingStartTime,
                     CompletedTime = x.CompletedTime,
-                    ActualDurationMinutes = x.ActualDurationMinutes
+                    ActualDurationMinutes = x.ActualDurationMinutes,
+                    HasPendingIncident = _context.IncidentAffectedBookings.Any(c =>
+                        c.BookingId == x.BookingId && c.Status == "AwaitingCustomer"),
+                    IncidentCaseId = _context.IncidentAffectedBookings
+                        .Where(c => c.BookingId == x.BookingId && c.Status == "AwaitingCustomer")
+                        .OrderByDescending(c => c.Id)
+                        .Select(c => (long?)c.Id)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
         }
@@ -582,6 +594,10 @@ namespace BLL.Services
                 throw new NotFoundException("Business profile not found.");
             }
             var booking = await _context.Bookings
+                .Include(x => x.Branch)
+                .Include(x => x.ProcessingLane)
+                .Include(x => x.FleetVehicle)
+                    .ThenInclude(x => x!.VehicleType)
                 .Include(x => x.BookingDetails)
                     .ThenInclude(x => x.Service)
                 .FirstOrDefaultAsync(x =>
@@ -595,13 +611,28 @@ namespace BLL.Services
             {
                 BookingId = booking.BookingId,
                 LicensePlate = booking.LicensePlate,
+                BranchId = booking.BranchId,
+                BranchName = booking.Branch?.Name ?? string.Empty,
+                LaneId = booking.ProcessingLaneId,
+                LaneName = booking.ProcessingLane?.Name,
+                VehicleTypeId = booking.FleetVehicle?.VehicleTypeId ?? booking.ActualVehicleTypeId,
+                VehicleType = booking.FleetVehicle?.VehicleType?.Name,
                 ScheduledTime = booking.ScheduledTime,
                 Status = booking.Status,
                 OriginalPrice = booking.OriginalPrice,
                 FinalAmount = booking.FinalAmount,
                 Services = booking.BookingDetails
                     .Select(x => x.Service.ServiceName)
-                    .ToList()
+                    .ToList(),
+                IsBusinessLane = string.Equals(booking.BookingType, "Fleet", StringComparison.OrdinalIgnoreCase)
+                    || booking.ProcessingLane?.IsBusinessLane == true,
+                HasPendingIncident = await _context.IncidentAffectedBookings.AnyAsync(c =>
+                    c.BookingId == booking.BookingId && c.Status == "AwaitingCustomer"),
+                IncidentCaseId = await _context.IncidentAffectedBookings
+                    .Where(c => c.BookingId == booking.BookingId && c.Status == "AwaitingCustomer")
+                    .OrderByDescending(c => c.Id)
+                    .Select(c => (long?)c.Id)
+                    .FirstOrDefaultAsync()
             };
         }
         public async Task CancelBookingAsync(int businessUserId, int bookingId)
@@ -623,6 +654,13 @@ namespace BLL.Services
             if (booking.Status != "Pending")
             {
                 throw new BadRequestException("Can only cancel bookings in pending status.");
+            }
+            if (await _context.IncidentAffectedBookings.AnyAsync(x =>
+                    x.BookingId == booking.BookingId && x.Status == "AwaitingCustomer"))
+            {
+                throw new ConflictException(
+                    "Booking is affected by an active incident. Please use the incident resolution flow.",
+                    "INCIDENT_DECISION_REQUIRED");
             }
             var slot = await _context.TimeSlots
                 .FirstOrDefaultAsync(x =>

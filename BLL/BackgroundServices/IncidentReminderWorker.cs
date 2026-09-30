@@ -72,7 +72,7 @@ namespace AutoWashPro.BLL.BackgroundServices
 
                     context.OutboxMessages.Add(new AutoWashPro.DAL.Entities.OutboxMessage
                     {
-                        Type = "INCIDENT_ACTION_REQUIRED",
+                        Type = "INCIDENT_SYSTEM_CANCELLED",
                         Payload = System.Text.Json.JsonSerializer.Serialize(new { BookingId = caseRecord.BookingId, IncidentId = caseRecord.IncidentId, Note = "Cancelled due to timeout" }),
                         CreatedAt = now,
                         NextRetryAt = now

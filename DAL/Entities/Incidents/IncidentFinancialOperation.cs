@@ -4,6 +4,15 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AutoWashPro.DAL.Entities
 {
+    public static class IncidentFinancialOperationKinds
+    {
+        public const string MoneyRefund = "MoneyRefund";
+        public const string PointsRefund = "PointsRefund";
+        public const string RestoreOriginalVoucher = "RestoreOriginalVoucher";
+        public const string CompensationVoucher = "CompensationVoucher";
+        public const string BusinessCreditRelease = "BusinessCreditRelease";
+    }
+
     public class IncidentFinancialOperation
     {
         [Key]
@@ -16,7 +25,7 @@ namespace AutoWashPro.DAL.Entities
 
         [Required]
         [MaxLength(50)]
-        public string Kind { get; set; } = null!; // "MoneyRefund", "PointsRefund", "RestoreOriginalVoucher", "CompensationVoucher"
+        public string Kind { get; set; } = null!;
 
         public decimal? Amount { get; set; }
 

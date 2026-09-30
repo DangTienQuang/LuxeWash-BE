@@ -112,28 +112,61 @@ namespace AutoWashPro.BLL.Services
         {
             var incident = await GetIncidentAsync(managerUserId, incidentId);
 
-            var impacted = await _context.IncidentAffectedBookings
+            var impactedEntities = await _context.IncidentAffectedBookings
                 .Include(b => b.Booking)
-                .ThenInclude(b => b.Vehicle)
                 .Where(b => b.IncidentId == incidentId)
-                .Select(b => new IncidentAffectedBookingDTO
-                {
-                    AffectedBookingId = b.Id,
-                    BookingId = b.BookingId,
-                    // Booking.LicensePlate is the canonical snapshot for both personal and
-                    // business bookings. Fleet bookings do not have Booking.Vehicle, so
-                    // reading the personal-vehicle navigation hides their license plate.
-                    LicensePlate = b.Booking.LicensePlate,
-                    ScheduledTime = b.Booking.ScheduledTime.ToString("yyyy-MM-dd HH:mm"),
-                    CustomerAction = b.Status, // AwaitingCustomer, Kept, CancelledBySystem, etc.
-                    SystemResolution = b.Decision ?? "",
-                    CustomerDeadlineVn = b.ResponseDeadlineAtVn,
-                    AlternativeBranchId = b.TargetBranchId.ToString(),
-                    AlternativeTimeSlot = b.TargetSlotId.ToString()
-                })
+                .AsNoTracking()
                 .ToListAsync();
 
-            return impacted;
+            var targetBranchIds = impactedEntities
+                .Where(item => item.TargetBranchId.HasValue)
+                .Select(item => item.TargetBranchId!.Value)
+                .Distinct()
+                .ToList();
+            var targetSlotIds = impactedEntities
+                .Where(item => item.TargetSlotId.HasValue)
+                .Select(item => item.TargetSlotId!.Value)
+                .Distinct()
+                .ToList();
+
+            var branchNames = await _context.Branches
+                .Where(branch => targetBranchIds.Contains(branch.BranchId))
+                .ToDictionaryAsync(branch => branch.BranchId, branch => branch.Name);
+            var slots = await _context.TimeSlots
+                .Where(slot => targetSlotIds.Contains(slot.SlotId))
+                .ToDictionaryAsync(slot => slot.SlotId);
+
+            return impactedEntities.Select(item =>
+            {
+                string? targetBranchName = null;
+                TimeSlot? targetSlot = null;
+                var hasTargetBranch = item.TargetBranchId.HasValue &&
+                    branchNames.TryGetValue(item.TargetBranchId.Value, out targetBranchName);
+                var hasTargetSlot = item.TargetSlotId.HasValue &&
+                    slots.TryGetValue(item.TargetSlotId.Value, out targetSlot);
+
+                return new IncidentAffectedBookingDTO
+                {
+                    AffectedBookingId = item.Id,
+                    BookingId = item.BookingId,
+                    // Booking.LicensePlate is the canonical snapshot for both personal and
+                    // business bookings. Fleet bookings do not have Booking.Vehicle.
+                    LicensePlate = item.Booking.LicensePlate,
+                    BookingType = item.Booking.BusinessProfileId.HasValue ? "Business" : "Personal",
+                    // Keep the impact table anchored to the appointment that was disrupted.
+                    // Booking.ScheduledTime changes after a successful transfer.
+                    ScheduledTime = item.OriginalScheduledTimeVn.ToString("yyyy-MM-dd HH:mm"),
+                    CustomerAction = item.Status,
+                    SystemResolution = item.Decision ?? "",
+                    CustomerDeadlineVn = item.ResponseDeadlineAtVn,
+                    AlternativeBranchId = item.TargetBranchId?.ToString(),
+                    AlternativeBranchName = hasTargetBranch ? targetBranchName : null,
+                    AlternativeTimeSlot = item.TargetSlotId?.ToString(),
+                    AlternativeTimeSlotLabel = hasTargetSlot
+                        ? $"{targetSlot!.StartTime:hh\\:mm} - {targetSlot.EndTime:hh\\:mm}"
+                        : null
+                };
+            }).ToList();
         }
 
         public async Task<PreviewIncidentResponseDTO> PreviewIncidentImpactAsync(int managerUserId, PreviewIncidentRequestDTO request)
@@ -142,13 +175,14 @@ namespace AutoWashPro.BLL.Services
 
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             if (request.EstimatedEndAtVn <= now)
-                throw new BadRequestException("Estimated end time must be in the future.");
+                throw new BadRequestException("EstimatedEndAtVn must be a future Vietnam local wall-clock time (UTC+7, without Z).");
 
             if (request.Scope == "SelectedLanes" && (request.LaneIds == null || request.LaneIds.Count == 0))
                 throw new BadRequestException("LaneIds must be provided when scope is SelectedLanes.");
 
             var activeBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
+                .Include(b => b.FleetVehicle)
                 .Include(b => b.BookingDetails)
                 .Where(b => b.BranchId == request.BranchId && b.UserId != null && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime < request.EstimatedEndAtVn && b.ScheduledTime.AddMinutes(60) > now) // Approximation
@@ -212,7 +246,11 @@ namespace AutoWashPro.BLL.Services
             var bookingsBySlot = activeBookings.GroupBy(b => new
             {
                 Date = b.ScheduledTime.Date,
-                SlotId = slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay)?.SlotId ?? 0
+                SlotId = slots.FirstOrDefault(s =>
+                    s.StartTime <= b.ScheduledTime.TimeOfDay &&
+                    (s.EndTime > s.StartTime
+                        ? s.EndTime > b.ScheduledTime.TimeOfDay
+                        : b.ScheduledTime.TimeOfDay >= s.StartTime || b.ScheduledTime.TimeOfDay < s.EndTime))?.SlotId ?? 0
             });
 
             foreach (var group in bookingsBySlot)
@@ -250,6 +288,7 @@ namespace AutoWashPro.BLL.Services
                     {
                         BookingId = b.BookingId,
                         LicensePlate = b.LicensePlate,
+                        BookingType = b.BusinessProfileId.HasValue ? "Business" : "Personal",
                         ScheduledTime = b.ScheduledTime.ToString("yyyy-MM-dd HH:mm"),
                         CapacityWeight = weight,
                         IsOverbooked = isOverbooked
@@ -270,7 +309,7 @@ namespace AutoWashPro.BLL.Services
 
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
             if (request.EstimatedEndAtVn <= now)
-                throw new BadRequestException("Estimated end time must be in the future.");
+                throw new BadRequestException("EstimatedEndAtVn must be a future Vietnam local wall-clock time (UTC+7, without Z).");
 
             if (request.Scope == "SelectedLanes" && (request.LaneIds == null || request.LaneIds.Count == 0))
                 throw new BadRequestException("LaneIds must be provided when scope is SelectedLanes.");
@@ -345,6 +384,7 @@ namespace AutoWashPro.BLL.Services
 
             var activeBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
+                .Include(b => b.FleetVehicle)
                 .Include(b => b.BookingDetails)
                 .Where(b => b.BranchId == request.BranchId && b.UserId != null && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime < request.EstimatedEndAtVn && b.ScheduledTime.AddMinutes(60) > now)
@@ -401,8 +441,12 @@ namespace AutoWashPro.BLL.Services
             if (employee == null || !employee.BranchId.HasValue) throw new UnauthorizedException("User is not authorized for any branch.");
             int branchId = employee.BranchId.Value;
 
-            var incident = await _context.BranchIncidents.FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active" && i.BranchId == branchId);
+            var incident = await _context.BranchIncidents
+                .Include(i => i.IncidentLanes)
+                .FirstOrDefaultAsync(i => i.Id == incidentId && i.Status == "Active" && i.BranchId == branchId);
             if (incident == null) throw new NotFoundException("Active incident not found in your branch.");
+            if (request.NewEstimatedEndAtVn <= now || request.NewEstimatedEndAtVn <= incident.EstimatedEndAtVn)
+                throw new BadRequestException("NewEstimatedEndAtVn must be later than the current ETA and use Vietnam local wall-clock time (UTC+7, without Z).");
 
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
@@ -420,16 +464,6 @@ namespace AutoWashPro.BLL.Services
             var oldEnd = incident.EstimatedEndAtVn;
 
 
-            var simulatedIncident = new BranchIncident
-            {
-                BranchId = incident.BranchId,
-                Type = incident.Type,
-                Scope = incident.Scope,
-                StartedAtVn = incident.StartedAtVn,
-                EstimatedEndAtVn = request.NewEstimatedEndAtVn,
-                IncidentLanes = incident.IncidentLanes
-            };
-
             incident.EstimatedEndAtVn = request.NewEstimatedEndAtVn;
             incident.UpdatedAtVn = now;
             incident.Version++;
@@ -437,13 +471,13 @@ namespace AutoWashPro.BLL.Services
 
             var newBookings = await _context.Bookings
                 .Include(b => b.Vehicle)
+                .Include(b => b.FleetVehicle)
                 .Include(b => b.BookingDetails)
                 .Where(b => b.BranchId == incident.BranchId && b.UserId != null && (b.Status == "Pending" || b.Status == "Confirmed"))
                 .Where(b => b.ScheduledTime >= oldEnd && b.ScheduledTime < request.NewEstimatedEndAtVn)
                 .ToListAsync();
 
             var deadline = now.AddMinutes(30);
-            
             var affectedBookingIds = request.SelectedBookingIds != null ? new HashSet<int>(request.SelectedBookingIds) : new HashSet<int>();
             var validNewBookingIds = newBookings.Select(b => b.BookingId).ToHashSet();
             affectedBookingIds.IntersectWith(validNewBookingIds);
@@ -517,6 +551,8 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.Booking)
                 .ThenInclude(b => b.Vehicle)
                 .Include(b => b.Booking)
+                .ThenInclude(b => b.FleetVehicle)
+                .Include(b => b.Booking)
                 .ThenInclude(b => b.BookingDetails)
                 .Include(b => b.Booking)
                 .ThenInclude(b => b.User)
@@ -528,7 +564,7 @@ namespace AutoWashPro.BLL.Services
             var slots = await _context.TimeSlots.Where(s => s.BranchId == incident.BranchId).ToListAsync();
 
             var casesToCancel = new List<AutoWashPro.DAL.Entities.IncidentAffectedBooking>();
-            var slotBookedWeights = new Dictionary<int, int>();
+            var slotBookedWeights = new Dictionary<(int SlotId, DateTime Date, bool IsBusiness), int>();
 
             foreach (var c in pendingCases)
             {
@@ -537,26 +573,32 @@ namespace AutoWashPro.BLL.Services
                 {
                     IsBusiness = b.BusinessProfileId.HasValue,
                     IsVipEligible = CustomerEligibilityHelper.IsVipEligible(b.User?.CustomerProfile),
-                    VehicleTypeId = b.Vehicle?.VehicleTypeId,
+                    VehicleTypeId = b.ActualVehicleTypeId ??
+                        b.FleetVehicle?.VehicleTypeId ??
+                        b.Vehicle?.VehicleTypeId,
                     ServiceIds = b.BookingDetails.Select(d => d.ServiceId).ToList(),
                     CapacityWeight = b.CapacityWeight > 0 ? b.CapacityWeight : 1
                 };
                 
-                var slot = slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay);
+                var slot = slots.FirstOrDefault(s =>
+                    s.StartTime <= b.ScheduledTime.TimeOfDay &&
+                    s.EndTime > b.ScheduledTime.TimeOfDay);
                 int slotId = slot?.SlotId ?? 0;
+                var capacityKey = (slotId, b.ScheduledTime.Date, b.BusinessProfileId.HasValue);
                 
                 var cap = await _capacityService.GetEffectiveSlotCapacityAsync(incident.BranchId, b.ScheduledTime.Date, slotId, ctx, now, ignoreIncidentId: incident.Id);
                 
-                if (!slotBookedWeights.ContainsKey(slotId))
+                if (!slotBookedWeights.ContainsKey(capacityKey))
                 {
-                    slotBookedWeights[slotId] = cap.BookedWeight;
+                    slotBookedWeights[capacityKey] = cap.BookedWeight;
                 }
-                
-                if (cap.EffectiveCapacity >= slotBookedWeights[slotId])
+
+                if (cap.EffectiveCapacity >= slotBookedWeights[capacityKey])
                 {
                     c.Status = "Kept";
                     c.Decision = "Keep";
                     c.DecidedAtVn = now;
+                    c.ActiveBookingId = null;
                     
                     _context.OutboxMessages.Add(new OutboxMessage
                     {
@@ -569,7 +611,7 @@ namespace AutoWashPro.BLL.Services
                 else
                 {
                     casesToCancel.Add(c);
-                    slotBookedWeights[slotId] = Math.Max(0, slotBookedWeights[slotId] - ctx.CapacityWeight);
+                    slotBookedWeights[capacityKey] = Math.Max(0, slotBookedWeights[capacityKey] - ctx.CapacityWeight);
 
                     _context.OutboxMessages.Add(new OutboxMessage
                     {

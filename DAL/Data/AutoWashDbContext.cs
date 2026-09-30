@@ -540,6 +540,9 @@ namespace AutoWashPro.DAL.Data
             modelBuilder.Entity<IncidentAffectedBooking>()
                 .HasIndex(b => new { b.UserId, b.Status });
             modelBuilder.Entity<IncidentAffectedBooking>()
+                .HasIndex(b => b.DecisionIdempotencyKey)
+                .IsUnique();
+            modelBuilder.Entity<IncidentAffectedBooking>()
                 .HasOne(b => b.Incident)
                 .WithMany(i => i.AffectedBookings)
                 .HasForeignKey(b => b.IncidentId)

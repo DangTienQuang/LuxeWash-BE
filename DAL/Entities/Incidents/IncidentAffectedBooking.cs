@@ -46,6 +46,9 @@ namespace AutoWashPro.DAL.Entities
 
         public int? CompensationUserVoucherId { get; set; }
 
+        [MaxLength(100)]
+        public string? DecisionIdempotencyKey { get; set; }
+
         [ConcurrencyCheck]
         public int Version { get; set; } = 1;
     }

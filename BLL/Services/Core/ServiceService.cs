@@ -52,9 +52,7 @@ namespace AutoWashPro.BLL.Services
         }
         public async Task<ServiceDTO> CreateServiceAsync(CreateOrUpdateServiceDTO request)
         {
-            var vehicleTypeIds = request.Prices.Select(p => p.VehicleTypeId).Distinct().ToList();
-            var existingTypesCount = await _context.VehicleTypes.CountAsync(vt => vehicleTypeIds.Contains(vt.Id));
-            if (existingTypesCount != vehicleTypeIds.Count) throw new Exception("One or more vehicle types are invalid.");
+            await ValidatePricesAsync(request);
             var service = new Service
             {
                 ServiceName = request.ServiceName,
@@ -79,9 +77,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(s => s.ServicePrices)
                 .FirstOrDefaultAsync(s => s.ServiceId == id);
             if (service == null) throw new Exception("Service not found.");
-            var vehicleTypeIds = request.Prices.Select(p => p.VehicleTypeId).Distinct().ToList();
-            var existingTypesCount = await _context.VehicleTypes.CountAsync(vt => vehicleTypeIds.Contains(vt.Id));
-            if (existingTypesCount != vehicleTypeIds.Count) throw new Exception("One or more vehicle types are invalid.");
+            await ValidatePricesAsync(request);
             service.ServiceName = request.ServiceName;
             service.Description = request.Description;
             _context.ServicePrices.RemoveRange(service.ServicePrices);
@@ -95,6 +91,25 @@ namespace AutoWashPro.BLL.Services
             }).ToList();
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        private async Task ValidatePricesAsync(CreateOrUpdateServiceDTO request)
+        {
+            var duplicatePrice = request.Prices
+                .GroupBy(p => new { p.BranchId, p.VehicleTypeId })
+                .Any(group => group.Count() > 1);
+            if (duplicatePrice)
+                throw new Exception("Each vehicle type can only have one price per branch.");
+
+            var vehicleTypeIds = request.Prices.Select(p => p.VehicleTypeId).Distinct().ToList();
+            var existingTypesCount = await _context.VehicleTypes.CountAsync(vt => vehicleTypeIds.Contains(vt.Id));
+            if (existingTypesCount != vehicleTypeIds.Count)
+                throw new Exception("One or more vehicle types are invalid.");
+
+            var branchIds = request.Prices.Select(p => p.BranchId).Distinct().ToList();
+            var existingBranchesCount = await _context.Branches.CountAsync(branch => branchIds.Contains(branch.BranchId));
+            if (existingBranchesCount != branchIds.Count)
+                throw new Exception("One or more branches are invalid.");
         }
         public async Task<bool> DeleteServiceAsync(int id)
         {

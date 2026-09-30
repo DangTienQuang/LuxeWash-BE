@@ -14,9 +14,13 @@ namespace BLL.Services
     public class LaneSchedulerService : ILaneSchedulerService
     {
         private readonly AutoWashDbContext _context;
-        public LaneSchedulerService(AutoWashDbContext context)
+        private readonly AutoWashPro.BLL.Services.Interface.IIncidentCapacityService _incidentCapacityService;
+        public LaneSchedulerService(
+            AutoWashDbContext context,
+            AutoWashPro.BLL.Services.Interface.IIncidentCapacityService incidentCapacityService)
         {
             _context = context;
+            _incidentCapacityService = incidentCapacityService;
         }
         public async Task<Dictionary<int, DateTime>> GetLaneProjectedFreeTimesAsync(int branchId, DateTime slotStart, bool isBusinessLane = false)
         {
@@ -102,6 +106,98 @@ namespace BLL.Services
             public DateTime EndWithBuffer { get; init; }
         }
 
+        private sealed class ScheduleDaySnapshot
+        {
+            public List<AutoWashPro.DAL.Entities.TimeSlot> Slots { get; init; } = new();
+            public List<AutoWashPro.DAL.Entities.Lane> Lanes { get; init; } = new();
+            public Dictionary<int, DateTime> ProjectedFreeTimes { get; init; } = new();
+            public List<AutoWashPro.DAL.Entities.Booking> ExistingBookings { get; init; } = new();
+            public Dictionary<int, List<AutoWashPro.DAL.Entities.ServicePrice>> ExistingPricesByVehicleType { get; init; } = new();
+            public Dictionary<int, int> BookedWeights { get; init; } = new();
+            public bool HasActiveIncident { get; init; }
+        }
+
+        // LaneSchedulerService is scoped to one HTTP request. Availability and
+        // incident-option endpoints evaluate many starting slots in that request;
+        // cache the shared branch/day data so those evaluations do not repeat the
+        // same database queries for every slot.
+        private readonly Dictionary<(int BranchId, DateTime Date), Task<ScheduleDaySnapshot>> _daySnapshots = new();
+
+        private Task<ScheduleDaySnapshot> GetDaySnapshotAsync(int branchId, DateTime targetDate)
+        {
+            var key = (branchId, targetDate.Date);
+            if (!_daySnapshots.TryGetValue(key, out var snapshotTask))
+            {
+                snapshotTask = LoadDaySnapshotAsync(branchId, targetDate.Date);
+                _daySnapshots[key] = snapshotTask;
+            }
+
+            return snapshotTask;
+        }
+
+        private async Task<ScheduleDaySnapshot> LoadDaySnapshotAsync(int branchId, DateTime dayStart)
+        {
+            var dayEnd = dayStart.AddDays(1);
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            var slots = await _context.TimeSlots
+                .Where(x => x.BranchId == branchId)
+                .OrderBy(x => x.StartTime)
+                .ToListAsync();
+            var lanes = await _context.Lanes
+                .Where(x => x.BranchId == branchId && x.IsActive)
+                .OrderBy(x => x.IsBusinessLane ? 0 : 1)
+                .ThenBy(x => x.LaneId)
+                .ToListAsync();
+            var projectedFreeTimes = await GetLaneProjectedFreeTimesAsync(
+                branchId,
+                dayStart,
+                isBusinessLane: true);
+            var existingBookings = await _context.Bookings
+                .Include(x => x.BookingDetails)
+                .Include(x => x.FleetVehicle)
+                .Include(x => x.Vehicle)
+                .Where(x =>
+                    x.BranchId == branchId &&
+                    (x.BookingType == "Business" || x.BookingType == "Fleet") &&
+                    (x.Status == "Pending" || x.Status == "Confirmed") &&
+                    x.ScheduledTime >= dayStart &&
+                    x.ScheduledTime < dayEnd)
+                .OrderBy(x => x.ScheduledTime)
+                .ThenBy(x => x.BookingId)
+                .ToListAsync();
+            var vehicleTypeIds = existingBookings
+                .Where(b => b.BookingDetails.Count > 0)
+                .Select(b => b.FleetVehicle?.VehicleTypeId ?? b.Vehicle?.VehicleTypeId)
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+            var pricesByVehicleType = (await _context.ServicePrices
+                .Where(x => x.BranchId == branchId && vehicleTypeIds.Contains(x.VehicleTypeId))
+                .ToListAsync())
+                .GroupBy(x => x.VehicleTypeId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            var bookedWeights = await _context.DailySlotCapacities
+                .Where(x => x.BranchId == branchId && x.Date == dayStart)
+                .ToDictionaryAsync(x => x.SlotId, x => x.BookedWeight);
+            var hasActiveIncident = await _context.BranchIncidents.AnyAsync(i =>
+                i.BranchId == branchId &&
+                i.Status == "Active" &&
+                i.StartedAtVn < dayEnd &&
+                (i.EstimatedEndAtVn > dayStart || i.EstimatedEndAtVn <= now));
+
+            return new ScheduleDaySnapshot
+            {
+                Slots = slots,
+                Lanes = lanes,
+                ProjectedFreeTimes = projectedFreeTimes,
+                ExistingBookings = existingBookings,
+                ExistingPricesByVehicleType = pricesByVehicleType,
+                BookedWeights = bookedWeights,
+                HasActiveIncident = hasActiveIncident
+            };
+        }
+
         private static DateTime? FindEarliestStart(
             DateTime windowStart,
             DateTime windowEnd,
@@ -134,66 +230,31 @@ namespace BLL.Services
             if (!vehicles.Any())
                 return LaneScheduleResult.Fail("Vehicle list cannot be empty.");
 
-            var allSlots = await _context.TimeSlots
-                .Where(x => x.BranchId == branchId)
-                .OrderBy(x => x.StartTime)
-                .ToListAsync();
+            var dayStart = targetDate.Date;
+            var dayEnd = dayStart.AddDays(1);
+            var snapshot = await GetDaySnapshotAsync(branchId, dayStart);
+            var allSlots = snapshot.Slots;
             var startingIndex = allSlots.FindIndex(x => x.SlotId == startingSlotId);
             if (startingIndex < 0)
                 return LaneScheduleResult.Fail("Time slot not found.");
             var candidateSlots = allSlots.Skip(startingIndex).ToList();
 
-            var lanes = await _context.Lanes
-                .Where(x => x.BranchId == branchId && x.IsActive)
-                .OrderBy(x => x.IsBusinessLane ? 0 : 1)
-                .ThenBy(x => x.LaneId)
-                .ToListAsync();
+            var lanes = snapshot.Lanes;
             if (!lanes.Any())
                 return LaneScheduleResult.Fail("No available lane in this branch.");
 
-            var dayStart = targetDate.Date;
-            var dayEnd = dayStart.AddDays(1);
-            var firstSlotStart = dayStart.Add(candidateSlots[0].StartTime);
-            var projectedFreeTimes = await GetLaneProjectedFreeTimesAsync(
-                branchId, firstSlotStart, isBusinessLane: true);
+            var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
+            var incidentIsActive = snapshot.HasActiveIncident;
             var minimumLaneStart = lanes.ToDictionary(
                 lane => lane.LaneId,
-                lane => projectedFreeTimes.TryGetValue(lane.LaneId, out var freeAt)
+                lane => snapshot.ProjectedFreeTimes.TryGetValue(lane.LaneId, out var freeAt)
                     ? freeAt
-                    : firstSlotStart);
+                    : dayStart);
             var reservations = lanes.ToDictionary(
                 lane => lane.LaneId,
                 _ => new List<LaneReservation>());
 
-            var existingBookings = await _context.Bookings
-                .Include(x => x.BookingDetails)
-                .Include(x => x.FleetVehicle)
-                .Include(x => x.Vehicle)
-                .Where(x =>
-                    x.BranchId == branchId &&
-                    (x.BookingType == "Business" || x.BookingType == "Fleet") &&
-                    x.BookingId != excludedBookingId &&
-                    (x.Status == "Pending" || x.Status == "Confirmed") &&
-                    x.ScheduledTime >= dayStart &&
-                    x.ScheduledTime < dayEnd)
-                .OrderBy(x => x.ScheduledTime)
-                .ThenBy(x => x.BookingId)
-                .ToListAsync();
-
-            var existingBookingVehicleTypeIds = existingBookings
-                .Where(b => b.BookingDetails.Count > 0)
-                .Select(b => b.FleetVehicle?.VehicleTypeId ?? b.Vehicle?.VehicleTypeId)
-                .Where(id => id.HasValue)
-                .Select(id => id!.Value)
-                .Distinct()
-                .ToList();
-            var existingBookingPricesByVehicleType = (await _context.ServicePrices
-                .Where(x => x.BranchId == branchId && existingBookingVehicleTypeIds.Contains(x.VehicleTypeId))
-                .ToListAsync())
-                .GroupBy(x => x.VehicleTypeId)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            foreach (var booking in existingBookings)
+            foreach (var booking in snapshot.ExistingBookings.Where(x => x.BookingId != excludedBookingId))
             {
                 if (booking.BookingDetails.Count == 0)
                     continue;
@@ -202,7 +263,7 @@ namespace BLL.Services
                     continue;
 
                 var serviceIds = booking.BookingDetails.Select(x => x.ServiceId).ToList();
-                var prices = existingBookingPricesByVehicleType.TryGetValue(vehicleTypeId.Value, out var priceList)
+                var prices = snapshot.ExistingPricesByVehicleType.TryGetValue(vehicleTypeId.Value, out var priceList)
                     ? priceList.Where(x => serviceIds.Contains(x.ServiceId)).ToList()
                     : new List<AutoWashPro.DAL.Entities.ServicePrice>();
                 var duration = WashTimeEstimator.EstimateMinutes(prices);
@@ -231,44 +292,90 @@ namespace BLL.Services
                 });
             }
 
-            var bookedWeights = await _context.DailySlotCapacities
-                .Where(x => x.BranchId == branchId && x.Date == dayStart)
-                .ToDictionaryAsync(x => x.SlotId, x => x.BookedWeight);
+            var bookedWeights = new Dictionary<int, int>(snapshot.BookedWeights);
+            var excludedWeightsBySlot = new Dictionary<int, int>();
             if (excludedBookingId.HasValue)
             {
-                var excludedBooking = await _context.Bookings
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.BookingId == excludedBookingId.Value);
-                if (excludedBooking != null && excludedBooking.ScheduledTime.Date == dayStart)
+                var excludedBooking = snapshot.ExistingBookings
+                    .FirstOrDefault(x => x.BookingId == excludedBookingId.Value);
+                if (excludedBooking != null &&
+                    excludedBooking.BranchId == branchId &&
+                    excludedBooking.ScheduledTime.Date == dayStart)
                 {
                     var excludedSlot = allSlots.FirstOrDefault(x =>
                         x.StartTime <= excludedBooking.ScheduledTime.TimeOfDay &&
                         x.EndTime > excludedBooking.ScheduledTime.TimeOfDay);
                     if (excludedSlot != null && bookedWeights.ContainsKey(excludedSlot.SlotId))
                     {
+                        var excludedCapacityWeight = excludedBooking.CapacityWeight > 0
+                            ? excludedBooking.CapacityWeight
+                            : 1;
+                        excludedWeightsBySlot[excludedSlot.SlotId] = excludedCapacityWeight;
                         bookedWeights[excludedSlot.SlotId] = Math.Max(
                             0,
-                            bookedWeights[excludedSlot.SlotId] - excludedBooking.CapacityWeight);
+                            bookedWeights[excludedSlot.SlotId] - excludedCapacityWeight);
                     }
                 }
             }
 
             var assignments = new List<VehicleAssignment>();
+            var newlyAssignedWeights = new Dictionary<int, int>();
+            var incidentCapacities = new Dictionary<int, AutoWashPro.BLL.Services.Interface.EffectiveSlotCapacityResult>();
             foreach (var vehicle in vehicles)
             {
                 var duration = WashTimeEstimator.EstimateMinutes(vehicle.ServicePrices);
                 VehicleAssignment? assignment = null;
                 foreach (var slot in candidateSlots)
                 {
-                    var bookedWeight = bookedWeights.TryGetValue(slot.SlotId, out var weight)
-                        ? weight
+                    AutoWashPro.BLL.Services.Interface.EffectiveSlotCapacityResult incidentCapacity;
+                    if (!incidentIsActive)
+                    {
+                        var slotBookedWeight = bookedWeights.TryGetValue(slot.SlotId, out var currentWeight)
+                            ? currentWeight
+                            : 0;
+                        incidentCapacity = new AutoWashPro.BLL.Services.Interface.EffectiveSlotCapacityResult
+                        {
+                            BaseCapacity = slot.MaxCapacity,
+                            EffectiveCapacity = slot.MaxCapacity,
+                            BookedWeight = slotBookedWeight,
+                            AvailableWeight = Math.Max(0, slot.MaxCapacity - slotBookedWeight)
+                        };
+                    }
+                    else if (!incidentCapacities.TryGetValue(slot.SlotId, out incidentCapacity!))
+                    {
+                        incidentCapacity = await _incidentCapacityService.GetEffectiveSlotCapacityAsync(
+                            branchId,
+                            targetDate,
+                            slot.SlotId,
+                            new AutoWashPro.BLL.Services.Interface.BookingContextDTO
+                            {
+                                IsBusiness = true,
+                                IsVipEligible = false,
+                                VehicleTypeId = vehicle.VehicleType.Id,
+                                ServiceIds = vehicle.ServicePrices.Select(p => p.ServiceId).ToList(),
+                                CapacityWeight = vehicle.CapacityWeight
+                            },
+                            now);
+                        incidentCapacities[slot.SlotId] = incidentCapacity;
+                    }
+
+                    var excludedWeight = excludedWeightsBySlot.TryGetValue(slot.SlotId, out var ownWeight)
+                        ? ownWeight
                         : 0;
-                    if (bookedWeight + vehicle.CapacityWeight > slot.MaxCapacity)
+                    var bookedWeight = Math.Max(0, incidentCapacity.BookedWeight - excludedWeight) +
+                        (newlyAssignedWeights.TryGetValue(slot.SlotId, out var assignedWeight)
+                            ? assignedWeight
+                            : 0);
+                    if (bookedWeight + vehicle.CapacityWeight > incidentCapacity.EffectiveCapacity)
                         continue;
 
                     var slotStart = dayStart.Add(slot.StartTime);
                     var slotEnd = dayStart.Add(slot.EndTime);
+                    var eligibleLaneIds = incidentCapacity.IncidentIds.Count > 0
+                        ? incidentCapacity.EligibleLaneIds.ToHashSet()
+                        : null;
                     var laneChoice = lanes
+                        .Where(lane => eligibleLaneIds == null || eligibleLaneIds.Contains(lane.LaneId))
                         .Select(lane => new
                         {
                             lane.LaneId,
@@ -301,7 +408,10 @@ namespace BLL.Services
                         Start = estimatedStart,
                         EndWithBuffer = estimatedEnd.AddMinutes(WashTimeEstimator.GetInterVehicleBuffer())
                     });
-                    bookedWeights[slot.SlotId] = bookedWeight + vehicle.CapacityWeight;
+                    newlyAssignedWeights[slot.SlotId] =
+                        (newlyAssignedWeights.TryGetValue(slot.SlotId, out var currentAssignedWeight)
+                            ? currentAssignedWeight
+                            : 0) + vehicle.CapacityWeight;
                     break;
                 }
 

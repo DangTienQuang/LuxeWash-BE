@@ -11,12 +11,20 @@ namespace BLL.DTOs.Business
     {
         public int BookingId { get; set; }
         public string LicensePlate { get; set; } = null!;
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = string.Empty;
+        public int? LaneId { get; set; }
+        public string? LaneName { get; set; }
+        public int? VehicleTypeId { get; set; }
+        public string? VehicleType { get; set; }
         public DateTime ScheduledTime { get; set; }
         public string Status { get; set; } = null!;
         public decimal OriginalPrice { get; set; }
         public decimal FinalAmount { get; set; }
         public List<string> Services { get; set; } = [];
         public bool IsBusinessLane { get; set; }
+        public bool HasPendingIncident { get; set; }
+        public long? IncidentCaseId { get; set; }
     }
 
     public class MultiVehicleBookingResponseDTO

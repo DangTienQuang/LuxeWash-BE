@@ -19,6 +19,9 @@ namespace AutoWashPro.BLL.DTOs
 
         public List<int>? LaneIds { get; set; }
 
+        /// <summary>
+        /// Vietnam local wall-clock time (UTC+7). Send without a UTC suffix, for example 2026-09-23T18:30:00.
+        /// </summary>
         [Required]
         public DateTime EstimatedEndAtVn { get; set; }
     }
@@ -35,6 +38,7 @@ namespace AutoWashPro.BLL.DTOs
     {
         public int BookingId { get; set; }
         public string LicensePlate { get; set; } = null!;
+        public string BookingType { get; set; } = null!;
         public string ScheduledTime { get; set; } = null!;
         public int CapacityWeight { get; set; }
         public bool IsOverbooked { get; set; }
@@ -49,6 +53,9 @@ namespace AutoWashPro.BLL.DTOs
 
     public class ExtendIncidentRequestDTO
     {
+        /// <summary>
+        /// New Vietnam local wall-clock ETA (UTC+7), without a UTC suffix.
+        /// </summary>
         [Required]
         public DateTime NewEstimatedEndAtVn { get; set; }
         public string? Note { get; set; }
@@ -76,12 +83,15 @@ namespace AutoWashPro.BLL.DTOs
         public long AffectedBookingId { get; set; }
         public int BookingId { get; set; }
         public string LicensePlate { get; set; } = null!;
+        public string BookingType { get; set; } = null!;
         public string ScheduledTime { get; set; } = null!;
         public string CustomerAction { get; set; } = null!;
         public string SystemResolution { get; set; } = null!;
         public DateTime CustomerDeadlineVn { get; set; }
         public string? AlternativeBranchId { get; set; }
+        public string? AlternativeBranchName { get; set; }
         public string? AlternativeTimeSlot { get; set; }
+        public string? AlternativeTimeSlotLabel { get; set; }
     }
 }
 namespace AutoWashPro.BLL.DTOs
@@ -109,6 +119,11 @@ namespace AutoWashPro.BLL.DTOs
         public List<IncidentAlternativeDTO> Alternatives { get; set; } = new List<IncidentAlternativeDTO>();
         public RefundPreviewDTO RefundPreview { get; set; } = new RefundPreviewDTO();
         public VoucherTermsDTO VoucherTerms { get; set; } = new VoucherTermsDTO();
+        public int? TargetBranchId { get; set; }
+        public string? TargetBranchName { get; set; }
+        public int? TargetSlotId { get; set; }
+        public string? TargetSlotLabel { get; set; }
+        public string? TargetScheduledTime { get; set; }
         public int Version { get; set; }
     }
 
@@ -134,8 +149,10 @@ namespace AutoWashPro.BLL.DTOs
 
     public class VoucherTermsDTO
     {
+        public bool IsEligible { get; set; } = true;
         public int DiscountPercent { get; set; } = 20;
         public string Code { get; set; } = "INCIDENT_COMP_20";
+        public string? Message { get; set; }
     }
 
     public class IncidentDecisionRequestDTO

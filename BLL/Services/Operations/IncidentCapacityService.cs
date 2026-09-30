@@ -38,8 +38,10 @@ namespace AutoWashPro.BLL.Services
             var activeIncidentsQuery = _context.BranchIncidents
                 .Include(i => i.IncidentLanes)
                 .Where(i => i.BranchId == branchId && i.Status == "Active")
-                // Intersection check
-                .Where(i => i.StartedAtVn < slotEnd && i.EstimatedEndAtVn > slotStart);
+                // An overdue incident stays in force until a manager explicitly
+                // resolves it. ETA is an estimate, not an automatic reopen time.
+                .Where(i => i.StartedAtVn < slotEnd &&
+                    (i.EstimatedEndAtVn > slotStart || i.EstimatedEndAtVn <= nowVn));
 
             if (ignoreIncidentId.HasValue)
             {
@@ -154,7 +156,6 @@ namespace AutoWashPro.BLL.Services
                 int unavailableLaneCount = allLanes.Count - remainingLanesAll.Count;
                 effectiveTotalCapacity = Math.Max(0, slot.MaxCapacity - unavailableLaneCount);
             }
-
             result.EffectiveCapacity = Math.Min(slot.MaxCapacity, effectiveTotalCapacity);
             result.ClosedReason = "INCIDENT_PARTIAL";
 

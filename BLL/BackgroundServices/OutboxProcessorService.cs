@@ -243,7 +243,15 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 {
                                     string refType = caseRecord != null ? "IncidentCase" : "Booking";
                                     string refId = caseRecord != null ? caseRecord.Id.ToString() : bookingId.ToString();
-                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Lịch đặt của bạn bị ảnh hưởng bởi sự cố", "Vui lòng vào ứng dụng để chọn hướng xử lý.", refType, refId);
+                                    bool isBusiness = booking.BusinessProfileId.HasValue ||
+                                        string.Equals(booking.BookingType, "Business", StringComparison.OrdinalIgnoreCase);
+                                    var title = isBusiness
+                                        ? "Lịch Fleet bị ảnh hưởng bởi sự cố"
+                                        : "Lịch đặt của bạn bị ảnh hưởng bởi sự cố";
+                                    var content = isBusiness
+                                        ? "Vui lòng vào cổng doanh nghiệp để chuyển chi nhánh hoặc hủy lịch."
+                                        : "Vui lòng vào ứng dụng để chọn hướng xử lý.";
+                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, title, content, refType, refId);
                                 }
                                 message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             }
@@ -263,7 +271,12 @@ namespace AutoWashPro.BLL.BackgroundServices
                                 {
                                     string refType = caseRecord != null ? "IncidentCase" : "Booking";
                                     string refId = caseRecord != null ? caseRecord.Id.ToString() : bookingId.ToString();
-                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Lịch đặt đã bị hủy do sự cố", "Lịch của bạn đã bị hủy do hệ thống không còn đủ chỗ sau khi khắc phục sự cố.", refType, refId);
+                                    bool isBusiness = booking.BusinessProfileId.HasValue ||
+                                        string.Equals(booking.BookingType, "Business", StringComparison.OrdinalIgnoreCase);
+                                    var content = isBusiness
+                                        ? "Lịch Fleet đã bị hủy do sự cố và khoản cam kết đã được giải phóng khỏi hạn mức tháng."
+                                        : "Lịch của bạn đã bị hủy do hệ thống không còn đủ chỗ sau khi khắc phục sự cố.";
+                                    await notificationService.CreateNotificationAsync(booking.UserId.Value, "Lịch đặt đã bị hủy do sự cố", content, refType, refId);
                                 }
                                 message.ProcessedAt = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
                             }
