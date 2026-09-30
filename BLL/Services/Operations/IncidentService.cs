@@ -158,14 +158,6 @@ namespace AutoWashPro.BLL.Services
 
             var response = new PreviewIncidentResponseDTO();
             int totalCapacityLoss = 0;
-
-            if (request.Scope == "WholeBranch")
-            {
-                foreach (var slot in slots)
-                {
-                    totalCapacityLoss += slot.MaxCapacity;
-                }
-            }
             
             var simulatedIncident = new BranchIncident
             {
@@ -179,26 +171,66 @@ namespace AutoWashPro.BLL.Services
                 IncidentLanes = request.LaneIds?.Select(id => new IncidentLane { LaneId = id }).ToList() ?? new List<IncidentLane>()
             };
 
-            var bookingsBySlot = activeBookings.GroupBy(b => slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay)?.SlotId ?? 0);
+            var capacityContext = new BookingContextDTO
+            {
+                // This calculation measures branch capacity, not whether a new
+                // customer may enter a VIP-only time slot. Existing bookings in
+                // the slot have already passed that eligibility check.
+                IsVipEligible = true,
+                CapacityWeight = 1
+            };
+
+            var capacityBySlotOccurrence = new Dictionary<(DateTime Date, int SlotId), EffectiveSlotCapacityResult>();
+            for (var date = now.Date; date <= request.EstimatedEndAtVn.Date; date = date.AddDays(1))
+            {
+                foreach (var slot in slots)
+                {
+                    var slotStart = date.Add(slot.StartTime);
+                    var slotEnd = date.Add(slot.EndTime);
+                    if (slot.EndTime <= slot.StartTime)
+                    {
+                        slotEnd = slotEnd.AddDays(1);
+                    }
+
+                    if (slotStart >= request.EstimatedEndAtVn || slotEnd <= now)
+                    {
+                        continue;
+                    }
+
+                    var capacity = await _capacityService.GetEffectiveSlotCapacityAsync(
+                        request.BranchId,
+                        date,
+                        slot.SlotId,
+                        capacityContext,
+                        now,
+                        simulatedIncident);
+                    capacityBySlotOccurrence[(date, slot.SlotId)] = capacity;
+                    totalCapacityLoss += Math.Max(0, capacity.BaseCapacity - capacity.EffectiveCapacity);
+                }
+            }
+
+            var bookingsBySlot = activeBookings.GroupBy(b => new
+            {
+                Date = b.ScheduledTime.Date,
+                SlotId = slots.FirstOrDefault(s => s.StartTime == b.ScheduledTime.TimeOfDay)?.SlotId ?? 0
+            });
 
             foreach (var group in bookingsBySlot)
             {
-                int slotId = group.Key;
+                int slotId = group.Key.SlotId;
                 if (slotId == 0) continue;
 
                 var slotBookings = group.OrderByDescending(b => b.BookingId).ToList(); // LIFO
-                var firstBooking = slotBookings.First();
-
-                var ctx = new BookingContextDTO
+                if (!capacityBySlotOccurrence.TryGetValue((group.Key.Date, slotId), out var cap))
                 {
-                    IsBusiness = firstBooking.BusinessProfileId.HasValue,
-                    IsVipEligible = false,
-                    VehicleTypeId = firstBooking.Vehicle?.VehicleTypeId,
-                    ServiceIds = firstBooking.BookingDetails.Select(d => d.ServiceId).ToList(),
-                    CapacityWeight = 1
-                };
-
-                var cap = await _capacityService.GetEffectiveSlotCapacityAsync(request.BranchId, firstBooking.ScheduledTime.Date, slotId, ctx, now, simulatedIncident);
+                    cap = await _capacityService.GetEffectiveSlotCapacityAsync(
+                        request.BranchId,
+                        group.Key.Date,
+                        slotId,
+                        capacityContext,
+                        now,
+                        simulatedIncident);
+                }
                 
                 int effectiveCapacity = cap.EffectiveCapacity;
                 int overbookedAmount = cap.BookedWeight - effectiveCapacity;
@@ -486,6 +518,10 @@ namespace AutoWashPro.BLL.Services
                 .ThenInclude(b => b.Vehicle)
                 .Include(b => b.Booking)
                 .ThenInclude(b => b.BookingDetails)
+                .Include(b => b.Booking)
+                .ThenInclude(b => b.User)
+                .ThenInclude(u => u!.CustomerProfile)
+                .ThenInclude(p => p.Tier)
                 .Where(b => b.IncidentId == incident.Id && b.Status == "AwaitingCustomer")
                 .ToListAsync();
 
@@ -500,7 +536,7 @@ namespace AutoWashPro.BLL.Services
                 var ctx = new BookingContextDTO
                 {
                     IsBusiness = b.BusinessProfileId.HasValue,
-                    IsVipEligible = false, 
+                    IsVipEligible = CustomerEligibilityHelper.IsVipEligible(b.User?.CustomerProfile),
                     VehicleTypeId = b.Vehicle?.VehicleTypeId,
                     ServiceIds = b.BookingDetails.Select(d => d.ServiceId).ToList(),
                     CapacityWeight = b.CapacityWeight > 0 ? b.CapacityWeight : 1

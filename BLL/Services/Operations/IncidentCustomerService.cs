@@ -8,6 +8,7 @@ using AutoWashPro.DAL.Data;
 using AutoWashPro.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 using AutoWashPro.BLL.Exceptions;
+using BLL.Helpers;
 
 namespace AutoWashPro.BLL.Services
 {
@@ -318,11 +319,14 @@ namespace AutoWashPro.BLL.Services
 
             var vehicle = await _context.Vehicles.FindAsync(originalBooking.VehicleId);
             var bookingDetails = await _context.BookingDetails.Where(d => d.BookingId == originalBooking.BookingId).ToListAsync();
+            var customerProfile = await _context.CustomerProfiles
+                .Include(profile => profile.Tier)
+                .FirstOrDefaultAsync(profile => profile.UserId == userId);
 
             var ctx = new BookingContextDTO
             {
                 IsBusiness = originalBooking.BusinessProfileId.HasValue,
-                IsVipEligible = false, 
+                IsVipEligible = CustomerEligibilityHelper.IsVipEligible(customerProfile),
                 VehicleTypeId = vehicle?.VehicleTypeId,
                 ServiceIds = bookingDetails.Select(d => d.ServiceId).ToList(),
                 CapacityWeight = originalBooking.CapacityWeight > 0 ? originalBooking.CapacityWeight : 1

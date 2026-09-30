@@ -126,23 +126,34 @@ namespace AutoWashPro.BLL.Services
                 return result;
             }
 
-            // Calculate effective capacity based on remaining lanes.
-            // Fail closed when lane capacity has not been calibrated because an
-            // incident is active and TimeSlot.MaxCapacity is no longer sufficient.
-            if (laneCapacities.Count == 0 || laneCapacities.Any(lc => !lc.IsCalibrated))
-            {
-                result.EffectiveCapacity = 0;
-                result.ClosedReason = "CONFIGURATION_REQUIRED";
-                result.AvailableWeight = 0;
-                return result;
-            }
-
-            // Sum the capacity of every remaining unaffected lane. Eligibility for
-            // this booking is checked separately above.
             var remainingLanesAll = allLanes.Where(l => !affectedLaneIds.Contains(l.LaneId)).Select(l => l.LaneId).ToList();
-            int effectiveTotalCapacity = laneCapacities
-                .Where(lc => remainingLanesAll.Contains(lc.LaneId))
-                .Sum(lc => lc.MaxWeightUnits);
+
+            // Prefer calibrated per-lane values when every active lane has a valid
+            // entry for this slot. The current product has no screen/API that
+            // creates these rows, so legacy branches legitimately have no data.
+            // In that case, use the same conservative fallback already used by the
+            // incident transfer preview: each unavailable lane removes one weight
+            // unit from TimeSlot.MaxCapacity. Do not close the whole slot merely
+            // because optional calibration data is absent.
+            var calibratedCapacityByLane = laneCapacities
+                .Where(capacity => capacity.IsCalibrated && capacity.MaxWeightUnits >= 0)
+                .GroupBy(capacity => capacity.LaneId)
+                .ToDictionary(group => group.Key, group => group.First().MaxWeightUnits);
+
+            bool hasCompleteCalibration = allLanes.Count > 0
+                && allLanes.All(lane => calibratedCapacityByLane.ContainsKey(lane.LaneId));
+
+            int effectiveTotalCapacity;
+            if (hasCompleteCalibration)
+            {
+                effectiveTotalCapacity = remainingLanesAll
+                    .Sum(laneId => calibratedCapacityByLane[laneId]);
+            }
+            else
+            {
+                int unavailableLaneCount = allLanes.Count - remainingLanesAll.Count;
+                effectiveTotalCapacity = Math.Max(0, slot.MaxCapacity - unavailableLaneCount);
+            }
 
             result.EffectiveCapacity = Math.Min(slot.MaxCapacity, effectiveTotalCapacity);
             result.ClosedReason = "INCIDENT_PARTIAL";
