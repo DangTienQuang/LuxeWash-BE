@@ -1375,9 +1375,12 @@ namespace AutoWashPro.BLL.Services
             var vehicle = await _context.Vehicles.Include(v => v.VehicleType).FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
             if (vehicle == null)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Vehicle with license plate {licensePlate} does not exist in your profile.");
-            bool hasActiveBooking = await _context.Bookings.Include(b => b.AppliedVoucher).AnyAsync(b => b.LicensePlate == licensePlate && (b.Status == "Pending" || b.Status == "CheckedIn"));
-            if (hasActiveBooking)
-                throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Vehicle with license plate {licensePlate} has an unfinished booking. Cannot create a new booking.");
+            bool hasConflictingBooking = await _context.Bookings.AnyAsync(b =>
+                b.LicensePlate == licensePlate &&
+                (b.Status == "Pending" || b.Status == "CheckedIn") &&
+                b.ScheduledTime == targetDateTime);
+            if (hasConflictingBooking)
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Vehicle with license plate {licensePlate} already has a booking at this time slot.");
             foreach (var serviceId in serviceIds)
             {
                 var service = await _context.Services.FindAsync(serviceId);
