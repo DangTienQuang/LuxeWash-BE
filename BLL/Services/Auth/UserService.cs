@@ -36,12 +36,7 @@ namespace AutoWashPro.BLL.Services
 
             if (user == null) throw new NotFoundException("User not found.");
 
-            var fullName = user.CustomerProfile?.FullName
-                        ?? user.StaffProfile?.FullName
-                        ?? user.ManagerProfile?.FullName
-                        ?? user.EmployeeProfile?.FullName
-                        ?? user.BusinessProfile?.CompanyName
-                        ?? user.PhoneNumber;
+            var fullName = PersonnelNames.DisplayName(user);
 
             return new UserProfileDTO
             {
@@ -81,6 +76,11 @@ namespace AutoWashPro.BLL.Services
             if (!string.IsNullOrWhiteSpace(request.FullName))
             {
                 var newName = request.FullName.Trim();
+                if (user.Role == UserRoles.Staff || user.Role == UserRoles.Manager)
+                {
+                    PersonnelNames.Rename(user, newName);
+                    isUpdated = true;
+                }
                 if (user.CustomerProfile != null && user.CustomerProfile.FullName != newName)
                 {
                     user.CustomerProfile.FullName = newName;
@@ -217,6 +217,7 @@ namespace AutoWashPro.BLL.Services
                                       || (u.CustomerProfile != null && u.CustomerProfile.FullName.ToLower().Contains(keyword))
                                       || (u.StaffProfile != null && u.StaffProfile.FullName.ToLower().Contains(keyword))
                                       || (u.ManagerProfile != null && u.ManagerProfile.FullName.ToLower().Contains(keyword))
+                                      || (u.EmployeeProfile != null && u.EmployeeProfile.FullName.ToLower().Contains(keyword))
                                       || (u.BusinessProfile != null && u.BusinessProfile.CompanyName.ToLower().Contains(keyword)));
             }
 
@@ -228,27 +229,24 @@ namespace AutoWashPro.BLL.Services
             int totalItems = await query.CountAsync();
             int totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
 
-            var users = await query
+            var pageUsers = await query
                 .OrderByDescending(u => u.UserId)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
+                .ToListAsync();
+            var users = pageUsers
                 .Select(u => new UserAdminSummaryDTO
                 {
                     UserId = u.UserId,
                     Email = u.Email,
-                    FullName = u.CustomerProfile != null ? u.CustomerProfile.FullName
-                        : u.StaffProfile != null ? u.StaffProfile.FullName
-                        : u.ManagerProfile != null ? u.ManagerProfile.FullName
-                        : u.EmployeeProfile != null ? u.EmployeeProfile.FullName
-                        : u.BusinessProfile != null ? u.BusinessProfile.CompanyName
-                        : "N/A",
+                    FullName = PersonnelNames.DisplayName(u),
                     PhoneNumber = u.PhoneNumber,
                     Role = u.Role,
                     TierName = u.CustomerProfile != null && u.CustomerProfile.Tier != null ? u.CustomerProfile.Tier.TierName : "N/A",
                     Status = u.Status,
                     LastVisitDate = u.CustomerProfile != null ? u.CustomerProfile.LastVisitDate : null
                 })
-                .ToListAsync();
+                .ToList();
 
             return new PagedResultDTO<UserAdminSummaryDTO>
             {

@@ -168,6 +168,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(u => u.StaffProfile)
                 .Include(u => u.ManagerProfile)
                 .Include(u => u.EmployeeProfile)
+                .Include(u => u.BusinessProfile)
                 .FirstOrDefaultAsync(u => u.PhoneNumber == loginInput || (u.Email != null && u.Email.ToLower() == loginInput));
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
@@ -270,6 +271,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(u => u.StaffProfile)
                 .Include(u => u.ManagerProfile)
                 .Include(u => u.EmployeeProfile)
+                .Include(u => u.BusinessProfile)
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
             if (user == null || user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiryTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
@@ -343,16 +345,7 @@ namespace AutoWashPro.BLL.Services
 
         private static string GetFullName(User user)
         {
-            return user.Role switch
-            {
-                UserRoles.Manager => user.ManagerProfile?.FullName ?? user.PhoneNumber,
-                UserRoles.Staff => user.StaffProfile?.FullName ?? user.PhoneNumber,
-                UserRoles.Customer => user.CustomerProfile?.FullName ?? user.PhoneNumber,
-                _ => user.CustomerProfile?.FullName
-                    ?? user.ManagerProfile?.FullName
-                    ?? user.StaffProfile?.FullName
-                    ?? user.PhoneNumber
-            };
+            return PersonnelNames.DisplayName(user);
         }
 
         private string GenerateRefreshToken()
@@ -500,6 +493,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(u => u.StaffProfile)
                 .Include(u => u.ManagerProfile)
                 .Include(u => u.EmployeeProfile)
+                .Include(u => u.BusinessProfile)
                 .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalizedEmail);
 
             if (user == null)

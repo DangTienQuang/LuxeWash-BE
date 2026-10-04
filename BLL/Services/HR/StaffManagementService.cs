@@ -28,7 +28,8 @@ namespace AutoWashPro.BLL.Services
                 query = query.Where(u => u.PhoneNumber.Contains(key)
                     || (u.Email != null && u.Email.ToLower().Contains(key))
                     || (u.StaffProfile != null && u.StaffProfile.FullName.ToLower().Contains(key))
-                    || (u.ManagerProfile != null && u.ManagerProfile.FullName.ToLower().Contains(key)));
+                    || (u.ManagerProfile != null && u.ManagerProfile.FullName.ToLower().Contains(key))
+                    || (u.EmployeeProfile != null && u.EmployeeProfile.FullName.ToLower().Contains(key)));
             }
             if (!string.IsNullOrWhiteSpace(role))
             {
@@ -39,9 +40,8 @@ namespace AutoWashPro.BLL.Services
                 query = query.Where(u => u.Status == status.Trim());
             }
             var users = await query
-                .OrderBy(u => u.Role == UserRoles.Manager ? u.ManagerProfile!.FullName : u.StaffProfile!.FullName)
                 .ToListAsync();
-            return users.Select(MapStaff).ToList();
+            return users.Select(MapStaff).OrderBy(u => u.FullName).ToList();
         }
         public async Task<List<StaffResponseDTO>> GetStaffsByRoleAsync(string role, string? keyword, string? status)
         {
@@ -99,6 +99,7 @@ namespace AutoWashPro.BLL.Services
                     HiredDate = request.HiredDate?.Date ?? AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date
                 };
             }
+            PersonnelNames.EnsureProfiles(user);
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
             return MapStaff(user);
@@ -106,6 +107,9 @@ namespace AutoWashPro.BLL.Services
         public async Task<StaffResponseDTO> UpdateStaffAsync(int staffUserId, UpdateStaffDTO request)
         {
             var user = await GetStaffUserAsync(staffUserId);
+            PersonnelNames.EnsureProfiles(user);
+            if (!string.IsNullOrWhiteSpace(request.FullName))
+                PersonnelNames.Rename(user, request.FullName);
             if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
             {
                 var phone = request.PhoneNumber.Trim();
@@ -122,18 +126,12 @@ namespace AutoWashPro.BLL.Services
             }
             if (user.Role == UserRoles.Manager)
             {
-                user.ManagerProfile ??= new ManagerProfile { UserId = staffUserId, FullName = request.FullName?.Trim() ?? user.PhoneNumber };
-                if (!string.IsNullOrWhiteSpace(request.FullName))
-                    user.ManagerProfile.FullName = request.FullName.Trim();
                 user.ManagerProfile.Position = request.Position?.Trim();
                 if (request.HiredDate.HasValue)
                     user.ManagerProfile.HiredDate = request.HiredDate.Value.Date;
             }
             else
             {
-                user.StaffProfile ??= new StaffProfile { UserId = staffUserId, FullName = request.FullName?.Trim() ?? user.PhoneNumber };
-                if (!string.IsNullOrWhiteSpace(request.FullName))
-                    user.StaffProfile.FullName = request.FullName.Trim();
                 user.StaffProfile.Position = request.Position?.Trim();
                 if (request.HiredDate.HasValue)
                     user.StaffProfile.HiredDate = request.HiredDate.Value.Date;
@@ -526,6 +524,7 @@ namespace AutoWashPro.BLL.Services
             return _context.StaffShiftAssignments
                 .Include(a => a.StaffUser).ThenInclude(u => u.StaffProfile)
                 .Include(a => a.StaffUser).ThenInclude(u => u.ManagerProfile)
+                .Include(a => a.StaffUser).ThenInclude(u => u.EmployeeProfile)
                 .Include(a => a.WorkShift);
         }
         private static void ApplyAssignmentFilters(ref IQueryable<StaffShiftAssignment> query, DateTime? fromDate, DateTime? toDate, int? staffUserId)
@@ -538,15 +537,18 @@ namespace AutoWashPro.BLL.Services
         {
             return _context.OvertimeRequests
                 .Include(o => o.StaffUser).ThenInclude(u => u.StaffProfile)
+                .Include(o => o.StaffUser).ThenInclude(u => u.EmployeeProfile)
                 .Include(o => o.StaffUser).ThenInclude(u => u.ManagerProfile);
         }
         private IQueryable<ShiftSwapRequest> BaseSwapQuery()
         {
             return _context.ShiftSwapRequests
                 .Include(s => s.FromAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.StaffProfile)
+                .Include(s => s.FromAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.EmployeeProfile)
                 .Include(s => s.FromAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.ManagerProfile)
                 .Include(s => s.FromAssignment).ThenInclude(a => a.WorkShift)
                 .Include(s => s.ToAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.StaffProfile)
+                .Include(s => s.ToAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.EmployeeProfile)
                 .Include(s => s.ToAssignment).ThenInclude(a => a.StaffUser).ThenInclude(u => u.ManagerProfile)
                 .Include(s => s.ToAssignment).ThenInclude(a => a.WorkShift)
                 .Include(s => s.ToWorkShift);
@@ -572,9 +574,7 @@ namespace AutoWashPro.BLL.Services
         private static StaffResponseDTO MapStaff(User user) => new()
         {
             UserId = user.UserId,
-            FullName = user.Role == UserRoles.Manager
-                ? user.ManagerProfile?.FullName ?? "N/A"
-                : user.StaffProfile?.FullName ?? "N/A",
+            FullName = PersonnelNames.DisplayName(user),
             PhoneNumber = user.PhoneNumber,
             Email = user.Email,
             Role = user.Role,
@@ -594,9 +594,7 @@ namespace AutoWashPro.BLL.Services
         };
         private static string GetPersonnelName(User user)
         {
-            return user.Role == UserRoles.Manager
-                ? user.ManagerProfile?.FullName ?? user.PhoneNumber
-                : user.StaffProfile?.FullName ?? user.PhoneNumber;
+            return PersonnelNames.DisplayName(user);
         }
         private static ShiftAssignmentResponseDTO MapAssignment(StaffShiftAssignment assignment) => new()
         {

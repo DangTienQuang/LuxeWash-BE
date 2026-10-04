@@ -34,10 +34,11 @@ namespace AutoWashPro.BLL.Services
                 Status = "Active",
                 EmployeeProfile = new EmployeeProfile
                 {
-                    FullName = createDto.FullName,
+                    FullName = createDto.FullName.Trim(),
                     BranchId = createDto.BranchId
                 }
             };
+            PersonnelNames.EnsureProfiles(user);
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
             return new EmployeeProfileDTO
@@ -68,9 +69,7 @@ namespace AutoWashPro.BLL.Services
                 employee = new EmployeeProfile
                 {
                     EmployeeId = user.UserId,
-                    FullName = user.Role == "Manager"
-                        ? user.ManagerProfile?.FullName ?? user.PhoneNumber
-                        : user.StaffProfile?.FullName ?? user.PhoneNumber,
+                    FullName = PersonnelNames.DisplayName(user),
                     BranchId = transferDto.BranchId
                 };
                 _context.EmployeeProfiles.Add(employee);

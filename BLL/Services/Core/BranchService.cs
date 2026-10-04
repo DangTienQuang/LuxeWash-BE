@@ -80,7 +80,8 @@ namespace AutoWashPro.BLL.Services
                 throw new NotFoundException("Branch not found.");
             }
             var employees = await _context.EmployeeProfiles
-                .Include(e => e.User)
+                .Include(e => e.User).ThenInclude(u => u.StaffProfile)
+                .Include(e => e.User).ThenInclude(u => u.ManagerProfile)
                 .Where(e => e.BranchId == branchId)
                 .ToListAsync();
             var managers = employees
@@ -89,7 +90,7 @@ namespace AutoWashPro.BLL.Services
                 {
                     UserId = e.EmployeeId,
                     PhoneNumber = e.User.PhoneNumber,
-                    FullName = e.FullName,
+                    FullName = PersonnelNames.DisplayName(e.User),
                     Role = e.User.Role,
                     Status = e.User.Status,
                     BranchId = e.BranchId
@@ -101,7 +102,7 @@ namespace AutoWashPro.BLL.Services
                 {
                     UserId = e.EmployeeId,
                     PhoneNumber = e.User.PhoneNumber,
-                    FullName = e.FullName,
+                    FullName = PersonnelNames.DisplayName(e.User),
                     Role = e.User.Role,
                     Status = e.User.Status,
                     BranchId = e.BranchId
@@ -118,20 +119,23 @@ namespace AutoWashPro.BLL.Services
         public async Task<List<BranchEmployeesSummaryItemDTO>> GetAllBranchEmployeesSummaryAsync()
         {
             var employees = await _context.EmployeeProfiles
-                .Include(e => e.User)
+                .Include(e => e.User).ThenInclude(u => u.StaffProfile)
+                .Include(e => e.User).ThenInclude(u => u.ManagerProfile)
                 .Where(e => e.BranchId.HasValue)
+                .ToListAsync();
+            var summaries = employees
                 .Select(e => new
                 {
                     BranchId = e.BranchId!.Value,
                     e.EmployeeId,
-                    e.FullName,
+                    FullName = PersonnelNames.DisplayName(e.User),
                     e.User.PhoneNumber,
                     e.User.Role,
                     e.User.Status
                 })
-                .ToListAsync();
+                .ToList();
 
-            return employees
+            return summaries
                 .GroupBy(e => e.BranchId)
                 .Select(group => new BranchEmployeesSummaryItemDTO
                 {

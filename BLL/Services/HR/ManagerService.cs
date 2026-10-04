@@ -49,17 +49,18 @@ namespace AutoWashPro.BLL.Services
         {
             var managerProfile = await GetManagerProfileAsync(managerUserId);
             var staffList = await _context.EmployeeProfiles
-                .Include(e => e.User)
+                .Include(e => e.User).ThenInclude(u => u.StaffProfile)
                 .Where(e => e.BranchId == managerProfile.BranchId && e.User.Role == "Staff")
+                .ToListAsync();
+            return staffList
                 .Select(e => new ManagerStaffDTO
                 {
                     UserId = e.EmployeeId,
-                    FullName = e.FullName,
+                    FullName = PersonnelNames.DisplayName(e.User),
                     PhoneNumber = e.User.PhoneNumber,
                     Status = e.User.Status
                 })
-                .ToListAsync();
-            return staffList;
+                .ToList();
         }
         public async Task<List<ManagerBookingListDTO>> GetCheckInBookingsInBranchAsync(int managerUserId, System.DateTime? targetDate = null, bool includeAllStatuses = false)
         {
@@ -73,6 +74,8 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.ProcessingLane)
                 .Include(b => b.ProcessingStaff)
                     .ThenInclude(s => s.EmployeeProfile)
+                .Include(b => b.ProcessingStaff)
+                    .ThenInclude(s => s.StaffProfile)
                 .Where(b => b.BranchId == managerProfile.BranchId);
 
             if (targetDate == null)
@@ -101,7 +104,7 @@ namespace AutoWashPro.BLL.Services
                 ProcessingLaneId = b.ProcessingLaneId,
                 ProcessingLaneName = b.ProcessingLane?.Name,
                 ProcessingStaffId = b.ProcessingStaffId,
-                ProcessingStaffName = b.ProcessingStaff?.EmployeeProfile?.FullName,
+                ProcessingStaffName = b.ProcessingStaff != null ? PersonnelNames.DisplayName(b.ProcessingStaff) : null,
                 IsBusinessLane = b.ProcessingLane != null && b.ProcessingLane.IsBusinessLane,
                 ProcessingStartTime = b.ProcessingStartTime.HasValue ? b.ProcessingStartTime.Value : (DateTime?)null,
                 CompletedTime = b.CompletedTime.HasValue ? b.CompletedTime.Value : (DateTime?)null,
