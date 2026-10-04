@@ -62,9 +62,9 @@ namespace API.Controllers.Admin
         }
 
         [HttpGet("{id}/points-history")]
-        public async Task<IActionResult> GetCustomerPointsHistory(int id)
+        public async Task<IActionResult> GetCustomerPointsHistory(int id, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
         {
-            var result = await _walletService.GetPointsHistoryAsync(id);
+            var result = await _walletService.GetPointsHistoryAsync(id, page, pageSize);
             return Ok(new { statusCode = 200, message = "Success", data = result });
         }
     }

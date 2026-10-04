@@ -1696,6 +1696,7 @@ namespace AutoWashPro.BLL.Services
                 .Include(b => b.Branch)
                 .Where(b => b.UserId == userId)
                 .OrderByDescending(b => b.ScheduledTime)
+                .ThenByDescending(b => b.BookingId)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(b => new BookingResponseDTO

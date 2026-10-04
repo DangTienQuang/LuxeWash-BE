@@ -37,6 +37,9 @@ namespace AutoWashPro.BLL.Services
             if (user == null) throw new NotFoundException("User not found.");
 
             var fullName = PersonnelNames.DisplayName(user);
+            var walletBalance = await _context.Wallets.Where(w => w.UserId == userId)
+                .Select(w => (decimal?)w.Balance).FirstOrDefaultAsync() ?? 0;
+            var totalWashes = await _context.Bookings.CountAsync(b => b.UserId == userId && b.Status == "Completed");
 
             return new UserProfileDTO
             {
@@ -49,6 +52,11 @@ namespace AutoWashPro.BLL.Services
                 TierName = user.CustomerProfile?.Tier?.TierName,
                 TotalPoint = user.CustomerProfile?.TotalPoint ?? 0,
                 PromotionPoint = user.CustomerProfile?.PromotionPoint ?? 0,
+                WalletBalance = walletBalance,
+                VehicleCount = user.Vehicles.Count(v => !v.IsDeleted),
+                TotalWashes = totalWashes,
+                LastVisitDate = user.CustomerProfile?.LastVisitDate,
+                PointMultiplier = user.CustomerProfile?.Tier?.PointMultiplier ?? 1,
                 ChurnScore = user.CustomerProfile?.ChurnScore ?? 0,
                 Vehicles = user.Vehicles.Select(v => new VehicleDTO
                 {
@@ -194,6 +202,8 @@ namespace AutoWashPro.BLL.Services
 
         public async Task<PagedResultDTO<UserAdminSummaryDTO>> GetAllCustomersAsync(int page, int pageSize, string? searchKeyword, string? statusFilter, string? roleFilter)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
             var query = _context.Users
                 .Include(u => u.CustomerProfile)
                     .ThenInclude(cp => cp.Tier)
@@ -212,13 +222,16 @@ namespace AutoWashPro.BLL.Services
             if (!string.IsNullOrWhiteSpace(searchKeyword))
             {
                 var keyword = searchKeyword.Trim().ToLower();
+                var plateKeyword = keyword.Replace(" ", "").Replace("-", "").Replace(".", "");
                 query = query.Where(u => u.PhoneNumber.Contains(keyword)
                                       || (u.Email != null && u.Email.ToLower().Contains(keyword))
                                       || (u.CustomerProfile != null && u.CustomerProfile.FullName.ToLower().Contains(keyword))
                                       || (u.StaffProfile != null && u.StaffProfile.FullName.ToLower().Contains(keyword))
                                       || (u.ManagerProfile != null && u.ManagerProfile.FullName.ToLower().Contains(keyword))
                                       || (u.EmployeeProfile != null && u.EmployeeProfile.FullName.ToLower().Contains(keyword))
-                                      || (u.BusinessProfile != null && u.BusinessProfile.CompanyName.ToLower().Contains(keyword)));
+                                      || (u.BusinessProfile != null && u.BusinessProfile.CompanyName.ToLower().Contains(keyword))
+                                      || (plateKeyword != "" && u.Vehicles.Any(v => !v.IsDeleted
+                                          && v.LicensePlate.ToLower().Replace(" ", "").Replace("-", "").Replace(".", "").Contains(plateKeyword))));
             }
 
             if (!string.IsNullOrWhiteSpace(statusFilter))
@@ -234,6 +247,16 @@ namespace AutoWashPro.BLL.Services
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
+            // Aggregate only users on this page; do not issue one query per customer.
+            var pageIds = pageUsers.Select(u => u.UserId).ToList();
+            var balances = await _context.Wallets.Where(w => pageIds.Contains(w.UserId))
+                .ToDictionaryAsync(w => w.UserId, w => w.Balance);
+            var vehicleCounts = await _context.Vehicles.Where(v => v.UserId.HasValue && pageIds.Contains(v.UserId.Value) && !v.IsDeleted)
+                .GroupBy(v => v.UserId!.Value).Select(g => new { UserId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(g => g.UserId, g => g.Count);
+            var washCounts = await _context.Bookings.Where(b => b.UserId.HasValue && pageIds.Contains(b.UserId.Value) && b.Status == "Completed")
+                .GroupBy(b => b.UserId!.Value).Select(g => new { UserId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(g => g.UserId, g => g.Count);
             var users = pageUsers
                 .Select(u => new UserAdminSummaryDTO
                 {
@@ -242,6 +265,11 @@ namespace AutoWashPro.BLL.Services
                     FullName = PersonnelNames.DisplayName(u),
                     PhoneNumber = u.PhoneNumber,
                     Role = u.Role,
+                    TotalPoint = u.CustomerProfile?.TotalPoint ?? 0,
+                    PromotionPoint = u.CustomerProfile?.PromotionPoint ?? 0,
+                    WalletBalance = balances.GetValueOrDefault(u.UserId),
+                    VehicleCount = vehicleCounts.GetValueOrDefault(u.UserId),
+                    TotalWashes = washCounts.GetValueOrDefault(u.UserId),
                     TierName = u.CustomerProfile != null && u.CustomerProfile.Tier != null ? u.CustomerProfile.Tier.TierName : "N/A",
                     Status = u.Status,
                     LastVisitDate = u.CustomerProfile != null ? u.CustomerProfile.LastVisitDate : null

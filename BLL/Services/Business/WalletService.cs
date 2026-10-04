@@ -559,6 +559,7 @@ namespace AutoWashPro.BLL.Services
             return await _context.PointLedgers
                 .Where(p => p.UserId == userId)
                 .OrderByDescending(p => p.TransactionDate)
+                .ThenByDescending(p => p.LedgerId)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(p => new PointHistoryResponseDTO

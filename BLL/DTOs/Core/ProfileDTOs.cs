@@ -13,6 +13,11 @@ namespace AutoWashPro.BLL.DTOs
         public string TierName { get; set; } = null!;
         public int TotalPoint { get; set; }
         public int PromotionPoint { get; set; }
+        public decimal WalletBalance { get; set; }
+        public int VehicleCount { get; set; }
+        public int TotalWashes { get; set; }
+        public DateTime? LastVisitDate { get; set; }
+        public double PointMultiplier { get; set; } = 1;
         public double ChurnScore { get; set; }
         public List<VehicleDTO> Vehicles { get; set; } = null!;
         public DateTime? DateOfBirth { get; set; }
@@ -76,6 +81,11 @@ namespace AutoWashPro.BLL.DTOs
     }
     public class UserAdminSummaryDTO
     {
+        public int TotalPoint { get; set; }
+        public int PromotionPoint { get; set; }
+        public decimal WalletBalance { get; set; }
+        public int VehicleCount { get; set; }
+        public int TotalWashes { get; set; }
         public int UserId { get; set; }
         public string FullName { get; set; } = null!;
         public string PhoneNumber { get; set; } = null!;
