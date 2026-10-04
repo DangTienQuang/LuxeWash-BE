@@ -287,6 +287,55 @@ namespace AutoWashPro.BLL.Services
             }
             await ConfirmTransactionPaymentAsync(transaction.TransactionId, data.Amount, orderCodeStr);
         }
+        public async Task<PagedResultDTO<AdminTransactionDTO>> GetAdminTransactionsAsync(AdminTransactionQueryDTO request)
+        {
+            // Read-only: do not reconcile payments or create wallets while browsing.
+            var query = from t in _context.Transactions.AsNoTracking()
+                        join b in _context.Bookings.AsNoTracking() on t.ReferenceBookingId equals (int?)b.BookingId into bookings
+                        from b in bookings.DefaultIfEmpty()
+                        where t.Wallet == null || t.Wallet.User.Role == "Customer" || t.Wallet.User.Role == "Business"
+                        select new AdminTransactionDTO
+                        {
+                            TransactionId = t.TransactionId,
+                            UserId = t.Wallet != null ? (int?)t.Wallet.UserId : b.UserId,
+                            CustomerName = t.Wallet != null
+                                ? (t.Wallet.User.BusinessProfile != null ? t.Wallet.User.BusinessProfile.CompanyName : t.Wallet.User.CustomerProfile.FullName)
+                                : (b.User != null ? b.User.CustomerProfile.FullName : null),
+                            PhoneNumber = t.Wallet != null ? t.Wallet.User.PhoneNumber : b.User.PhoneNumber,
+                            Amount = t.Amount,
+                            TransactionType = t.TransactionType,
+                            Description = t.Description,
+                            Status = t.Status,
+                            PaymentMethod = t.PaymentMethod,
+                            OrderCode = t.OrderCode,
+                            ReferenceBookingId = t.ReferenceBookingId,
+                            ReferenceInvoiceId = t.ReferenceInvoiceId,
+                            CreatedAt = t.CreatedAt
+                        };
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+            {
+                var keyword = request.Keyword.Trim();
+                int.TryParse(keyword.TrimStart('#'), out var id);
+                query = query.Where(t => (t.CustomerName != null && t.CustomerName.Contains(keyword))
+                    || (t.PhoneNumber != null && t.PhoneNumber.Contains(keyword))
+                    || (t.OrderCode != null && t.OrderCode.Contains(keyword))
+                    || t.TransactionId == id || t.ReferenceBookingId == id || t.ReferenceInvoiceId == id);
+            }
+            if (!string.IsNullOrWhiteSpace(request.Status)) query = query.Where(t => t.Status == request.Status);
+            if (!string.IsNullOrWhiteSpace(request.TransactionType)) query = query.Where(t => t.TransactionType == request.TransactionType);
+            if (request.From.HasValue) query = query.Where(t => t.CreatedAt >= request.From.Value);
+            if (request.To.HasValue) query = query.Where(t => t.CreatedAt < request.To.Value);
+            var total = await query.CountAsync();
+            return new PagedResultDTO<AdminTransactionDTO>
+            {
+                Items = await query.OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.TransactionId)
+                    .Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToListAsync(),
+                TotalItems = total,
+                TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                CurrentPage = request.Page
+            };
+        }
+
         public async Task<List<TransactionResponseDTO>> GetTransactionsAsync(int userId, int page = 1, int pageSize = 50)
         {
             if (page < 1) page = 1;

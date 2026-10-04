@@ -6,6 +6,7 @@ namespace AutoWashPro.BLL.Services
 {
     public interface IWalletService
     {
+        Task<PagedResultDTO<AdminTransactionDTO>> GetAdminTransactionsAsync(AdminTransactionQueryDTO request);
         Task<WalletResponseDTO> GetWalletInfoAsync(int userId);
         Task<PaymentQrResponseDTO> CreatePaymentQrAsync(int userId, PaymentQrRequestDTO request);
         Task<TopUpResponseDTO> CreateTopUpLinkAsync(int userId, TopUpRequestDTO request);
