@@ -1347,6 +1347,43 @@ namespace AutoWashPro.BLL.Services
 
             return (true, checkInResult, checkOutResult);
         }
+        private IQueryable<Booking> ActiveVehicleBookings(DateTime nowVn) =>
+            _context.Bookings.Where(b =>
+                b.Status == BookingStatuses.CheckedIn ||
+                b.Status == BookingStatuses.Processing ||
+                (b.ScheduledTime >= nowVn.Date &&
+                    (b.Status == BookingStatuses.Pending ||
+                     b.Status == BookingStatuses.Confirmed ||
+                     b.Status == BookingStatuses.Delayed)));
+
+        private async Task EnsureVehicleHasNoActiveBookingAsync(int vehicleId, string licensePlate)
+        {
+            var hasActiveBooking = await ActiveVehicleBookings(AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
+                .AnyAsync(b => b.VehicleId == vehicleId || b.LicensePlate == licensePlate);
+            if (hasActiveBooking)
+            {
+                throw new AutoWashPro.BLL.Exceptions.ConflictException(
+                    $"Xe {licensePlate} đang có lịch rửa chưa kết thúc. Vui lòng xem hoặc dời lịch hiện tại trước khi đặt lịch mới.",
+                    "VEHICLE_ACTIVE_BOOKING");
+            }
+        }
+
+        public async Task<List<ActiveVehicleBookingDTO>> GetActiveVehicleBookingsAsync(int userId)
+        {
+            return await ActiveVehicleBookings(AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
+                .Where(b => b.UserId == userId)
+                .OrderBy(b => b.ScheduledTime)
+                .ThenBy(b => b.BookingId)
+                .Select(b => new ActiveVehicleBookingDTO
+                {
+                    BookingId = b.BookingId,
+                    LicensePlate = b.LicensePlate,
+                    ScheduledTime = b.ScheduledTime,
+                    Status = b.Status
+                })
+                .ToListAsync();
+        }
+
         public async Task<CompatibilityDTO> ValidateBookingCompatibilityAsync(int userId, int branchId, int slotId, DateTime targetDate, int? vehicleId, string licensePlate, List<int> serviceIds)
         {
             if (serviceIds == null || serviceIds.Count == 0)
@@ -1376,12 +1413,7 @@ namespace AutoWashPro.BLL.Services
             var vehicle = await _context.Vehicles.Include(v => v.VehicleType).FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
             if (vehicle == null)
                 throw new AutoWashPro.BLL.Exceptions.NotFoundException($"Vehicle with license plate {licensePlate} does not exist in your profile.");
-            bool hasConflictingBooking = await _context.Bookings.AnyAsync(b =>
-                b.LicensePlate == licensePlate &&
-                (b.Status == "Pending" || b.Status == "CheckedIn") &&
-                b.ScheduledTime == targetDateTime);
-            if (hasConflictingBooking)
-                throw new AutoWashPro.BLL.Exceptions.BadRequestException($"Vehicle with license plate {licensePlate} already has a booking at this time slot.");
+            await EnsureVehicleHasNoActiveBookingAsync(vehicle.Id, vehicle.LicensePlate);
             foreach (var serviceId in serviceIds)
             {
                 var service = await _context.Services.FindAsync(serviceId);
@@ -1495,6 +1527,15 @@ namespace AutoWashPro.BLL.Services
                 });
             }
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            // Serialize requests for the same vehicle before checking its active bookings.
+            // The lock is held until this booking transaction commits or rolls back.
+            var lockedVehicle = await _context.Vehicles
+                .FromSqlInterpolated($"SELECT * FROM Vehicles WHERE Id = {vehicleTypeQuery.VehicleId} FOR UPDATE")
+                .AsNoTracking()
+                .ToListAsync();
+            if (lockedVehicle.Count == 0)
+                throw new AutoWashPro.BLL.Exceptions.NotFoundException("Vehicle not found.");
+            await EnsureVehicleHasNoActiveBookingAsync(vehicleTypeQuery.VehicleId, vehicleTypeQuery.LicensePlate);
             var dailyCapacity = await _context.DailySlotCapacities.FirstOrDefaultAsync(dc => dc.SlotId == slot.SlotId && dc.BranchId == request.BranchId && dc.Date == targetDateTime.Date);
             if (dailyCapacity == null)
             {

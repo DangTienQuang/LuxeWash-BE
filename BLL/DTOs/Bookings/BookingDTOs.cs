@@ -120,6 +120,13 @@ namespace AutoWashPro.BLL.DTOs
     {
         public string? PaymentUrl { get; set; }
     }
+    public class ActiveVehicleBookingDTO
+    {
+        public int BookingId { get; set; }
+        public string LicensePlate { get; set; } = string.Empty;
+        public DateTime ScheduledTime { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
     public class BookingResponseDTO
     {
         public int BookingId { get; set; }
