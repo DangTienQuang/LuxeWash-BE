@@ -1369,8 +1369,9 @@ namespace AutoWashPro.BLL.Services
                 }
             }
             var targetDateTime = targetDate.Date.Add(slot.StartTime);
-            if (targetDateTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
-                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot book a time slot in the past or that has already started.");
+            var slotEndDateTime = GetSlotEndDateTime(targetDate, slot.StartTime, slot.EndTime);
+            if (slotEndDateTime <= AutoWashPro.DAL.Helpers.TimeHelper.VnNow)
+                throw new AutoWashPro.BLL.Exceptions.BadRequestException("Cannot book a time slot in the past or that has already ended.");
             int totalCapacityWeight = 0;
             var vehicle = await _context.Vehicles.Include(v => v.VehicleType).FirstOrDefaultAsync(v => v.LicensePlate == licensePlate && v.UserId == userId && !v.IsDeleted);
             if (vehicle == null)
