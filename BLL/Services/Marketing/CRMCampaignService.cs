@@ -75,11 +75,10 @@ namespace AutoWashPro.BLL.Services
             var today = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.Date;
             var assignedCount = 0;
 
-            var tomorrow = today.AddDays(1);
+            var triggerKey = $"WeatherCampaign_{today:yyyyMMdd}";
             var usersReceivedToday = await _context.UserVouchers
                 .Where(uv => uv.VoucherId == voucher.VoucherId &&
-                             uv.ReceivedDate >= today && uv.ReceivedDate < tomorrow &&
-                             uv.TriggerKey == "WeatherCampaign")
+                             uv.TriggerKey == triggerKey)
                 .Select(uv => uv.UserId)
                 .ToListAsync();
 
@@ -96,7 +95,7 @@ namespace AutoWashPro.BLL.Services
                         ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                         ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(1),
                         IsUsed = false,
-                        TriggerKey = "WeatherCampaign"
+                        TriggerKey = triggerKey
                     };
 
                     _context.UserVouchers.Add(userVoucher);
@@ -203,13 +202,12 @@ namespace AutoWashPro.BLL.Services
             var voucherIds = existingVouchers.Values.Select(v => v.VoucherId).ToList();
             var issuedTodaySet = new HashSet<(int VoucherId, int UserId)>();
 
-            var tomorrow = today.AddDays(1);
+            var triggerKey = $"SmartWeatherCampaign_{today:yyyyMMdd}";
             if (voucherIds.Any())
             {
                 var existingUserVouchers = await _context.UserVouchers
                     .Where(uv => voucherIds.Contains(uv.VoucherId) &&
-                                 uv.ReceivedDate >= today && uv.ReceivedDate < tomorrow &&
-                                 uv.TriggerKey == "SmartWeatherCampaign")
+                                 uv.TriggerKey == triggerKey)
                     .Select(uv => new { uv.VoucherId, uv.UserId })
                     .ToListAsync();
 
@@ -242,7 +240,7 @@ namespace AutoWashPro.BLL.Services
                             ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                             ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(1),
                             IsUsed = false,
-                            TriggerKey = "SmartWeatherCampaign"
+                            TriggerKey = triggerKey
                         };
                         _context.UserVouchers.Add(userVoucher);
 
@@ -324,11 +322,10 @@ namespace AutoWashPro.BLL.Services
                 .Distinct()
                 .ToListAsync();
 
-            var tomorrow = today.AddDays(1);
+            var triggerKey = $"SmartWeatherCampaign_{today:yyyyMMdd}";
             var issuedTodayUserIds = await _context.UserVouchers
                 .Where(uv => uv.VoucherId == voucher.VoucherId &&
-                             uv.ReceivedDate >= today && uv.ReceivedDate < tomorrow &&
-                             uv.TriggerKey == "SmartWeatherCampaign")
+                             uv.TriggerKey == triggerKey)
                 .Select(uv => uv.UserId)
                 .ToListAsync();
 
@@ -346,7 +343,7 @@ namespace AutoWashPro.BLL.Services
                         ReceivedDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow,
                         ExpiryDate = AutoWashPro.DAL.Helpers.TimeHelper.VnNow.AddDays(1),
                         IsUsed = false,
-                        TriggerKey = "SmartWeatherCampaign"
+                        TriggerKey = triggerKey
                     };
                     _context.UserVouchers.Add(userVoucher);
 
