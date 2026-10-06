@@ -730,6 +730,8 @@ namespace BLL.Services
         public async Task<FleetCheckInResponseDTO> WalkInAsync(FleetWalkInDTO dto)
         {
             var vehicle = await _context.FleetVehicles
+                .Include(x => x.BusinessProfile)
+                .Include(x => x.VehicleType)
                 .FirstOrDefaultAsync(x =>
                     x.LicensePlate == dto.LicensePLate &&
                     x.Status == "Active");
@@ -768,20 +770,63 @@ namespace BLL.Services
                 .FirstOrDefaultAsync();
 
             var now = AutoWashPro.DAL.Helpers.TimeHelper.VnNow;
-            var washLog = new FleetWashLog
+
+            if (pendingBooking == null)
             {
-                FleetVehicleId = vehicle.FleetVehicleId,
-                BranchId = dto.BranchId,
-                BookingId = pendingBooking?.BookingId,
-                CheckInTime = now,
-                Status = "CheckedIn",
-                WashCost = pendingBooking?.FinalAmount ?? 0
-            };
-            if (pendingBooking != null)
+                var defaultServicePrice = await _context.ServicePrices
+                    .Include(sp => sp.Service)
+                    .Where(sp => sp.BranchId == dto.BranchId && sp.VehicleTypeId == vehicle.VehicleTypeId && sp.Service.IsActive)
+                    .OrderBy(sp => sp.Price)
+                    .FirstOrDefaultAsync();
+
+                if (defaultServicePrice == null)
+                {
+                    throw new BadRequestException("Không tìm thấy dịch vụ nào cho loại xe này tại chi nhánh.");
+                }
+
+                pendingBooking = new Booking
+                {
+                    UserId = vehicle.BusinessProfile.UserId,
+                    BusinessProfileId = vehicle.BusinessProfileId,
+                    FleetVehicleId = vehicle.FleetVehicleId,
+                    BookingType = "Business",
+                    BranchId = dto.BranchId,
+                    ScheduledTime = now,
+                    LicensePlate = vehicle.LicensePlate,
+                    Status = "CheckedIn",
+                    OriginalPrice = defaultServicePrice.Price,
+                    FinalAmount = defaultServicePrice.Price,
+                    CapacityWeight = defaultServicePrice.CapacityWeight > 0 ? defaultServicePrice.CapacityWeight : vehicle.VehicleType.BaseWeight,
+                    ActualVehicleTypeId = vehicle.VehicleTypeId,
+                    FallbackQrCode = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                    BookingDetails = new List<BookingDetail>
+                    {
+                        new BookingDetail
+                        {
+                            ServiceId = defaultServicePrice.ServiceId,
+                            Price = defaultServicePrice.Price
+                        }
+                    }
+                };
+
+                _context.Bookings.Add(pendingBooking);
+                await _context.SaveChangesAsync();
+            }
+            else
             {
                 pendingBooking.Status = "CheckedIn";
                 pendingBooking.UpdatedAt = now;
             }
+
+            var washLog = new FleetWashLog
+            {
+                FleetVehicleId = vehicle.FleetVehicleId,
+                BranchId = dto.BranchId,
+                BookingId = pendingBooking.BookingId,
+                CheckInTime = now,
+                Status = "CheckedIn",
+                WashCost = pendingBooking.FinalAmount
+            };
             _context.FleetWashLogs.Add(washLog);
             await _context.SaveChangesAsync();
             var admission = await _laneCoordinator.CheckInAtEntryGateAsync(
