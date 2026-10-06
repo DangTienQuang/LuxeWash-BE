@@ -56,7 +56,7 @@ namespace AutoWashPro.BLL.Services
                 voucher = new Voucher
                 {
                     Code = voucherCode,
-                    DiscountAmount = 30,
+                    DiscountAmount = new Random().Next(20, 31) * 1000,
                     VoucherType = VoucherType.Discount,
                     CampaignType = VoucherCampaignType.Weather,
                     ExpiryDays = 1,
@@ -165,7 +165,7 @@ namespace AutoWashPro.BLL.Services
                     var newVoucher = new Voucher
                     {
                         Code = voucherCode,
-                        DiscountAmount = 30,
+                        DiscountAmount = new Random().Next(20, 31) * 1000,
                         VoucherType = VoucherType.Discount,
                         CampaignType = VoucherCampaignType.Weather,
                         ExpiryDays = 1,
@@ -301,7 +301,7 @@ namespace AutoWashPro.BLL.Services
                 voucher = new Voucher
                 {
                     Code = voucherCode,
-                    DiscountAmount = 30,
+                    DiscountAmount = new Random().Next(20, 31) * 1000,
                     VoucherType = VoucherType.Discount,
                     CampaignType = VoucherCampaignType.Weather,
                     ExpiryDays = 1,
