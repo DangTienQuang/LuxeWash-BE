@@ -49,7 +49,14 @@ namespace AutoWashPro.BLL.Services
                     RequiredTierId = uv.Voucher.RequiredTierId,
                     RequiredTierName = uv.Voucher.RequiredTier != null ? uv.Voucher.RequiredTier.TierName : null,
                     ValidStartTime = uv.Voucher.ValidStartTime,
-                    ValidEndTime = uv.Voucher.ValidEndTime, VehicleTypeId = uv.Voucher.VehicleTypeId
+                    ValidEndTime = uv.Voucher.ValidEndTime,
+                    VehicleTypeId = uv.Voucher.VehicleTypeId,
+                    VehicleTypeName = uv.Voucher.VehicleType != null ? uv.Voucher.VehicleType.Name : null,
+                    BranchId = uv.Voucher.BranchId,
+                    BranchName = uv.Voucher.Branch != null ? uv.Voucher.Branch.Name : null,
+                    StartDate = uv.Voucher.StartDate,
+                    MaxUsages = uv.Voucher.MaxUsages,
+                    CurrentUsageCount = uv.Voucher.CurrentUsageCount
                 })
                 .ToListAsync();
         }
@@ -104,7 +111,11 @@ namespace AutoWashPro.BLL.Services
                     RequiredTierName = v.RequiredTier != null ? v.RequiredTier.TierName : null,
                     ValidStartTime = v.ValidStartTime,
                     ValidEndTime = v.ValidEndTime,
-                    VehicleTypeId = v.VehicleTypeId
+                    VehicleTypeId = v.VehicleTypeId,
+                    VehicleTypeName = v.VehicleType != null ? v.VehicleType.Name : null,
+                    BranchId = v.BranchId,
+                    BranchName = v.Branch != null ? v.Branch.Name : null,
+                    StartDate = v.StartDate
                 })
                 .ToListAsync();
         }

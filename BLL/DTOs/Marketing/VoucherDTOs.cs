@@ -28,6 +28,13 @@ namespace AutoWashPro.BLL.DTOs
         public TimeSpan? ValidStartTime { get; set; }
         public TimeSpan? ValidEndTime { get; set; }
         public int? VehicleTypeId { get; set; }
+        public string? VehicleTypeName { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public int? BranchId { get; set; }
+        public string? BranchName { get; set; }
+        public DateTime? StartDate { get; set; }
+        public int MaxUsages { get; set; }
+        public int CurrentUsageCount { get; set; }
     }
     public class RedeemVoucherRequestDTO
     {
@@ -53,6 +60,11 @@ namespace AutoWashPro.BLL.DTOs
         public TimeSpan? ValidStartTime { get; set; }
         public TimeSpan? ValidEndTime { get; set; }
         public int? VehicleTypeId { get; set; }
+        public string? VehicleTypeName { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public int? BranchId { get; set; }
+        public string? BranchName { get; set; }
+        public DateTime? StartDate { get; set; }
     }
     public class ConsumeVoucherRequestDTO
     {
